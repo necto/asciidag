@@ -97,10 +97,10 @@ DAG parseDAG(std::string str) {
     ++col;
     switch (c) {
       case ' ':
-        addNode(col);
+        addNode(col - 1);
         break;
       case '\n':
-        addNode(col);
+        addNode(col - 1);
         std::swap(prevPositions, curPositions);
         curPositions.clear();
         col = 0;
