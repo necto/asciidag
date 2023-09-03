@@ -1,0 +1,257 @@
+# Requires clang-format version 16 + a custom patch (https://github.com/SonarSource/llvm-project/pull/91).
+#
+# Clang-format 15 has a bug with BlockIndent and if/else-if conditions: it will put the whole condition on
+# one huge line. A small patch is required to make this work better.
+# This is still relevant with version 16.
+
+DisableFormat: false
+Language: Cpp
+# BasedOnStyle: *FULLY CUSTOMIZED*
+Standard: c++17
+
+ColumnLimit: 120
+
+# Comments
+ReflowComments: true
+FixNamespaceComments: true
+AlignTrailingComments: false
+
+# Includes
+SortIncludes: CaseSensitive
+SortUsingDeclarations: true
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex:           '^"(llvm|llvm-c|clang|clang-c)/'
+    Priority:        2
+  - Regex:           '^(<|"(gtest|gmock|isl|json)/)'
+    Priority:        3
+  - Regex:           '.*'
+    Priority:        1
+
+# Qualifiers & types
+QualifierAlignment: Custom
+QualifierOrder: ['inline', 'static', 'constexpr', 'type', 'volatile', 'const']
+DerivePointerAlignment: false
+PointerAlignment: Left
+ReferenceAlignment: Pointer
+SpaceAroundPointerQualifiers: Default # Use PointerAlignment.
+
+# File encoding
+UseTab: Never
+LineEnding: LF
+
+# Indentation
+IndentWidth: 2
+PPIndentWidth: -1 # Use IndentWidth
+TabWidth: 2
+ConstructorInitializerIndentWidth: 2
+ContinuationIndentWidth: 2
+IndentAccessModifiers: false # true hardcodes an indent of 2 spaces, false allows using AccessModifierOffset instead.
+AccessModifierOffset: -2 # Negative IndentWidth to have no extra indent.
+IndentCaseBlocks: false
+IndentCaseLabels: true
+IndentExternBlock: NoIndent
+IndentGotoLabels: false
+IndentPPDirectives: AfterHash
+IndentRequiresClause: false
+IndentWrappedFunctionNames: false
+LambdaBodyIndentation: Signature
+NamespaceIndentation: None
+
+# Whitespace
+InsertNewlineAtEOF: true
+AlignEscapedNewlines: DontAlign
+BitFieldColonSpacing: Both
+SpaceAfterCStyleCast: false
+SpaceAfterLogicalNot: false
+SpaceAfterTemplateKeyword: true
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCaseColon: false
+SpaceBeforeCpp11BracedList: false
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeInheritanceColon: true
+SpaceBeforeParens: Custom
+SpaceBeforeParensOptions:
+  AfterControlStatements: true
+  AfterForeachMacros: false
+  AfterFunctionDeclarationName: false
+  AfterFunctionDefinitionName: false
+  AfterIfMacros: false
+  AfterOverloadedOperator: false
+  AfterRequiresInClause: true
+  AfterRequiresInExpression: true
+  BeforeNonEmptyParentheses: false
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceBeforeSquareBrackets: false
+SpaceInEmptyBlock: false
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 1
+SpacesInAngles: Never
+SpacesInCStyleCastParentheses: false
+SpacesInConditionalStatement: false
+SpacesInContainerLiterals: true
+SpacesInLineCommentPrefix:
+  Minimum: 1
+  Maximum: -1 # No max.
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+
+# One-liners
+AllowShortBlocksOnASingleLine: Empty
+AllowShortCaseLabelsOnASingleLine: false # true is inconvenient because there is no option to say "true iff all cases are short".
+AllowShortEnumsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLambdasOnASingleLine: All
+AllowShortLoopsOnASingleLine: true
+CompactNamespaces: false
+ShortNamespaceLines: 1
+
+# Templates, concepts, return type, ...: on their own line.
+AlwaysBreakTemplateDeclarations: Yes
+BreakBeforeConceptDeclarations: Always
+AlwaysBreakAfterReturnType: None # Use PenaltyReturnTypeOnItsOwnLine to know when to break or not.
+RequiresClausePosition: OwnLine
+BreakAfterAttributes: Always
+
+# Line breaks & braces
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterCaseLabel: false
+  AfterClass: false
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterStruct: false
+  AfterUnion: false
+  AfterExternBlock: false
+  BeforeCatch: false
+  BeforeElse: false
+  BeforeLambdaBody: false
+  BeforeWhile: false
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true
+RemoveBracesLLVM: false
+
+InsertBraces: true
+# The doc says:
+#    Warning: Setting this option to true could lead to incorrect code formatting due to clang-format's lack of complete
+#    semantic information. As such, extra care should be taken to review code changes made by this option.
+# This seems to be fine in our case. Probably because we already enforce S121: Control structures should use curly braces.
+RemoveSemicolon: true
+
+# Line breaks & operators/strings
+BreakBeforeBinaryOperators: NonAssignment
+BreakBeforeTernaryOperators: true
+AlignOperands: AlignAfterOperator
+AlwaysBreakBeforeMultilineStrings: false # Setting it to true hides some (unrelated) operators.
+BreakStringLiterals: false # This needs to be done manually to be meaningful.
+
+AlignArrayOfStructures: None # Left and Right result in code inconsistently aligned.
+
+# Do not align assignments, bit fields, and so on: this could result in a large diff when modifying only one line.
+AlignConsecutiveAssignments: None
+AlignConsecutiveBitFields: None
+AlignConsecutiveDeclarations: None
+AlignConsecutiveMacros: None
+
+# Arguments/Parameters/Initializer packing.
+# Either all parameters/arguments are on the same line, or they are each on their own line.
+# Ensure the closing parenthesis is horizontally aligned with the callee.
+#
+# Note: clang-format cannot always properly distinguish arguments from parameters.
+# Having the next two options set to the same value ensure consistency.
+BinPackArguments: false
+BinPackParameters: false
+ExperimentalAutoDetectBinPacking: false
+AlignAfterOpenBracket: BlockIndent # NB: This doesn't cover }, only ).
+AllowAllArgumentsOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
+# Cpp11BracedListStyle is set to true because this makes bin packing consistent with parenthesis,
+# i.e. either all elements are on the same line or each is on its own line. This doesn't solve
+# the fact the closing brace is not indented properly (AlignAfterOpenBracket: BlockIndent has no impact here).
+Cpp11BracedListStyle: true
+BreakConstructorInitializers: BeforeComma # implies BeforeColon
+PackConstructorInitializers: CurrentLine
+# BreakInheritanceList is not set to avoid breaking lines when not required. There is no "PackInheritanceList" option.
+
+# Empty lines
+MaxEmptyLinesToKeep: 1
+EmptyLineAfterAccessModifier: Leave
+EmptyLineBeforeAccessModifier: Always
+KeepEmptyLinesAtTheStartOfBlocks: false
+SeparateDefinitionBlocks: Always
+
+# Penalties for fine-tuning
+PenaltyBreakAssignment: 0 # Prefer having the whole value on a new line rather than part of it only.
+PenaltyBreakBeforeFirstCallParameter: 0 # Fine-tuning, allows constructor calls to be consistent with function calls.
+PenaltyBreakFirstLessLess: 0 # Fine-tuning, fits better with llvm::errs() << usage (doesn't break the parenthesis).
+#PenaltyBreakString: 0 -- no impact on our codebase
+#PenaltyBreakTemplateDeclaration: 0 -- no impact on our codebase
+PenaltyBreakOpenParenthesis: 0 # Prefer breaking parenthesis than breaking < template arguments >.
+PenaltyExcessCharacter: 1000000
+PenaltyBreakComment: 1000
+PenaltyIndentedWhitespace: 10000 # Break more eagerly nested calls, which helps with matcher readability.
+PenaltyReturnTypeOnItsOwnLine: 0 # Prefer having the return type on its own line than breaking parameters.
+
+# Misc: format raw string literal with the same style.
+RawStringFormats:
+  - Language: Cpp
+    CanonicalDelimiter: 'cpp'
+    Delimiters:
+      - 'cpp'
+#      - ''
+# Uncomment the previous line and run clang-format on your file to automatically add
+# the "cpp" prefix to the string literals and format them.
+
+# The default value for these settings is used:
+# CommentPragmas:
+# IncludeIsMainRegex:
+# IncludeIsMainSourceRegex:
+# BreakBeforeInlineASMColon:
+# IntegerLiteralSeparator:
+# RequiresExpressionIndentation:
+
+# Use default settings for macro-related options.
+# AttributeMacros:
+# ForEachMacros:
+# IfMacros:
+# MacroBlockBegin:
+# MacroBlockEnd:
+# NamespaceMacros:
+# StatementAttributeLikeMacros:
+# StatementMacros:
+# TypenameMacros:
+# WhitespaceSensitiveMacros:
+
+# Irrelevant: Objective-C
+# ObjCBinPackProtocolList: Always
+# ObjCBlockIndentWidth:
+# ObjCBreakBeforeNestedBlockParam: false
+# ObjCSpaceAfterProperty: false
+# ObjCSpaceBeforeProtocolList: false
+
+# Irrelevant: Java
+# BreakAfterJavaFieldAnnotations: false
+# JavaImportGroups:
+# JavaScriptQuotes: Leave
+# JavaScriptWrapImports: false
+# SortJavaStaticImport:
+
+# Irrelevant: JS
+# InsertTrailingCommas:
+
+# Irrelevant: JSON
+# BreakArrays:
+
+# Irrelevant: deprecated
+# AllowAllConstructorInitializersOnNextLine
+# AlwaysBreakAfterDefinitionReturnType
+# BreakBeforeInheritanceComma:
+# BreakConstructorInitializersBeforeComma:
+# ConstructorInitializerAllOnOneLineOrOnePerLine
+# UseCRLF:
+# DeriveLineEnding:
