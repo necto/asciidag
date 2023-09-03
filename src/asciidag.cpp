@@ -1,3 +1,5 @@
+#include "asciidag.h"
+
 #include <algorithm>
 #include <iostream>
 #include <set>
@@ -5,23 +7,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-struct DAG {
-  using Props = std::unordered_map<std::string, std::string>;
-
-  struct OutEdge {
-    size_t to;
-    Props props;
-  };
-
-  struct Node {
-    std::vector<OutEdge> outEdges;
-    Props props;
-  };
-
-  std::vector<Node> nodes;
-  // Invariant: root node == 0U
-};
 
 std::vector<std::vector<size_t>> dagLayers(DAG const& dag) {
   std::vector<size_t> rank(dag.nodes.size(), 0);
@@ -141,29 +126,4 @@ DAG parseDAG(std::string str) {
     }
   }
   return {nodes};
-}
-
-int main() {
-  // DAG test;
-  // test.nodes.push_back(DAG::Node{{{1, {}}, {2, {}}, {3, {}}}, {}});
-  // test.nodes.push_back(DAG::Node{{{4, {}}}, {}});
-  // test.nodes.push_back(DAG::Node{{{4, {}}}, {}});
-  // test.nodes.push_back(DAG::Node{{{5, {}}}, {}});
-  // test.nodes.push_back(DAG::Node{{{5, {}}}, {}});
-  // test.nodes.push_back(DAG::Node{{}, {}});
-  // std::cout << renderDAG(test) << "\n";
-  std::string str = R"(
-    .
-    .
-)";
-  //   std::string str = R"(
-  //     .
-  //    / \
-//   .   .
-  //       |
-  //       ..
-  // )";
-
-  std::cout << renderDAG(parseDAG(str)) << "\n";
-  return 0;
 }
