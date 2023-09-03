@@ -9,7 +9,7 @@ Language: Cpp
 # BasedOnStyle: *FULLY CUSTOMIZED*
 Standard: c++17
 
-ColumnLimit: 120
+ColumnLimit: 100
 
 # Comments
 ReflowComments: true
