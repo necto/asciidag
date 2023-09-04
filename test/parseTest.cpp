@@ -473,3 +473,23 @@ TEST(parse, wigglyHammock) {
   EXPECT_EQ(dag.nodes[2].outEdges[0].to, 3U);
   EXPECT_EQ(dag.nodes[3].outEdges.size(), 0U);
 }
+
+TEST(parse, wideNodeHammock) {
+  std::string str = R"(
+   ###
+   | |
+ ### ###
+  \   /
+   ###
+)";
+  auto dag = parseDAG(str);
+  ASSERT_EQ(dag.nodes.size(), 4U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 2U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[1].to, 2U);
+  ASSERT_EQ(dag.nodes[1].outEdges.size(), 1U);
+  ASSERT_EQ(dag.nodes[2].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[1].outEdges[0].to, 3U);
+  EXPECT_EQ(dag.nodes[2].outEdges[0].to, 3U);
+  EXPECT_EQ(dag.nodes[3].outEdges.size(), 0U);
+}
