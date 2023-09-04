@@ -193,7 +193,7 @@ std::optional<size_t> convergentOnSlash(EdgesInFlight const& prevEdges, size_t p
 
 std::ostream& operator<<(std::ostream& os, EdgesInFlight const& edges) {
   return os
-      << "'.'" << edges.still << "'|'" << edges.straight << "'/'" << edges.left << "'\\'"
+      << "." << edges.still << " |" << edges.straight << " /" << edges.left << " \\"
       << edges.right;
 }
 
@@ -208,11 +208,11 @@ DAG parseDAG(std::string str) {
     }
     size_t id = nodes.size();
     nodes.push_back({});
-    for (auto p : convergentOnNode(prevEdges, col)) {
-      nodes[p].outEdges.push_back({id});
-    }
     for (size_t p = 0; p < partialNode.size(); ++p) {
-      currEdges.still[col + p] = id;
+      for (auto p : convergentOnNode(prevEdges, col - p)) {
+        nodes[p].outEdges.push_back({id});
+      }
+      currEdges.still[col - p] = id;
     }
     partialNode.clear();
   };

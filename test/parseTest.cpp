@@ -22,9 +22,30 @@ TEST(parse, singleNode) {
   EXPECT_EQ(dag.nodes[0].outEdges.size(), 0U);
 }
 
+TEST(parse, singleWideNode) {
+  std::string str = R"(
+
+    ###
+
+)";
+  auto dag = parseDAG(str);
+  ASSERT_EQ(dag.nodes.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges.size(), 0U);
+}
+
 TEST(parse, twoDisconnectedNodes) {
   std::string str = R"(
     . .
+)";
+  auto dag = parseDAG(str);
+  ASSERT_EQ(dag.nodes.size(), 2U);
+  EXPECT_EQ(dag.nodes[0].outEdges.size(), 0U);
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+}
+
+TEST(parse, twoWideNodes) {
+  std::string str = R"(
+    AA BB
 )";
   auto dag = parseDAG(str);
   ASSERT_EQ(dag.nodes.size(), 2U);
@@ -57,11 +78,115 @@ TEST(parse, twoConnectedNodesPipe) {
   EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
 }
 
+TEST(parse, twoConnectedWideNodesPipeLeft) {
+  std::string str = R"(
+    ##
+    |
+    ##
+)";
+  auto dag = parseDAG(str);
+  ASSERT_EQ(dag.nodes.size(), 2U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+}
+
+TEST(parse, twoConnectedWideNodesPipeRight) {
+  std::string str = R"(
+    ##
+     |
+    ##
+)";
+  auto dag = parseDAG(str);
+  ASSERT_EQ(dag.nodes.size(), 2U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+}
+
+TEST(parse, twoConnectedWideNodesPipeRightSkew) {
+  std::string str = R"(
+    ##
+     |
+     ##
+)";
+  auto dag = parseDAG(str);
+  ASSERT_EQ(dag.nodes.size(), 2U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+}
+
+TEST(parse, twoConnectedWideNodesPipeLeftSkew) {
+  std::string str = R"(
+     ##
+     |
+    ##
+)";
+  auto dag = parseDAG(str);
+  ASSERT_EQ(dag.nodes.size(), 2U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+}
+
 TEST(parse, twoConnectedNodesSlash) {
   std::string str = R"(
      .
     /
    .
+)";
+  auto dag = parseDAG(str);
+  ASSERT_EQ(dag.nodes.size(), 2U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+}
+
+TEST(parse, twoConnectedWideNodesSlashRightSkew) {
+  std::string str = R"(
+    ##
+    /
+   ##
+)";
+  auto dag = parseDAG(str);
+  ASSERT_EQ(dag.nodes.size(), 2U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+}
+
+TEST(parse, twoConnectedWideNodesSlashRightDoubleSkewLeft) {
+  std::string str = R"(
+    ##
+   /
+  ##
+)";
+  auto dag = parseDAG(str);
+  ASSERT_EQ(dag.nodes.size(), 2U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+}
+
+TEST(parse, twoConnectedWideNodesSlashRightDoubleSkewRight) {
+  std::string str = R"(
+    ##
+    /
+  ##
+)";
+  auto dag = parseDAG(str);
+  ASSERT_EQ(dag.nodes.size(), 2U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+}
+
+TEST(parse, twoConnectedWideNodesSlashRightTripleSkew) {
+  std::string str = R"(
+     ##
+    /
+  ##
 )";
   auto dag = parseDAG(str);
   ASSERT_EQ(dag.nodes.size(), 2U);
@@ -82,6 +207,59 @@ TEST(parse, twoConnectedNodesBackslash) {
   EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
   EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
 }
+
+TEST(parse, twoConnectedWideNodesBackslashRightSkew) {
+  std::string str = R"(
+   ##
+    \
+    ##
+)";
+  auto dag = parseDAG(str);
+  ASSERT_EQ(dag.nodes.size(), 2U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+}
+
+TEST(parse, twoConnectedWideNodesBackslashRightDoubleSkewLeft) {
+  std::string str = R"(
+  ##
+   \
+    ##
+)";
+  auto dag = parseDAG(str);
+  ASSERT_EQ(dag.nodes.size(), 2U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+}
+
+TEST(parse, twoConnectedWideNodesBackslashRightDoubleSkewRight) {
+  std::string str = R"(
+   ##
+    \
+    ##
+)";
+  auto dag = parseDAG(str);
+  ASSERT_EQ(dag.nodes.size(), 2U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+}
+
+TEST(parse, twoConnectedWideNodesBackslashRightTripleSkew) {
+  std::string str = R"(
+  ##
+    \
+     ##
+)";
+  auto dag = parseDAG(str);
+  ASSERT_EQ(dag.nodes.size(), 2U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+}
+
 
 TEST(parse, longEdgePipe) {
   std::string str = R"(
