@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <string>
@@ -89,46 +90,132 @@ std::ostream& operator<<(std::ostream& os, std::unordered_map<A, B> map) {
   return os;
 }
 
-template<typename T>
-void append(std::vector<T> &to, std::vector<T> const& from) {
+template <typename T>
+void append(std::vector<T>& to, std::vector<T> const& from) {
   for (auto const& x : from) {
     to.push_back(x);
   }
 }
 
-template<typename T>
-void add(std::set<T> &to, std::set<T> const& from) {
+template <typename T>
+void add(std::set<T>& to, std::set<T> const& from) {
   for (auto const& x : from) {
     to.insert(x);
   }
 }
 
+// enum class Momentum { Straight, Left, Right, Still };
+
+// struct EdgeInFlight {
+//   Momentum momentum;
+//   size_t node;
+// };
+
+template <typename K, typename V>
+V const* getIf(std::unordered_map<K, V> const& map, K const& k) {
+  if (auto iter = map.find(k); iter != map.end()) {
+    return &iter->second;
+  }
+  return nullptr;
+}
+
+struct EdgesInFlight {
+  std::unordered_map<size_t, size_t> straight;
+  std::unordered_map<size_t, size_t> left;
+  std::unordered_map<size_t, size_t> right;
+  std::unordered_map<size_t, size_t> still;
+};
+
+std::set<size_t> convergentOnNode(EdgesInFlight const& prevEdges, size_t pos) {
+  std::set<size_t> ret;
+  if (auto to = getIf(prevEdges.straight, pos)) {
+    ret.insert(*to);
+  }
+  if (auto to = getIf(prevEdges.still, pos)) {
+    ret.insert(*to);
+  }
+  if (auto to = getIf(prevEdges.left, pos + 1)) {
+    ret.insert(*to);
+  }
+  if (auto to = getIf(prevEdges.right, pos - 1)) {
+    ret.insert(*to);
+  }
+  return ret;
+}
+
+std::optional<size_t> convergentOnPipe(EdgesInFlight const& prevEdges, size_t pos) {
+  if (auto to = getIf(prevEdges.straight, pos)) {
+    return *to;
+  }
+  if (auto to = getIf(prevEdges.still, pos)) {
+    return *to;
+  }
+  if (auto to = getIf(prevEdges.left, pos)) {
+    return *to;
+  }
+  if (auto to = getIf(prevEdges.right, pos)) {
+    return *to;
+  }
+  return {};
+}
+
+std::optional<size_t> convergentOnBackslash(EdgesInFlight const& prevEdges, size_t pos) {
+  if (auto to = getIf(prevEdges.straight, pos)) {
+    return *to;
+  }
+  if (auto to = getIf(prevEdges.still, pos - 1)) {
+    return *to;
+  }
+  if (auto to = getIf(prevEdges.left, pos)) {
+    return *to;
+  }
+  if (auto to = getIf(prevEdges.right, pos - 1)) {
+    return *to;
+  }
+  return {};
+}
+
+std::optional<size_t> convergentOnSlash(EdgesInFlight const& prevEdges, size_t pos) {
+  if (auto to = getIf(prevEdges.straight, pos)) {
+    return *to;
+  }
+  if (auto to = getIf(prevEdges.still, pos + 1)) {
+    return *to;
+  }
+  if (auto to = getIf(prevEdges.left, pos + 1)) {
+    return *to;
+  }
+  if (auto to = getIf(prevEdges.right, pos)) {
+    return *to;
+  }
+  return {};
+}
+
+std::ostream& operator<<(std::ostream& os, EdgesInFlight const& edges) {
+  return os
+      << "'.'" << edges.still << "'|'" << edges.straight << "'/'" << edges.left << "'\\'"
+      << edges.right;
+}
+
 DAG parseDAG(std::string str) {
   std::vector<DAG::Node> nodes;
   std::vector<char> partialNode;
-  std::unordered_map<size_t, std::set<size_t>> prevPositions;
-  std::unordered_map<size_t, std::set<size_t>> curPositions;
-  std::unordered_map<size_t, std::set<size_t>> prevObliquePositions;
-  std::unordered_map<size_t, std::set<size_t>> curObliquePositions;
-  std::unordered_map<size_t, std::set<size_t>> prevPipePositions;
-  std::unordered_map<size_t, std::set<size_t>> curPipePositions;
-  auto addNode =
-    [&nodes, &partialNode, &prevPositions, &curPositions](
-      size_t col
-    ) {
-      if (partialNode.empty()) {
-        return;
-      }
-      size_t id = nodes.size();
-      nodes.push_back({});
-      for (auto p : prevPositions[col]) {
-        nodes[p].outEdges.push_back({id});
-      }
-      for (size_t p = 0; p < partialNode.size(); ++p) {
-        curPositions[col + p].insert(id);
-      }
-      partialNode.clear();
-    };
+  EdgesInFlight prevEdges;
+  EdgesInFlight currEdges;
+  auto addNode = [&nodes, &partialNode, &prevEdges, &currEdges](size_t col) {
+    if (partialNode.empty()) {
+      return;
+    }
+    size_t id = nodes.size();
+    nodes.push_back({});
+    for (auto p : convergentOnNode(prevEdges, col)) {
+      nodes[p].outEdges.push_back({id});
+    }
+    for (size_t p = 0; p < partialNode.size(); ++p) {
+      currEdges.still[col + p] = id;
+    }
+    partialNode.clear();
+  };
   size_t col = 0;
   for (char c : str) {
     ++col;
@@ -138,40 +225,24 @@ DAG parseDAG(std::string str) {
         break;
       case '\n':
         addNode(col - 1);
-        std::swap(prevPositions, curPositions);
-        std::swap(prevObliquePositions, curObliquePositions);
-        std::swap(prevPipePositions, curPipePositions);
-        curPositions.clear();
-        curObliquePositions.clear();
-        curPipePositions.clear();
+        prevEdges = std::move(currEdges);
+        currEdges = {};
         col = 0;
         break;
       case '|':
-        add(curPositions[col], prevPositions[col]);
-        add(curPositions[col], prevObliquePositions[col]);
-        add(curPositions[col], prevPipePositions[col]);
-
-        add(curPipePositions[col], prevPositions[col]);
-        add(curPipePositions[col], prevObliquePositions[col]);
-        add(curPipePositions[col], prevPipePositions[col]);
+        if (auto p = convergentOnPipe(prevEdges, col)) {
+          currEdges.straight[col] = *p;
+        }
         break;
       case '\\':
-        add(curPositions[col + 1], prevPositions[col - 1]);
-        add(curPositions[col + 1], prevPipePositions[col]);
-        add(curPositions[col + 1], prevObliquePositions[col - 1]);
-
-        add(curObliquePositions[col], prevPositions[col - 1]);
-        add(curObliquePositions[col], prevObliquePositions[col - 1]);
-        add(curObliquePositions[col], prevPipePositions[col]);
+        if (auto p = convergentOnBackslash(prevEdges, col)) {
+          currEdges.right[col] = *p;
+        }
         break;
       case '/':
-        add(curPositions[col - 1], prevPositions[col + 1]);
-        add(curPositions[col - 1], prevPipePositions[col]);
-        add(curPositions[col - 1], prevObliquePositions[col + 1]);
-
-        add(curObliquePositions[col], prevPositions[col + 1]);
-        add(curObliquePositions[col], prevObliquePositions[col + 1]);
-        add(curObliquePositions[col], prevPipePositions[col]);
+        if (auto p = convergentOnSlash(prevEdges, col)) {
+          currEdges.left[col] = *p;
+        }
         break;
       default:
         partialNode.push_back(c);
