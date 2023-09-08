@@ -31,6 +31,7 @@ TEST(parse, singleNode) {
   auto dag = parseSuccessfully(str);
   ASSERT_EQ(dag.nodes.size(), 1U);
   EXPECT_EQ(dag.nodes[0].outEdges.size(), 0U);
+  EXPECT_EQ(dag.nodes[0].text, ".");
 }
 
 TEST(parse, singleWideNode) {
@@ -42,6 +43,7 @@ TEST(parse, singleWideNode) {
   auto dag = parseSuccessfully(str);
   ASSERT_EQ(dag.nodes.size(), 1U);
   EXPECT_EQ(dag.nodes[0].outEdges.size(), 0U);
+  EXPECT_EQ(dag.nodes[0].text, "###");
 }
 
 TEST(parse, twoDisconnectedNodes) {
@@ -62,6 +64,8 @@ TEST(parse, twoWideNodes) {
   ASSERT_EQ(dag.nodes.size(), 2U);
   EXPECT_EQ(dag.nodes[0].outEdges.size(), 0U);
   EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+  EXPECT_EQ(dag.nodes[0].text, "AA");
+  EXPECT_EQ(dag.nodes[1].text, "BB");
 }
 
 TEST(parse, twoImmediatelyConnectedNodes) {

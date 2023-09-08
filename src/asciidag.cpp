@@ -230,7 +230,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
   //        ###
   // should now be considered an error and not two linked nodes
   std::vector<DAG::Node> nodes;
-  std::vector<char> partialNode;
+  std::string partialNode;
   EdgesInFlight prevEdges;
   EdgesInFlight currEdges;
   err.code = ParseError::Code::None;
@@ -241,6 +241,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
     }
     size_t id = nodes.size();
     nodes.push_back({});
+    nodes[id].text = partialNode;
     for (size_t p = 0; p < partialNode.size(); ++p) {
       for (auto p : findNRemoveEdgesToNode(prevEdges, col - p)) {
         nodes[p].outEdges.push_back({id});

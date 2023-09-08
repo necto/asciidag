@@ -6,16 +6,13 @@
 #include <vector>
 
 struct DAG {
-  using Props = std::unordered_map<std::string, std::string>;
-
   struct OutEdge {
     size_t to;
-    Props props;
   };
 
   struct Node {
     std::vector<OutEdge> outEdges;
-    Props props;
+    std::string text;
   };
 
   std::vector<Node> nodes;
