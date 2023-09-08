@@ -31,9 +31,9 @@ struct ParseError {
   size_t col;
 };
 
-std::ostream& operator<<(std::ostream& os, ParseError const& err);
+std::ostream &operator<<(std::ostream &os, ParseError const &err);
 std::string parseCodeToStr(ParseError::Code code);
 
-std::string renderDAG(DAG const& dag);
+std::string renderDAG(DAG const &dag);
 
-std::optional<DAG> parseDAG(std::string str, ParseError& err);
+std::optional<DAG> parseDAG(std::string str, ParseError &err);

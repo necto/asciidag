@@ -3,7 +3,6 @@
 #include <gtest/gtest.h>
 #include <string>
 
-
 DAG parseSuccessfully(std::string str) {
   ParseError err;
   auto dag = parseDAG(str, err);
@@ -270,7 +269,6 @@ TEST(parse, twoConnectedWideNodesBackslashRightTripleSkew) {
   EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
   EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
 }
-
 
 TEST(parse, longEdgePipe) {
   std::string str = R"(
@@ -618,6 +616,22 @@ TEST(parseError, danglingPipeWithNondangling) {
   EXPECT_EQ(err.col, 6U);
 }
 
+TEST(parseError, danglingPseudoMerge) {
+  std::string str = R"(
+    .
+    |\
+    |/
+    |
+    .
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  EXPECT_EQ(err.code, ParseError::Code::DanglingEdge);
+  EXPECT_EQ(err.line, 3U);
+  EXPECT_EQ(err.col, 6U);
+}
+
 TEST(parseError, danglingMissesNodeLeft) {
   std::string str = R"(
    ###
@@ -644,6 +658,36 @@ TEST(parseError, danglingMissesNodeRight) {
   EXPECT_EQ(err.code, ParseError::Code::DanglingEdge);
   EXPECT_EQ(err.line, 2U);
   EXPECT_EQ(err.col, 6U);
+}
+
+TEST(parseError, danglingMissLeft) {
+  std::string str = R"(
+    .
+    |\
+    \/
+     .
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  EXPECT_EQ(err.code, ParseError::Code::DanglingEdge);
+  EXPECT_EQ(err.line, 3U);
+  EXPECT_EQ(err.col, 6U);
+}
+
+TEST(parseError, danglingMissRight) {
+  std::string str = R"(
+    .
+    |\
+    \/
+    .
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  EXPECT_EQ(err.code, ParseError::Code::DanglingEdge);
+  EXPECT_EQ(err.line, 3U);
+  EXPECT_EQ(err.col, 5U);
 }
 
 TEST(parseError, suspendedPipeLineStart) {
