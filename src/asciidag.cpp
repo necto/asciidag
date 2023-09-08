@@ -236,19 +236,46 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
   err.code = ParseError::Code::None;
   size_t line = 0;
   auto addNode = [&nodes, &partialNode, &prevEdges, &currEdges](size_t col) {
+    std::optional<ParseError> ret;
     if (partialNode.empty()) {
-      return;
+      return ret;
     }
     size_t id = nodes.size();
-    nodes.push_back({});
-    nodes[id].text = partialNode;
-    for (size_t p = 0; p < partialNode.size(); ++p) {
-      for (auto p : findNRemoveEdgesToNode(prevEdges, col - p)) {
-        nodes[p].outEdges.push_back({id});
+    std::optional<size_t> nodeAbove;
+    for (size_t p = col - partialNode.size() + 1; p <= col; ++p) {
+      if (auto iter = prevEdges.still.find(p); iter != prevEdges.still.end()) {
+        if (nodeAbove && *nodeAbove != iter->second) {
+          // TODO: ERROR! node above changed surprisingly. but this can't happen with no gap though
+        }
+        nodeAbove = iter->second;
+      } else if (nodeAbove) {
+        // TODO: ERROR! was was and suddnly no node above
       }
-      currEdges.still[col - p] = id;
+      if (!nodeAbove) {
+        for (auto p : findNRemoveEdgesToNode(prevEdges, p)) {
+          nodes[p].outEdges.push_back({id});
+        }
+      }
+      if (nodeAbove) {
+        currEdges.still[p] = *nodeAbove;
+      } else {
+        currEdges.still[p] = id;
+      }
+    }
+    if (nodeAbove) {
+      if (prevEdges.still.count(col - partialNode.size()) != 0) {
+        // TODO: ERROR! previous node line was longer on left
+      }
+      if (prevEdges.still.count(col + 1) != 0) {
+        // TODO: ERROR! previous node line was longer on right
+      }
+      nodes[*nodeAbove].text += "\n" + partialNode;
+    } else {
+      nodes.push_back({});
+      nodes[id].text = partialNode;
     }
     partialNode.clear();
+    return ret;
   };
   size_t col = 0;
   auto makeSuspendedError = [&line, &col, &err](char edgeChar) {

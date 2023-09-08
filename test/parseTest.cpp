@@ -68,16 +68,73 @@ TEST(parse, twoWideNodes) {
   EXPECT_EQ(dag.nodes[1].text, "BB");
 }
 
-TEST(parse, twoImmediatelyConnectedNodes) {
+TEST(parse, twoLineNode) {
   std::string str = R"(
-    .
-    .
+     .
+     .
 )";
+
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].outEdges.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
-  EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+  ASSERT_EQ(dag.nodes.size(), 1);
+  EXPECT_EQ(dag.nodes[0].text, ".\n.");
+  EXPECT_TRUE(dag.nodes[0].outEdges.empty());
+}
+
+TEST(parse, nodeSquare2) {
+  std::string str = R"(
+     12
+     34
+)";
+
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.nodes.size(), 1);
+  EXPECT_EQ(dag.nodes[0].text, "12\n34");
+  EXPECT_TRUE(dag.nodes[0].outEdges.empty());
+}
+
+TEST(parse, fourFatNodes) {
+  std::string str = R"(
+     12 56
+     34 78
+
+     ab AB
+     cd CD
+)";
+
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.nodes.size(), 4);
+  EXPECT_EQ(dag.nodes[0].text, "12\n34");
+  EXPECT_TRUE(dag.nodes[0].outEdges.empty());
+  EXPECT_EQ(dag.nodes[1].text, "56\n78");
+  EXPECT_TRUE(dag.nodes[1].outEdges.empty());
+  EXPECT_EQ(dag.nodes[2].text, "ab\ncd");
+  EXPECT_TRUE(dag.nodes[2].outEdges.empty());
+  EXPECT_EQ(dag.nodes[3].text, "AB\nCD");
+  EXPECT_TRUE(dag.nodes[3].outEdges.empty());
+}
+
+TEST(parse, checkered) {
+  std::string str = R"(
+         34
+     12  56
+       AB
+       CD
+      .  #
+      .
+)";
+
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.nodes.size(), 5);
+  EXPECT_EQ(dag.nodes[0].text, "34\n56");
+  EXPECT_TRUE(dag.nodes[0].outEdges.empty());
+  EXPECT_EQ(dag.nodes[1].text, "12");
+  EXPECT_TRUE(dag.nodes[1].outEdges.empty());
+  EXPECT_EQ(dag.nodes[2].text, "AB\nCD");
+  EXPECT_TRUE(dag.nodes[2].outEdges.empty());
+  EXPECT_EQ(dag.nodes[3].text, ".\n.");
+  EXPECT_TRUE(dag.nodes[3].outEdges.empty());
+  EXPECT_EQ(dag.nodes[4].text, "#");
+  EXPECT_TRUE(dag.nodes[4].outEdges.empty());
 }
 
 TEST(parse, twoConnectedNodesPipe) {
@@ -809,3 +866,4 @@ TEST(parseError, mergingEdgeLeftStraight) {
   EXPECT_EQ(err.line, 4U);
   EXPECT_EQ(err.col, 6U);
 }
+
