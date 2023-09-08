@@ -10,6 +10,8 @@
 #include <unordered_map>
 #include <vector>
 
+using namespace std::string_literals;
+
 std::vector<std::vector<size_t>> dagLayers(DAG const& dag) {
   std::vector<size_t> rank(dag.nodes.size(), 0);
   bool changed = false;
@@ -219,12 +221,6 @@ std::optional<ParseError> findDanglingEdge(EdgesInFlight const& edges, size_t li
 
 std::optional<DAG> parseDAG(std::string str, ParseError& err) {
   // TODO: add error detection:
-  // - dangling edge from above (unexpected start of an edge; edge ending "in the air")
-  //
-  //     |
-  //     |  |
-  //     *  \
-  //         *
   // - merging edges:
   //       \|
   //        \
@@ -253,6 +249,13 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
     partialNode.clear();
   };
   size_t col = 0;
+  auto makeSuspendedError = [&line, &col, &err](char edgeChar) {
+    return ParseError{
+      ParseError::Code::SuspendedEdge,
+      "Edge"s + edgeChar + "is suspended (not attached to any source node)",
+      line,
+      col};
+  };
   for (char c : str) {
     ++col;
     switch (c) {
@@ -273,16 +276,25 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
       case '|':
         if (auto p = findNRemoveEdgesToPipe(prevEdges, col)) {
           currEdges.straight[col] = *p;
+        } else {
+          err = makeSuspendedError(c);
+          return std::nullopt;
         }
         break;
       case '\\':
         if (auto p = findNRemoveEdgesToBackslash(prevEdges, col)) {
           currEdges.right[col] = *p;
+        } else {
+          err = makeSuspendedError(c);
+          return std::nullopt;
         }
         break;
       case '/':
         if (auto p = findNRemoveEdgesToSlash(prevEdges, col)) {
           currEdges.left[col] = *p;
+        } else {
+          err = makeSuspendedError(c);
+          return std::nullopt;
         }
         break;
       default:

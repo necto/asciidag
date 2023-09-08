@@ -645,3 +645,70 @@ TEST(parseError, danglingMissesNodeRight) {
   EXPECT_EQ(err.line, 2U);
   EXPECT_EQ(err.col, 6U);
 }
+
+TEST(parseError, suspendedPipeLineStart) {
+  std::string str = R"(|
+.
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  EXPECT_EQ(err.code, ParseError::Code::SuspendedEdge);
+  EXPECT_EQ(err.line, 0U);
+  EXPECT_EQ(err.col, 1U);
+}
+
+TEST(parseError, suspendedPipeEmptyLine) {
+  std::string str = R"(
+    |
+    .
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  EXPECT_EQ(err.code, ParseError::Code::SuspendedEdge);
+  EXPECT_EQ(err.line, 1U);
+  EXPECT_EQ(err.col, 5U);
+}
+
+TEST(parseError, suspendedPipeWithNormalEdge) {
+  std::string str = R"(
+    .
+     \
+     |
+    |/
+    .
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  EXPECT_EQ(err.code, ParseError::Code::SuspendedEdge);
+  EXPECT_EQ(err.line, 4U);
+  EXPECT_EQ(err.col, 5U);
+}
+
+TEST(parseError, suspendedSlash) {
+  std::string str = R"(
+     /
+    .
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  EXPECT_EQ(err.code, ParseError::Code::SuspendedEdge);
+  EXPECT_EQ(err.line, 1U);
+  EXPECT_EQ(err.col, 6U);
+}
+
+TEST(parseError, suspendedBackslash) {
+  std::string str = R"(
+   \
+    .
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  EXPECT_EQ(err.code, ParseError::Code::SuspendedEdge);
+  EXPECT_EQ(err.line, 1U);
+  EXPECT_EQ(err.col, 4U);
+}
