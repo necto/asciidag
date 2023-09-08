@@ -712,3 +712,51 @@ TEST(parseError, suspendedBackslash) {
   EXPECT_EQ(err.line, 1U);
   EXPECT_EQ(err.col, 4U);
 }
+
+TEST(parseError, mergingEdgeLeft) {
+  std::string str = R"(
+    .
+   /|
+   \|
+    \
+     .
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  EXPECT_EQ(err.code, ParseError::Code::MergingEdge);
+  EXPECT_EQ(err.line, 4U);
+  EXPECT_EQ(err.col, 5U);
+}
+
+TEST(parseError, mergingEdgeRightSkewed) {
+  std::string str = R"(
+    .
+    |\
+    |/
+    /
+   .
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  EXPECT_EQ(err.code, ParseError::Code::MergingEdge);
+  EXPECT_EQ(err.line, 4U);
+  EXPECT_EQ(err.col, 5U);
+}
+
+TEST(parseError, mergingEdgeLeftStraight) {
+  std::string str = R"(
+    .
+    |\
+    \/
+     \
+      .
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  EXPECT_EQ(err.code, ParseError::Code::MergingEdge);
+  EXPECT_EQ(err.line, 4U);
+  EXPECT_EQ(err.col, 6U);
+}
