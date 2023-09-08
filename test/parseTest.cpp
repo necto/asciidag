@@ -617,3 +617,31 @@ TEST(parseError, danglingPipeWithNondangling) {
   EXPECT_EQ(err.line, 3U);
   EXPECT_EQ(err.col, 6U);
 }
+
+TEST(parseError, danglingMissesNodeLeft) {
+  std::string str = R"(
+   ###
+   /
+   ###
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  EXPECT_EQ(err.code, ParseError::Code::DanglingEdge);
+  EXPECT_EQ(err.line, 2U);
+  EXPECT_EQ(err.col, 4U);
+}
+
+TEST(parseError, danglingMissesNodeRight) {
+  std::string str = R"(
+   ###
+     \
+   ###
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  EXPECT_EQ(err.code, ParseError::Code::DanglingEdge);
+  EXPECT_EQ(err.line, 2U);
+  EXPECT_EQ(err.col, 6U);
+}
