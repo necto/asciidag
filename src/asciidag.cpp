@@ -233,6 +233,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
   std::vector<char> partialNode;
   EdgesInFlight prevEdges;
   EdgesInFlight currEdges;
+  err.code = ParseError::Code::None;
   size_t line = 0;
   auto addNode = [&nodes, &partialNode, &prevEdges, &currEdges](size_t col) {
     if (partialNode.empty()) {

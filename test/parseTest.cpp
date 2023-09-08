@@ -6,6 +6,7 @@
 DAG parseSuccessfully(std::string str) {
   ParseError err;
   auto dag = parseDAG(str, err);
+  EXPECT_EQ(err.code, ParseError::Code::None);
   EXPECT_TRUE(dag.has_value());
   if (dag) {
     return *dag;
