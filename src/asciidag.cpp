@@ -257,9 +257,9 @@ std::optional<DAG> parseDAG(std::string str, ParseError &err) {
           nodeAbove = iter->second;
         } else {
           if (!nodeAbove) {
-            ret =
-                ParseError{ParseError::Code::NonRectangularNode,
-                           "Node-line above started midway node-line below.", line, p};
+            ret = ParseError{ParseError::Code::NonRectangularNode,
+                             "Node-line above started midway node-line below.",
+                             line, p};
             return ret;
           } else {
             // Node above can change only after a gap,
@@ -288,10 +288,16 @@ std::optional<DAG> parseDAG(std::string str, ParseError &err) {
     }
     if (nodeAbove) {
       if (prevEdges.still.count(col - partialNode.size()) != 0) {
-        // TODO: ERROR! previous node line was longer on left
+        ret = ParseError{ParseError::Code::NonRectangularNode,
+                         "Previous node-line was longer on the left side.",
+                         line, col - partialNode.size()};
+        return ret;
       }
       if (prevEdges.still.count(col + 1) != 0) {
-        // TODO: ERROR! previous node line was longer on right
+        ret = ParseError{ParseError::Code::NonRectangularNode,
+                         "Previous node-line was longer on the right side.",
+                         line, col + 1};
+        return ret;
       }
       nodes[*nodeAbove].text += "\n" + partialNode;
     } else {

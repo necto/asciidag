@@ -913,6 +913,154 @@ TEST(parseError, nodeShiftedRight) {
   EXPECT_EQ(err.col, 7U);
 }
 
+TEST(parseError, nodeShortLongMiddle) {
+  std::string str = R"(
+    ##
+   ####
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::NonRectangularNode);
+  EXPECT_EQ(err.line, 2U);
+  EXPECT_EQ(err.col, 5U);
+}
+
+TEST(parseError, nodeShortLongLeft) {
+  std::string str = R"(
+    ##
+   ###
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::NonRectangularNode);
+  EXPECT_EQ(err.line, 2U);
+  EXPECT_EQ(err.col, 5U);
+}
+
+TEST(parseError, nodeShortLongRight) {
+  std::string str = R"(
+    ##
+    ###
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::NonRectangularNode);
+  EXPECT_EQ(err.line, 2U);
+  EXPECT_EQ(err.col, 7U);
+}
+
+TEST(parseError, nodeLongShortMiddle) {
+  std::string str = R"(
+   ####
+    ##
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::NonRectangularNode);
+  EXPECT_EQ(err.line, 2U);
+  EXPECT_EQ(err.col, 4U);
+}
+
+TEST(parseError, nodeLongShortLeft) {
+  std::string str = R"(
+   ###
+    ##
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::NonRectangularNode);
+  EXPECT_EQ(err.line, 2U);
+  EXPECT_EQ(err.col, 4U);
+}
+
+TEST(parseError, nodeLongShortRight) {
+  std::string str = R"(
+    ###
+    ##
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::NonRectangularNode);
+  EXPECT_EQ(err.line, 2U);
+  EXPECT_EQ(err.col, 7U);
+}
+
+TEST(parseError, nodeWithOpenHoleAbove) {
+  std::string str = R"(
+    # #
+    ###
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::NonRectangularNode);
+  EXPECT_EQ(err.line, 2U);
+  EXPECT_EQ(err.col, 6U);
+}
+
+TEST(parseError, nodeWithOpenHoleBelow) {
+  std::string str = R"(
+    ###
+    # #
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::NonRectangularNode);
+  EXPECT_EQ(err.line, 2U);
+  EXPECT_EQ(err.col, 6U);
+}
+
+TEST(parseError, nodeWithOpenHoleLeft) {
+  std::string str = R"(
+    ###
+     ##
+    ###
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::NonRectangularNode);
+  EXPECT_EQ(err.line, 2U);
+  EXPECT_EQ(err.col, 5U);
+}
+
+TEST(parseError, nodeWithOpenHoleRight) {
+  std::string str = R"(
+    ###
+    ##
+    ###
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::NonRectangularNode);
+  EXPECT_EQ(err.line, 2U);
+  EXPECT_EQ(err.col, 7U);
+}
+
+TEST(parseError, nodeWithClosedHoleFalseAlarm) {
+  std::string str = R"(
+    ###
+    # #
+    ###
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  // FIXME:
+  // a space inside of a node must be allowed
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::NonRectangularNode);
+  EXPECT_EQ(err.line, 2U);
+  EXPECT_EQ(err.col, 6U);
+}
+
 // TODO: test for node with edges starting and finishing on a side
 //
 //    ###
