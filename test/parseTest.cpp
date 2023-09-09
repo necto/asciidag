@@ -887,6 +887,32 @@ TEST(parseError, mergingEdgeLeftStraight) {
   EXPECT_EQ(err.col, 6U);
 }
 
+TEST(parseError, nodeShiftedLeft) {
+  std::string str = R"(
+    ##
+   ##
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::NonRectangularNode);
+  EXPECT_EQ(err.line, 2U);
+  EXPECT_EQ(err.col, 5U);
+}
+
+TEST(parseError, nodeShiftedRight) {
+  std::string str = R"(
+    ##
+     ##
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::NonRectangularNode);
+  EXPECT_EQ(err.line, 2U);
+  EXPECT_EQ(err.col, 7U);
+}
+
 // TODO: test for node with edges starting and finishing on a side
 //
 //    ###

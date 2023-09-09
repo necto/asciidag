@@ -12,13 +12,13 @@
 
 using namespace std::string_literals;
 
-std::vector<std::vector<size_t>> dagLayers(DAG const& dag) {
+std::vector<std::vector<size_t>> dagLayers(DAG const &dag) {
   std::vector<size_t> rank(dag.nodes.size(), 0);
   bool changed = false;
   do {
     changed = false;
     for (size_t n = 0; n < dag.nodes.size(); ++n) {
-      for (auto const& e : dag.nodes[n].outEdges) {
+      for (auto const &e : dag.nodes[n].outEdges) {
         if (rank[e.to] < rank[n] + 1) {
           changed = true;
           rank[e.to] = rank[n] + 1;
@@ -34,12 +34,12 @@ std::vector<std::vector<size_t>> dagLayers(DAG const& dag) {
   return ret;
 }
 
-std::string renderDAG(DAG const& dag) {
+std::string renderDAG(DAG const &dag) {
   std::ostringstream ret;
   // TODO: draw edges
   // TODO: find proper order of nodes
   // TODO: find best horisontal position of nodes
-  for (auto const& layer : dagLayers(dag)) {
+  for (auto const &layer : dagLayers(dag)) {
     for (size_t n : layer) {
       ret << n << " ";
     }
@@ -49,10 +49,10 @@ std::string renderDAG(DAG const& dag) {
 }
 
 template <typename A>
-std::ostream& operator<<(std::ostream& os, std::set<A> v) {
+std::ostream &operator<<(std::ostream &os, std::set<A> v) {
   os << "{";
   bool first = true;
-  for (auto const& x : v) {
+  for (auto const &x : v) {
     if (!first) {
       os << ", ";
     }
@@ -64,10 +64,10 @@ std::ostream& operator<<(std::ostream& os, std::set<A> v) {
 }
 
 template <typename A>
-std::ostream& operator<<(std::ostream& os, std::vector<A> v) {
+std::ostream &operator<<(std::ostream &os, std::vector<A> v) {
   os << "[";
   bool first = true;
-  for (auto const& x : v) {
+  for (auto const &x : v) {
     if (!first) {
       os << ", ";
     }
@@ -79,10 +79,10 @@ std::ostream& operator<<(std::ostream& os, std::vector<A> v) {
 }
 
 template <typename A, typename B>
-std::ostream& operator<<(std::ostream& os, std::unordered_map<A, B> map) {
+std::ostream &operator<<(std::ostream &os, std::unordered_map<A, B> map) {
   os << "{";
   bool first = true;
-  for (auto const& [a, b] : map) {
+  for (auto const &[a, b] : map) {
     if (!first) {
       os << ", ";
     }
@@ -94,21 +94,20 @@ std::ostream& operator<<(std::ostream& os, std::unordered_map<A, B> map) {
 }
 
 template <typename T>
-void append(std::vector<T>& to, std::vector<T> const& from) {
-  for (auto const& x : from) {
+void append(std::vector<T> &to, std::vector<T> const &from) {
+  for (auto const &x : from) {
     to.push_back(x);
   }
 }
 
-template <typename T>
-void add(std::set<T>& to, std::set<T> const& from) {
-  for (auto const& x : from) {
+template <typename T> void add(std::set<T> &to, std::set<T> const &from) {
+  for (auto const &x : from) {
     to.insert(x);
   }
 }
 
 template <typename K, typename V>
-std::optional<V> findAndEraseIf(std::unordered_map<K, V>& map, K const& k) {
+std::optional<V> findAndEraseIf(std::unordered_map<K, V> &map, K const &k) {
   std::optional<V> ret = std::nullopt;
   if (auto iter = map.find(k); iter != map.end()) {
     ret.emplace(std::move(iter->second));
@@ -118,7 +117,7 @@ std::optional<V> findAndEraseIf(std::unordered_map<K, V>& map, K const& k) {
 }
 
 template <typename K, typename V>
-V const* getIf(std::unordered_map<K, V> const& map, K const& k) {
+V const *getIf(std::unordered_map<K, V> const &map, K const &k) {
   if (auto iter = map.find(k); iter != map.end()) {
     return &iter->second;
   }
@@ -134,7 +133,8 @@ struct EdgesInFlight {
   EdgeMap still;
 };
 
-std::vector<size_t> findNRemoveEdgesToNode(EdgesInFlight& prevEdges, size_t pos) {
+std::vector<size_t> findNRemoveEdgesToNode(EdgesInFlight &prevEdges,
+                                           size_t pos) {
   std::vector<size_t> ret;
   if (auto to = getIf(prevEdges.still, pos)) {
     // TODO: this should be forbidden
@@ -152,7 +152,8 @@ std::vector<size_t> findNRemoveEdgesToNode(EdgesInFlight& prevEdges, size_t pos)
   return ret;
 }
 
-std::vector<size_t> findNRemoveEdgesToPipe(EdgesInFlight& prevEdges, size_t pos) {
+std::vector<size_t> findNRemoveEdgesToPipe(EdgesInFlight &prevEdges,
+                                           size_t pos) {
   std::vector<size_t> ret;
   if (auto to = getIf(prevEdges.still, pos)) {
     ret.push_back(*to);
@@ -169,7 +170,8 @@ std::vector<size_t> findNRemoveEdgesToPipe(EdgesInFlight& prevEdges, size_t pos)
   return ret;
 }
 
-std::vector<size_t> findNRemoveEdgesToBackslash(EdgesInFlight& prevEdges, size_t pos) {
+std::vector<size_t> findNRemoveEdgesToBackslash(EdgesInFlight &prevEdges,
+                                                size_t pos) {
   std::vector<size_t> ret;
   if (auto to = getIf(prevEdges.still, pos - 1)) {
     ret.push_back(*to);
@@ -186,7 +188,8 @@ std::vector<size_t> findNRemoveEdgesToBackslash(EdgesInFlight& prevEdges, size_t
   return ret;
 }
 
-std::vector<size_t> findNRemoveEdgesToSlash(EdgesInFlight& prevEdges, size_t pos) {
+std::vector<size_t> findNRemoveEdgesToSlash(EdgesInFlight &prevEdges,
+                                            size_t pos) {
   std::vector<size_t> ret;
   if (auto to = getIf(prevEdges.still, pos + 1)) {
     ret.push_back(*to);
@@ -203,17 +206,20 @@ std::vector<size_t> findNRemoveEdgesToSlash(EdgesInFlight& prevEdges, size_t pos
   return ret;
 }
 
-std::ostream& operator<<(std::ostream& os, EdgesInFlight const& edges) {
-  return os
-      << "." << edges.still << " |" << edges.straight << " /" << edges.left << " \\" << edges.right;
+std::ostream &operator<<(std::ostream &os, EdgesInFlight const &edges) {
+  return os << "." << edges.still << " |" << edges.straight << " /"
+            << edges.left << " \\" << edges.right;
 }
 
-std::optional<ParseError> findDanglingEdge(EdgesInFlight const& edges, size_t line) {
+std::optional<ParseError> findDanglingEdge(EdgesInFlight const &edges,
+                                           size_t line) {
   std::optional<ParseError> ret;
-  auto keepLeftmost = [&ret, line](EdgesInFlight::EdgeMap const& edgeMap, std::string prefix) {
-    for (auto const& [col, src] : edgeMap) {
+  auto keepLeftmost = [&ret, line](EdgesInFlight::EdgeMap const &edgeMap,
+                                   std::string prefix) {
+    for (auto const &[col, src] : edgeMap) {
       if (!ret || col < ret->col) {
-        ret = ParseError{ParseError::Code::DanglingEdge, prefix + std::to_string(src), line, col};
+        ret = ParseError{ParseError::Code::DanglingEdge,
+                         prefix + std::to_string(src), line, col};
       }
     }
   };
@@ -223,7 +229,7 @@ std::optional<ParseError> findDanglingEdge(EdgesInFlight const& edges, size_t li
   return ret;
 }
 
-std::optional<DAG> parseDAG(std::string str, ParseError& err) {
+std::optional<DAG> parseDAG(std::string str, ParseError &err) {
   // TODO: support multi-line nodes
   // - detect and report when a multi-line node isn't aligned
   // e.g.:   ###
@@ -235,22 +241,38 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
   EdgesInFlight currEdges;
   err.code = ParseError::Code::None;
   size_t line = 0;
-  auto addNode = [&nodes, &partialNode, &prevEdges, &currEdges](size_t col) {
+  auto addNode = [&nodes, &partialNode, &prevEdges, &currEdges,
+                  &line](size_t col) {
     std::optional<ParseError> ret;
     if (partialNode.empty()) {
       return ret;
     }
     size_t id = nodes.size();
     std::optional<size_t> nodeAbove;
+    bool first = true;
     for (size_t p = col - partialNode.size() + 1; p <= col; ++p) {
       if (auto iter = prevEdges.still.find(p); iter != prevEdges.still.end()) {
-        // Node above can change only after a gap,
-        // Two nodes "AA" and "BB" cannot follow each other immediately.
-        // "AABB" would have been treated as a single node.
-        assert(!nodeAbove || *nodeAbove == iter->second);
-        nodeAbove = iter->second;
+        if (first) {
+          assert(!nodeAbove);
+          nodeAbove = iter->second;
+        } else {
+          if (!nodeAbove) {
+            ret =
+                ParseError{ParseError::Code::NonRectangularNode,
+                           "Node-line above started midway node-line below.", line, p};
+            return ret;
+          } else {
+            // Node above can change only after a gap,
+            // Two nodes "AA" and "BB" cannot follow each other immediately.
+            // "AABB" would have been treated as a single node.
+            assert(*nodeAbove == iter->second);
+          }
+        }
       } else if (nodeAbove) {
-        // TODO: ERROR! was was and suddnly no node above
+        ret = ParseError{ParseError::Code::NonRectangularNode,
+                         "Node-line above ended midway node-line below.", line,
+                         p};
+        return ret;
       }
       if (!nodeAbove) {
         for (auto p : findNRemoveEdgesToNode(prevEdges, p)) {
@@ -262,6 +284,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
       } else {
         currEdges.still[p] = id;
       }
+      first = false;
     }
     if (nodeAbove) {
       if (prevEdges.still.count(col - partialNode.size()) != 0) {
@@ -280,81 +303,81 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
   };
   size_t col = 0;
   auto makeSuspendedError = [&line, &col](char edgeChar) {
-    return ParseError{
-      ParseError::Code::SuspendedEdge,
-      "Edge"s + edgeChar + "is suspended (not attached to any source node)",
-      line,
-      col};
+    return ParseError{ParseError::Code::SuspendedEdge,
+                      "Edge"s + edgeChar +
+                          "is suspended (not attached to any source node)",
+                      line, col};
   };
   auto makeMergeError = [&line, &col]() {
-    return ParseError{ParseError::Code::MergingEdge, "Edges merged into one edge", line, col};
+    return ParseError{ParseError::Code::MergingEdge,
+                      "Edges merged into one edge", line, col};
   };
   for (char c : str) {
     ++col;
     switch (c) {
-      case ' ': {
-        if (auto nodeErr = addNode(col - 1)) {
-          err = *nodeErr;
-          return std::nullopt;
-        }
-        break;
+    case ' ': {
+      if (auto nodeErr = addNode(col - 1)) {
+        err = *nodeErr;
+        return std::nullopt;
       }
-      case '\n':
-        if (auto nodeErr = addNode(col - 1)) {
-          err = *nodeErr;
-          return std::nullopt;
-        }
-        if (auto dangling = findDanglingEdge(prevEdges, line - 1)) {
-          err = *dangling;
-          return std::nullopt;
-        }
-        prevEdges = std::move(currEdges);
-        currEdges = {};
-        col = 0;
-        ++line;
-        break;
-      case '|': {
-        auto fromNodes = findNRemoveEdgesToPipe(prevEdges, col);
-        if (fromNodes.size() == 1) {
-          currEdges.straight[col] = fromNodes.front();
-        } else if (fromNodes.size() == 0) {
-          err = makeSuspendedError(c);
-          return std::nullopt;
-        } else {
-          err = makeMergeError();
-          return std::nullopt;
-        }
-        break;
+      break;
+    }
+    case '\n':
+      if (auto nodeErr = addNode(col - 1)) {
+        err = *nodeErr;
+        return std::nullopt;
       }
-      case '\\': {
-        auto fromNodes = findNRemoveEdgesToBackslash(prevEdges, col);
-        if (fromNodes.size() == 1) {
-          currEdges.right[col] = fromNodes.front();
-        } else if (fromNodes.size() == 0) {
-          err = makeSuspendedError(c);
-          return std::nullopt;
-        } else {
-          err = makeMergeError();
-          return std::nullopt;
-        }
-        break;
+      if (auto dangling = findDanglingEdge(prevEdges, line - 1)) {
+        err = *dangling;
+        return std::nullopt;
       }
-      case '/': {
-        auto fromNodes = findNRemoveEdgesToSlash(prevEdges, col);
-        if (fromNodes.size() == 1) {
-          currEdges.left[col] = fromNodes.front();
-        } else if (fromNodes.size() == 0) {
-          err = makeSuspendedError(c);
-          return std::nullopt;
-        } else {
-          err = makeMergeError();
-          return std::nullopt;
-        }
-        break;
+      prevEdges = std::move(currEdges);
+      currEdges = {};
+      col = 0;
+      ++line;
+      break;
+    case '|': {
+      auto fromNodes = findNRemoveEdgesToPipe(prevEdges, col);
+      if (fromNodes.size() == 1) {
+        currEdges.straight[col] = fromNodes.front();
+      } else if (fromNodes.size() == 0) {
+        err = makeSuspendedError(c);
+        return std::nullopt;
+      } else {
+        err = makeMergeError();
+        return std::nullopt;
       }
-      default:
-        partialNode.push_back(c);
-        break;
+      break;
+    }
+    case '\\': {
+      auto fromNodes = findNRemoveEdgesToBackslash(prevEdges, col);
+      if (fromNodes.size() == 1) {
+        currEdges.right[col] = fromNodes.front();
+      } else if (fromNodes.size() == 0) {
+        err = makeSuspendedError(c);
+        return std::nullopt;
+      } else {
+        err = makeMergeError();
+        return std::nullopt;
+      }
+      break;
+    }
+    case '/': {
+      auto fromNodes = findNRemoveEdgesToSlash(prevEdges, col);
+      if (fromNodes.size() == 1) {
+        currEdges.left[col] = fromNodes.front();
+      } else if (fromNodes.size() == 0) {
+        err = makeSuspendedError(c);
+        return std::nullopt;
+      } else {
+        err = makeMergeError();
+        return std::nullopt;
+      }
+      break;
+    }
+    default:
+      partialNode.push_back(c);
+      break;
     }
   }
   if (auto dangling = findDanglingEdge(prevEdges, line - 1)) {
@@ -371,23 +394,22 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
 std::string parseCodeToStr(ParseError::Code code) {
   using Code = ParseError::Code;
   switch (code) {
-    case Code::DanglingEdge:
-      return "DanglingEdge";
-    case Code::MergingEdge:
-      return "MergingEdge";
-    case Code::SuspendedEdge:
-      return "SuspendedEdge";
-    case Code::NonRectangularNode:
-      return "NonRectangularNode";
-    case Code::None:
-      return "None";
+  case Code::DanglingEdge:
+    return "DanglingEdge";
+  case Code::MergingEdge:
+    return "MergingEdge";
+  case Code::SuspendedEdge:
+    return "SuspendedEdge";
+  case Code::NonRectangularNode:
+    return "NonRectangularNode";
+  case Code::None:
+    return "None";
   }
   assert(false);
   return "Unexpected ParseError::Code";
 }
 
-std::ostream& operator<<(std::ostream& os, ParseError const& err) {
-  return os
-      << "ERROR: " << parseCodeToStr(err.code) << " at " << err.line << ": " << err.col << ":"
-      << err.message;
+std::ostream &operator<<(std::ostream &os, ParseError const &err) {
+  return os << "ERROR: " << parseCodeToStr(err.code) << " at " << err.line
+            << ": " << err.col << ":" << err.message;
 }
