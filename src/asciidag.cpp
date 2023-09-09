@@ -244,9 +244,10 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
     std::optional<size_t> nodeAbove;
     for (size_t p = col - partialNode.size() + 1; p <= col; ++p) {
       if (auto iter = prevEdges.still.find(p); iter != prevEdges.still.end()) {
-        if (nodeAbove && *nodeAbove != iter->second) {
-          // TODO: ERROR! node above changed surprisingly. but this can't happen with no gap though
-        }
+        // Node above can change only after a gap,
+        // Two nodes "AA" and "BB" cannot follow each other immediately.
+        // "AABB" would have been treated as a single node.
+        assert(!nodeAbove || *nodeAbove == iter->second);
         nodeAbove = iter->second;
       } else if (nodeAbove) {
         // TODO: ERROR! was was and suddnly no node above
@@ -278,24 +279,31 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
     return ret;
   };
   size_t col = 0;
-  auto makeSuspendedError = [&line, &col, &err](char edgeChar) {
+  auto makeSuspendedError = [&line, &col](char edgeChar) {
     return ParseError{
       ParseError::Code::SuspendedEdge,
       "Edge"s + edgeChar + "is suspended (not attached to any source node)",
       line,
       col};
   };
-  auto makeMergeError = [&line, &col, &err]() {
+  auto makeMergeError = [&line, &col]() {
     return ParseError{ParseError::Code::MergingEdge, "Edges merged into one edge", line, col};
   };
   for (char c : str) {
     ++col;
     switch (c) {
-      case ' ':
-        addNode(col - 1);
+      case ' ': {
+        if (auto nodeErr = addNode(col - 1)) {
+          err = *nodeErr;
+          return std::nullopt;
+        }
         break;
+      }
       case '\n':
-        addNode(col - 1);
+        if (auto nodeErr = addNode(col - 1)) {
+          err = *nodeErr;
+          return std::nullopt;
+        }
         if (auto dangling = findDanglingEdge(prevEdges, line - 1)) {
           err = *dangling;
           return std::nullopt;
@@ -365,6 +373,14 @@ std::string parseCodeToStr(ParseError::Code code) {
   switch (code) {
     case Code::DanglingEdge:
       return "DanglingEdge";
+    case Code::MergingEdge:
+      return "MergingEdge";
+    case Code::SuspendedEdge:
+      return "SuspendedEdge";
+    case Code::NonRectangularNode:
+      return "NonRectangularNode";
+    case Code::None:
+      return "None";
   }
   assert(false);
   return "Unexpected ParseError::Code";

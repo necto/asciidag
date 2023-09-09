@@ -20,7 +20,13 @@ struct DAG {
 };
 
 struct ParseError {
-  enum class Code { None, DanglingEdge, SuspendedEdge, MergingEdge };
+  enum class Code {
+    None,
+    DanglingEdge,
+    SuspendedEdge,
+    MergingEdge,
+    NonRectangularNode
+  };
 
   Code code;
   std::string message;

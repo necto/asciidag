@@ -3,12 +3,32 @@
 #include <gtest/gtest.h>
 #include <string>
 
+void checkRectangularString(std::string const& s) {
+  size_t lastLine = 0;
+  size_t lineLen = 0;
+  for (size_t pos = 0; pos < s.size(); ++pos) {
+    if (s[pos] == '\n') {
+      if (lastLine != 0) {
+        EXPECT_EQ(pos - lastLine, lineLen);
+      }
+      lastLine = pos;
+    }
+  }
+}
+
+void checkRectangularNodes(DAG const& dag) {
+  for (auto const& n : dag.nodes) {
+    checkRectangularString(n.text);
+  }
+}
+
 DAG parseSuccessfully(std::string str) {
   ParseError err;
   auto dag = parseDAG(str, err);
   EXPECT_EQ(err.code, ParseError::Code::None);
   EXPECT_TRUE(dag.has_value());
   if (dag) {
+    checkRectangularNodes(*dag);
     return *dag;
   }
   return DAG{};
@@ -572,7 +592,7 @@ TEST(parseError, danglingPipeEOS) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::DanglingEdge);
+  ASSERT_EQ(err.code, ParseError::Code::DanglingEdge);
   EXPECT_EQ(err.line, 2U);
   EXPECT_EQ(err.col, 5U);
 }
@@ -585,7 +605,7 @@ TEST(parseError, danglingPipeEOL) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::DanglingEdge);
+  ASSERT_EQ(err.code, ParseError::Code::DanglingEdge);
   EXPECT_EQ(err.line, 2U);
   EXPECT_EQ(err.col, 5U);
 }
@@ -599,7 +619,7 @@ TEST(parseError, danglingPipeEmptyLine) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::DanglingEdge);
+  ASSERT_EQ(err.code, ParseError::Code::DanglingEdge);
   EXPECT_EQ(err.line, 2U);
   EXPECT_EQ(err.col, 5U);
 }
@@ -614,7 +634,7 @@ TEST(parseError, danglingPipeDisconnectedNodes) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::DanglingEdge);
+  ASSERT_EQ(err.code, ParseError::Code::DanglingEdge);
   EXPECT_EQ(err.line, 2U);
   EXPECT_EQ(err.col, 5U);
 }
@@ -628,7 +648,7 @@ TEST(parseError, danglingSlash) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::DanglingEdge);
+  ASSERT_EQ(err.code, ParseError::Code::DanglingEdge);
   EXPECT_EQ(err.line, 2U);
   EXPECT_EQ(err.col, 4U);
 }
@@ -642,7 +662,7 @@ TEST(parseError, danglingBackslash) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::DanglingEdge);
+  ASSERT_EQ(err.code, ParseError::Code::DanglingEdge);
   EXPECT_EQ(err.line, 2U);
   EXPECT_EQ(err.col, 6U);
 }
@@ -657,7 +677,7 @@ TEST(parseError, dangling2Pipes) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::DanglingEdge);
+  ASSERT_EQ(err.code, ParseError::Code::DanglingEdge);
   EXPECT_EQ(err.line, 3U);
   EXPECT_EQ(err.col, 5U);
 }
@@ -673,7 +693,7 @@ TEST(parseError, danglingPipeWithNondangling) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::DanglingEdge);
+  ASSERT_EQ(err.code, ParseError::Code::DanglingEdge);
   EXPECT_EQ(err.line, 3U);
   EXPECT_EQ(err.col, 6U);
 }
@@ -689,7 +709,7 @@ TEST(parseError, danglingPseudoMerge) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::DanglingEdge);
+  ASSERT_EQ(err.code, ParseError::Code::DanglingEdge);
   EXPECT_EQ(err.line, 3U);
   EXPECT_EQ(err.col, 6U);
 }
@@ -703,7 +723,7 @@ TEST(parseError, danglingMissesNodeLeft) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::DanglingEdge);
+  ASSERT_EQ(err.code, ParseError::Code::DanglingEdge);
   EXPECT_EQ(err.line, 2U);
   EXPECT_EQ(err.col, 4U);
 }
@@ -717,7 +737,7 @@ TEST(parseError, danglingMissesNodeRight) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::DanglingEdge);
+  ASSERT_EQ(err.code, ParseError::Code::DanglingEdge);
   EXPECT_EQ(err.line, 2U);
   EXPECT_EQ(err.col, 6U);
 }
@@ -732,7 +752,7 @@ TEST(parseError, danglingMissLeft) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::DanglingEdge);
+  ASSERT_EQ(err.code, ParseError::Code::DanglingEdge);
   EXPECT_EQ(err.line, 3U);
   EXPECT_EQ(err.col, 6U);
 }
@@ -747,7 +767,7 @@ TEST(parseError, danglingMissRight) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::DanglingEdge);
+  ASSERT_EQ(err.code, ParseError::Code::DanglingEdge);
   EXPECT_EQ(err.line, 3U);
   EXPECT_EQ(err.col, 5U);
 }
@@ -759,7 +779,7 @@ TEST(parseError, suspendedPipeLineStart) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::SuspendedEdge);
+  ASSERT_EQ(err.code, ParseError::Code::SuspendedEdge);
   EXPECT_EQ(err.line, 0U);
   EXPECT_EQ(err.col, 1U);
 }
@@ -772,7 +792,7 @@ TEST(parseError, suspendedPipeEmptyLine) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::SuspendedEdge);
+  ASSERT_EQ(err.code, ParseError::Code::SuspendedEdge);
   EXPECT_EQ(err.line, 1U);
   EXPECT_EQ(err.col, 5U);
 }
@@ -788,7 +808,7 @@ TEST(parseError, suspendedPipeWithNormalEdge) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::SuspendedEdge);
+  ASSERT_EQ(err.code, ParseError::Code::SuspendedEdge);
   EXPECT_EQ(err.line, 4U);
   EXPECT_EQ(err.col, 5U);
 }
@@ -801,7 +821,7 @@ TEST(parseError, suspendedSlash) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::SuspendedEdge);
+  ASSERT_EQ(err.code, ParseError::Code::SuspendedEdge);
   EXPECT_EQ(err.line, 1U);
   EXPECT_EQ(err.col, 6U);
 }
@@ -814,7 +834,7 @@ TEST(parseError, suspendedBackslash) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::SuspendedEdge);
+  ASSERT_EQ(err.code, ParseError::Code::SuspendedEdge);
   EXPECT_EQ(err.line, 1U);
   EXPECT_EQ(err.col, 4U);
 }
@@ -830,7 +850,7 @@ TEST(parseError, mergingEdgeLeft) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::MergingEdge);
+  ASSERT_EQ(err.code, ParseError::Code::MergingEdge);
   EXPECT_EQ(err.line, 4U);
   EXPECT_EQ(err.col, 5U);
 }
@@ -846,7 +866,7 @@ TEST(parseError, mergingEdgeRightSkewed) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::MergingEdge);
+  ASSERT_EQ(err.code, ParseError::Code::MergingEdge);
   EXPECT_EQ(err.line, 4U);
   EXPECT_EQ(err.col, 5U);
 }
@@ -862,8 +882,15 @@ TEST(parseError, mergingEdgeLeftStraight) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, ParseError::Code::MergingEdge);
+  ASSERT_EQ(err.code, ParseError::Code::MergingEdge);
   EXPECT_EQ(err.line, 4U);
   EXPECT_EQ(err.col, 6U);
 }
 
+// TODO: test for node with edges starting and finishing on a side
+//
+//    ###
+//    ###\
+//    ### \###
+//         ###
+//         ###
