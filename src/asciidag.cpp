@@ -230,11 +230,6 @@ std::optional<ParseError> findDanglingEdge(EdgesInFlight const &edges,
 }
 
 std::optional<DAG> parseDAG(std::string str, ParseError &err) {
-  // TODO: support multi-line nodes
-  // - detect and report when a multi-line node isn't aligned
-  // e.g.:   ###
-  //        ###
-  // should now be considered an error and not two linked nodes
   std::vector<DAG::Node> nodes;
   std::string partialNode;
   EdgesInFlight prevEdges;
@@ -320,6 +315,13 @@ std::optional<DAG> parseDAG(std::string str, ParseError &err) {
   };
   for (char c : str) {
     ++col;
+    if (c != '\n' && !partialNode.empty() &&
+        prevEdges.still.count(col - 1) != 0 &&
+        prevEdges.still.count(col) != 0) {
+      // Keep accumulating at least for as long as the node-line above
+      partialNode.push_back(c);
+      continue;
+    }
     switch (c) {
     case ' ': {
       if (auto nodeErr = addNode(col - 1)) {

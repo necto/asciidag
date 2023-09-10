@@ -1011,10 +1011,11 @@ TEST(parseError, nodeWithOpenHoleBelow) {
 )";
   ParseError err;
   auto result = parseDAG(str, err);
-  EXPECT_FALSE(result.has_value());
-  ASSERT_EQ(err.code, ParseError::Code::NonRectangularNode);
-  EXPECT_EQ(err.line, 2U);
-  EXPECT_EQ(err.col, 6U);
+  EXPECT_TRUE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::None);
+  ASSERT_EQ(result->nodes.size(), 1U);
+  EXPECT_TRUE(result->nodes[0].outEdges.empty());
+  EXPECT_EQ(result->nodes[0].text, "###\n# #");
 }
 
 TEST(parseError, nodeWithOpenHoleLeft) {
@@ -1053,12 +1054,65 @@ TEST(parseError, nodeWithClosedHoleFalseAlarm) {
 )";
   ParseError err;
   auto result = parseDAG(str, err);
-  // FIXME:
-  // a space inside of a node must be allowed
+  EXPECT_TRUE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::None);
+  ASSERT_EQ(result->nodes.size(), 1U);
+  EXPECT_TRUE(result->nodes[0].outEdges.empty());
+  EXPECT_EQ(result->nodes[0].text, "###\n# #\n###");
+}
+
+TEST(parseError, nodeWithEdgeCharMidLeftNonrecNode) {
+  std::string str = R"(
+    ###
+    /##
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
   ASSERT_EQ(err.code, ParseError::Code::NonRectangularNode);
   EXPECT_EQ(err.line, 2U);
-  EXPECT_EQ(err.col, 6U);
+  EXPECT_EQ(err.col, 5U);
+}
+
+TEST(parseError, nodeWithEdgeCharMidLeftSuspendedEdge) {
+  std::string str = R"(
+    ###
+    \##
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::SuspendedEdge);
+  EXPECT_EQ(err.line, 2U);
+  EXPECT_EQ(err.col, 5U);
+}
+
+TEST(parseError, nodeWithEdgeCharMidCenter) {
+  std::string str = R"(
+    ###
+    #\#
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_TRUE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::None);
+  ASSERT_EQ(result->nodes.size(), 1U);
+  EXPECT_TRUE(result->nodes[0].outEdges.empty());
+  EXPECT_EQ(result->nodes[0].text, "###\n#\\#");
+}
+
+TEST(parseError, nodeWithEdgeCharMidRight) {
+  std::string str = R"(
+    ###
+    ##|
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_TRUE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::None);
+  ASSERT_EQ(result->nodes.size(), 1U);
+  EXPECT_TRUE(result->nodes[0].outEdges.empty());
+  EXPECT_EQ(result->nodes[0].text, "###\n##|");
 }
 
 // TODO: test for node with edges starting and finishing on a side
