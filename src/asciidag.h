@@ -1,8 +1,5 @@
 #include <optional>
-#include <set>
-#include <sstream>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 struct DAG {
@@ -36,6 +33,9 @@ struct ParseError {
 
 std::ostream &operator<<(std::ostream &os, ParseError const &err);
 std::string parseCodeToStr(ParseError::Code code);
+inline std::ostream &operator<<(std::ostream &os, ParseError::Code code) {
+  return os << parseCodeToStr(code);
+}
 
 std::string renderDAG(DAG const &dag);
 

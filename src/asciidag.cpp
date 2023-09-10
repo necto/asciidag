@@ -136,10 +136,7 @@ struct EdgesInFlight {
 std::vector<size_t> findNRemoveEdgesToNode(EdgesInFlight &prevEdges,
                                            size_t pos) {
   std::vector<size_t> ret;
-  if (auto to = getIf(prevEdges.still, pos)) {
-    // TODO: this should be forbidden
-    ret.push_back(*to);
-  }
+  // prevEdges.still might contain a reference to the upper line of the same node
   if (auto to = findAndEraseIf(prevEdges.straight, pos)) {
     ret.push_back(*to);
   }
@@ -282,6 +279,12 @@ std::optional<DAG> parseDAG(std::string str, ParseError &err) {
       first = false;
     }
     if (nodeAbove) {
+      for (auto edge : findNRemoveEdgesToNode(prevEdges, col - partialNode.size() + 1)) {
+        nodes[edge].outEdges.push_back({*nodeAbove});
+      }
+      for (auto edge : findNRemoveEdgesToNode(prevEdges, col)) {
+        nodes[edge].outEdges.push_back({*nodeAbove});
+      }
       if (prevEdges.still.count(col - partialNode.size()) != 0) {
         ret = ParseError{ParseError::Code::NonRectangularNode,
                          "Previous node-line was longer on the left side.",
@@ -345,6 +348,10 @@ std::optional<DAG> parseDAG(std::string str, ParseError &err) {
       ++line;
       break;
     case '|': {
+      if (auto nodeErr = addNode(col - 1)) {
+        err = *nodeErr;
+        return std::nullopt;
+      }
       auto fromNodes = findNRemoveEdgesToPipe(prevEdges, col);
       if (fromNodes.size() == 1) {
         currEdges.straight[col] = fromNodes.front();
@@ -358,6 +365,10 @@ std::optional<DAG> parseDAG(std::string str, ParseError &err) {
       break;
     }
     case '\\': {
+      if (auto nodeErr = addNode(col - 1)) {
+        err = *nodeErr;
+        return std::nullopt;
+      }
       auto fromNodes = findNRemoveEdgesToBackslash(prevEdges, col);
       if (fromNodes.size() == 1) {
         currEdges.right[col] = fromNodes.front();
@@ -371,6 +382,10 @@ std::optional<DAG> parseDAG(std::string str, ParseError &err) {
       break;
     }
     case '/': {
+      if (auto nodeErr = addNode(col - 1)) {
+        err = *nodeErr;
+        return std::nullopt;
+      }
       auto fromNodes = findNRemoveEdgesToSlash(prevEdges, col);
       if (fromNodes.size() == 1) {
         currEdges.left[col] = fromNodes.front();
