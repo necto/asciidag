@@ -28,6 +28,21 @@ void checkRectangularNodes(DAG const& dag) {
   }
 }
 
+void checkValidEdges(DAG const& dag) {
+  if (dag.nodes.empty()) {
+    return;
+  }
+
+  size_t maxId = dag.nodes.size() - 1;
+
+  for (size_t id = 0; id <= maxId; ++id) {
+    for (auto const& e : dag.nodes[id].outEdges) {
+      EXPECT_LE(e.to, maxId);
+      EXPECT_LT(id, e.to);
+    }
+  }
+}
+
 DAG parseSuccessfully(std::string str) {
   ParseError err;
   auto dag = parseDAG(str, err);
@@ -39,6 +54,7 @@ DAG parseSuccessfully(std::string str) {
   EXPECT_TRUE(dag.has_value());
   if (dag) {
     checkRectangularNodes(*dag);
+    checkValidEdges(*dag);
     return *dag;
   }
   return DAG{};
@@ -1222,20 +1238,23 @@ TEST(parse, sideEdgePipe) {
   EXPECT_EQ(dag.nodes[3].text, ".");
 }
 
-// TODO: test for node with edges starting and finishing on a side
-//
-//    right2
-//
-//    ###
-//    ###\
-//    ### \###
-//         ###
-//         ###
-//
-//  same for left2
-//
-//   ###
-//   | |
-//   |#|
-//   | |
-//   ###
+TEST(parse, sideEdgePipes) {
+  std::string str = R"(
+    ###
+    | |
+    |#|
+    | |
+    ###
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.nodes.size(), 3U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 2U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 2U);
+  EXPECT_EQ(dag.nodes[0].outEdges[1].to, 2U);
+  EXPECT_EQ(dag.nodes[0].text, "###");
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+  EXPECT_EQ(dag.nodes[1].text, "#");
+  ASSERT_EQ(dag.nodes[2].outEdges.size(), 0U);
+  EXPECT_EQ(dag.nodes[2].text, "###");
+}
+
