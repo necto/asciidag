@@ -8,11 +8,17 @@ void checkRectangularString(std::string const& s) {
   size_t lineLen = 0;
   for (size_t pos = 0; pos < s.size(); ++pos) {
     if (s[pos] == '\n') {
+      size_t curLineLen = pos - lastLine;
       if (lastLine != 0) {
-        EXPECT_EQ(pos - lastLine, lineLen);
+        EXPECT_EQ(curLineLen, lineLen);
       }
-      lastLine = pos;
+      lineLen = curLineLen;
+      lastLine = pos + 1;
     }
+  }
+  EXPECT_NE(s.back(), '\n');
+  if (lastLine != 0) {
+    EXPECT_EQ(s.size() - lastLine, lineLen);
   }
 }
 
@@ -1148,6 +1154,22 @@ TEST(parse, sideEdgeRight1) {
   EXPECT_EQ(dag.nodes[1].text, "###\n###");
 }
 
+TEST(parse, sideEdgeRight2) {
+  std::string str = R"(
+    ###
+    ###\ ###
+    ### \###
+         ###
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.nodes.size(), 2U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
+  EXPECT_EQ(dag.nodes[0].text, "###\n###\n###");
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+  EXPECT_EQ(dag.nodes[1].text, "###\n###\n###");
+}
+
 TEST(parse, sideEdgeLeft1) {
   std::string str = R"(
         ###
@@ -1161,6 +1183,22 @@ TEST(parse, sideEdgeLeft1) {
   EXPECT_EQ(dag.nodes[0].text, "###\n###");
   EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
   EXPECT_EQ(dag.nodes[1].text, "###\n###");
+}
+
+TEST(parse, sideEdgeLeft2) {
+  std::string str = R"(
+         ###
+    ### /###
+    ###/ ###
+    ###
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.nodes.size(), 2U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
+  EXPECT_EQ(dag.nodes[0].text, "###\n###\n###");
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+  EXPECT_EQ(dag.nodes[1].text, "###\n###\n###");
 }
 
 TEST(parse, sideEdgePipe) {
