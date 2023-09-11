@@ -1257,4 +1257,3 @@ TEST(parse, sideEdgePipes) {
   ASSERT_EQ(dag.nodes[2].outEdges.size(), 0U);
   EXPECT_EQ(dag.nodes[2].text, "###");
 }
-

@@ -1,9 +1,3 @@
-# Requires clang-format version 16 + a custom patch (https://github.com/SonarSource/llvm-project/pull/91).
-#
-# Clang-format 15 has a bug with BlockIndent and if/else-if conditions: it will put the whole condition on
-# one huge line. A small patch is required to make this work better.
-# This is still relevant with version 16.
-
 DisableFormat: false
 Language: Cpp
 # BasedOnStyle: *FULLY CUSTOMIZED*
