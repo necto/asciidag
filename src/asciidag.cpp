@@ -209,8 +209,8 @@ std::optional<ParseError> findDanglingEdge(EdgesInFlight const& edges, size_t li
   std::optional<ParseError> ret;
   auto keepLeftmost = [&ret, line](EdgesInFlight::EdgeMap const& edgeMap, std::string prefix) {
     for (auto const& [col, src] : edgeMap) {
-      if (!ret || col < ret->col) {
-        ret = ParseError{ParseError::Code::DanglingEdge, prefix + std::to_string(src), line, col};
+      if (!ret || col < ret->pos.col) {
+        ret = ParseError{ParseError::Code::DanglingEdge, prefix + std::to_string(src), {line, col}};
       }
     }
   };
@@ -227,10 +227,10 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
   EdgesInFlight currEdges;
   err.code = ParseError::Code::None;
   size_t line = 0;
-  auto addNode = [&nodes, &partialNode, &prevEdges, &currEdges, &line](size_t col) {
-    std::optional<ParseError> ret;
+  auto addNode =
+    [&nodes, &partialNode, &prevEdges, &currEdges, &line](size_t col) -> std::optional<ParseError> {
     if (partialNode.empty()) {
-      return ret;
+      return {};
     }
     size_t id = nodes.size();
     std::optional<size_t> nodeAbove;
@@ -242,13 +242,12 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
           nodeAbove = iter->second;
         } else {
           if (!nodeAbove) {
-            ret = ParseError{
+            return {ParseError{
               ParseError::Code::NonRectangularNode,
               "Node-line above started midway node-line below.",
-              line,
-              p
-            };
-            return ret;
+              {line,
+              p}
+            }};
           } else {
             // Node above can change only after a gap,
             // Two nodes "AA" and "BB" cannot follow each other immediately.
@@ -257,13 +256,12 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
           }
         }
       } else if (nodeAbove) {
-        ret = ParseError{
+        return {ParseError{
           ParseError::Code::NonRectangularNode,
           "Node-line above ended midway node-line below.",
-          line,
-          p
-        };
-        return ret;
+          {line,
+          p}
+        }};
       }
       if (!nodeAbove) {
         for (auto p : findNRemoveEdgesToNode(prevEdges, p)) {
@@ -285,22 +283,20 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
         nodes[edge].outEdges.push_back({*nodeAbove});
       }
       if (prevEdges.still.count(col - partialNode.size()) != 0) {
-        ret = ParseError{
+        return ParseError{
           ParseError::Code::NonRectangularNode,
           "Previous node-line was longer on the left side.",
-          line,
-          col - partialNode.size()
+          {line,
+          col - partialNode.size()}
         };
-        return ret;
       }
       if (prevEdges.still.count(col + 1) != 0) {
-        ret = ParseError{
+        return {ParseError{
           ParseError::Code::NonRectangularNode,
           "Previous node-line was longer on the right side.",
-          line,
-          col + 1
-        };
-        return ret;
+          {line,
+          col + 1}
+        }};
       }
       nodes[*nodeAbove].text += "\n" + partialNode;
     } else {
@@ -308,19 +304,19 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
       nodes[id].text = partialNode;
     }
     partialNode.clear();
-    return ret;
+    return {};
   };
   size_t col = 0;
   auto makeSuspendedError = [&line, &col](char edgeChar) {
     return ParseError{
       ParseError::Code::SuspendedEdge,
       "Edge"s + edgeChar + "is suspended (not attached to any source node)",
-      line,
-      col
+      {line,
+      col}
     };
   };
   auto makeMergeError = [&line, &col]() {
-    return ParseError{ParseError::Code::MergingEdge, "Edges merged into one edge", line, col};
+    return ParseError{ParseError::Code::MergingEdge, "Edges merged into one edge", {line, col}};
   };
   for (char c : str) {
     ++col;
@@ -436,8 +432,12 @@ std::string parseCodeToStr(ParseError::Code code) {
   return "Unexpected ParseError::Code";
 }
 
+std::ostream& operator<<(std::ostream& os, Position const& pos) {
+  return os << pos.line << ":" <<pos.col;
+}
+
 std::ostream& operator<<(std::ostream& os, ParseError const& err) {
   return os
-      << "ERROR: " << parseCodeToStr(err.code) << " at " << err.line << ": " << err.col << ":"
+      << "ERROR: " << parseCodeToStr(err.code) << " at " << err.pos << ":"
       << err.message;
 }

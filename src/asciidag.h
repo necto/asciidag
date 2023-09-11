@@ -1,5 +1,6 @@
 #include <optional>
 #include <string>
+#include <tuple>
 #include <vector>
 
 struct DAG {
@@ -16,27 +17,31 @@ struct DAG {
   // Invariant: root node index is 0U
 };
 
-struct ParseError {
-  enum class Code {
-    None,
-    DanglingEdge,
-    SuspendedEdge,
-    MergingEdge,
-    NonRectangularNode
-  };
-
-  Code code;
-  std::string message;
+struct Position {
   size_t line;
   size_t col;
 };
 
-std::ostream &operator<<(std::ostream &os, ParseError const &err);
+std::ostream& operator<<(std::ostream& os, Position const& pos);
+inline bool operator==(Position const& p1, Position const& p2) {
+  return std::tie(p1.line, p1.col) == std::tie(p2.line, p2.col);
+}
+
+struct ParseError {
+  enum class Code { None, DanglingEdge, SuspendedEdge, MergingEdge, NonRectangularNode };
+
+  Code code;
+  std::string message;
+  Position pos;
+};
+
+std::ostream& operator<<(std::ostream& os, ParseError const& err);
 std::string parseCodeToStr(ParseError::Code code);
-inline std::ostream &operator<<(std::ostream &os, ParseError::Code code) {
+
+inline std::ostream& operator<<(std::ostream& os, ParseError::Code code) {
   return os << parseCodeToStr(code);
 }
 
-std::string renderDAG(DAG const &dag);
+std::string renderDAG(DAG const& dag);
 
-std::optional<DAG> parseDAG(std::string str, ParseError &err);
+std::optional<DAG> parseDAG(std::string str, ParseError& err);
