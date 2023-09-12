@@ -223,8 +223,7 @@ std::optional<ParseError> findDanglingEdge(EdgesInFlight const& edges, size_t li
 class NodeCollector {
 public:
   // TODO: can it take a const ref to prevEdges or currEdges?
-  std::optional<ParseError>
-  addNode(EdgesInFlight& prevEdges, Position const& pos) {
+  std::optional<ParseError> addNode(EdgesInFlight& prevEdges, Position const& pos) {
     if (partialNode.empty()) {
       return {};
     }
@@ -307,10 +306,10 @@ public:
 
   EdgeMap const& getPrevNodes() const { return prevNodes; }
 
-    void newLine() {
-        prevNodes = std::move(currNodes);
-        currNodes = {};
-    }
+  void newLine() {
+    prevNodes = std::move(currNodes);
+    currNodes = {};
+  }
 
 private:
   std::vector<DAG::Node> nodes = {};
@@ -455,5 +454,6 @@ std::ostream& operator<<(std::ostream& os, Position const& pos) {
 }
 
 std::ostream& operator<<(std::ostream& os, ParseError const& err) {
-  return os << "ERROR: " << parseErrorCodeToStr(err.code) << " at " << err.pos << ":" << err.message;
+  return os
+      << "ERROR: " << parseErrorCodeToStr(err.code) << " at " << err.pos << ":" << err.message;
 }
