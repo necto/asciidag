@@ -128,7 +128,6 @@ V const* getIf(std::unordered_map<K, V> const& map, K const& k) {
 using EdgeMap = std::unordered_map<size_t, size_t>;
 
 struct EdgesInFlight {
-
   EdgeMap straight;
   EdgeMap left;
   EdgeMap right;
@@ -148,7 +147,8 @@ std::vector<size_t> findNRemoveEdgesToNode(EdgesInFlight& prevEdges, size_t pos)
   return ret;
 }
 
-std::vector<size_t> findNRemoveEdgesToPipe(EdgesInFlight& prevEdges, EdgeMap const& prevNodes, size_t pos) {
+std::vector<size_t>
+findNRemoveEdgesToPipe(EdgesInFlight& prevEdges, EdgeMap const& prevNodes, size_t pos) {
   std::vector<size_t> ret;
   if (auto to = getIf(prevNodes, pos)) {
     ret.push_back(*to);
@@ -165,7 +165,8 @@ std::vector<size_t> findNRemoveEdgesToPipe(EdgesInFlight& prevEdges, EdgeMap con
   return ret;
 }
 
-std::vector<size_t> findNRemoveEdgesToBackslash(EdgesInFlight& prevEdges, EdgeMap const& prevNodes, size_t pos) {
+std::vector<size_t>
+findNRemoveEdgesToBackslash(EdgesInFlight& prevEdges, EdgeMap const& prevNodes, size_t pos) {
   std::vector<size_t> ret;
   if (auto to = getIf(prevNodes, pos - 1)) {
     ret.push_back(*to);
@@ -182,7 +183,8 @@ std::vector<size_t> findNRemoveEdgesToBackslash(EdgesInFlight& prevEdges, EdgeMa
   return ret;
 }
 
-std::vector<size_t> findNRemoveEdgesToSlash(EdgesInFlight& prevEdges, EdgeMap const& prevNodes, size_t pos) {
+std::vector<size_t>
+findNRemoveEdgesToSlash(EdgesInFlight& prevEdges, EdgeMap const& prevNodes, size_t pos) {
   std::vector<size_t> ret;
   if (auto to = getIf(prevNodes, pos + 1)) {
     ret.push_back(*to);
@@ -200,8 +202,7 @@ std::vector<size_t> findNRemoveEdgesToSlash(EdgesInFlight& prevEdges, EdgeMap co
 }
 
 std::ostream& operator<<(std::ostream& os, EdgesInFlight const& edges) {
-  return os
-      << " |" << edges.straight << " /" << edges.left << " \\" << edges.right;
+  return os << " |" << edges.straight << " /" << edges.left << " \\" << edges.right;
 }
 
 std::optional<ParseError> findDanglingEdge(EdgesInFlight const& edges, size_t line) {
@@ -223,7 +224,7 @@ class NodeCollector {
 public:
   // TODO: can it take a const ref to prevEdges or currEdges?
   std::optional<ParseError>
-  addNode(EdgesInFlight& prevEdges, EdgeMap& prevNodes, EdgeMap& currNodes, Position const& pos) {
+  addNode(EdgesInFlight& prevEdges, Position const& pos) {
     if (partialNode.empty()) {
       return {};
     }
@@ -304,17 +305,24 @@ public:
 
   DAG buildDAG() { return {nodes}; }
 
+  EdgeMap const& getPrevNodes() const { return prevNodes; }
+
+    void newLine() {
+        prevNodes = std::move(currNodes);
+        currNodes = {};
+    }
+
 private:
   std::vector<DAG::Node> nodes = {};
   std::string partialNode = "";
+  EdgeMap prevNodes;
+  EdgeMap currNodes;
 };
 
 std::optional<DAG> parseDAG(std::string str, ParseError& err) {
   NodeCollector collector;
   EdgesInFlight prevEdges;
-  EdgeMap prevNodes;
   EdgesInFlight currEdges;
-  EdgeMap currNodes;
   err.code = ParseError::Code::None;
   Position pos{0, 0};
   auto makeSuspendedError = [&pos](char edgeChar) {
@@ -329,21 +337,21 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
   };
   for (char c : str) {
     ++pos.col;
-    if (c != '\n' && collector.curLineNonEmpty() && prevNodes.count(pos.col - 1) != 0 && prevNodes.count(pos.col) != 0) {
+    if (c != '\n' && collector.curLineNonEmpty() && collector.getPrevNodes().count(pos.col - 1) != 0 && collector.getPrevNodes().count(pos.col) != 0) {
       // Keep accumulating at least for as long as the node-line above
       collector.addNodeChar(c);
       continue;
     }
     switch (c) {
       case ' ': {
-        if (auto nodeErr = collector.addNode(prevEdges, prevNodes, currNodes, {pos.line, pos.col - 1})) {
+        if (auto nodeErr = collector.addNode(prevEdges, {pos.line, pos.col - 1})) {
           err = *nodeErr;
           return std::nullopt;
         }
         break;
       }
       case '\n':
-        if (auto nodeErr = collector.addNode(prevEdges, prevNodes, currNodes, {pos.line, pos.col - 1})) {
+        if (auto nodeErr = collector.addNode(prevEdges, {pos.line, pos.col - 1})) {
           err = *nodeErr;
           return std::nullopt;
         }
@@ -353,17 +361,16 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
         }
         prevEdges = std::move(currEdges);
         currEdges = {};
-        prevNodes = std::move(currNodes);
-        currNodes = {};
+        collector.newLine();
         pos.col = 0;
         ++pos.line;
         break;
       case '|': {
-        if (auto nodeErr = collector.addNode(prevEdges, prevNodes, currNodes, {pos.line, pos.col - 1})) {
+        if (auto nodeErr = collector.addNode(prevEdges, {pos.line, pos.col - 1})) {
           err = *nodeErr;
           return std::nullopt;
         }
-        auto fromNodes = findNRemoveEdgesToPipe(prevEdges, prevNodes, pos.col);
+        auto fromNodes = findNRemoveEdgesToPipe(prevEdges, collector.getPrevNodes(), pos.col);
         if (fromNodes.size() == 1) {
           currEdges.straight[pos.col] = fromNodes.front();
         } else if (fromNodes.size() == 0) {
@@ -376,11 +383,11 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
         break;
       }
       case '\\': {
-        if (auto nodeErr = collector.addNode(prevEdges, prevNodes, currNodes, {pos.line, pos.col - 1})) {
+        if (auto nodeErr = collector.addNode(prevEdges, {pos.line, pos.col - 1})) {
           err = *nodeErr;
           return std::nullopt;
         }
-        auto fromNodes = findNRemoveEdgesToBackslash(prevEdges, prevNodes, pos.col);
+        auto fromNodes = findNRemoveEdgesToBackslash(prevEdges, collector.getPrevNodes(), pos.col);
         if (fromNodes.size() == 1) {
           currEdges.right[pos.col] = fromNodes.front();
         } else if (fromNodes.size() == 0) {
@@ -393,11 +400,11 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
         break;
       }
       case '/': {
-        if (auto nodeErr = collector.addNode(prevEdges, prevNodes, currNodes, {pos.line, pos.col - 1})) {
+        if (auto nodeErr = collector.addNode(prevEdges, {pos.line, pos.col - 1})) {
           err = *nodeErr;
           return std::nullopt;
         }
-        auto fromNodes = findNRemoveEdgesToSlash(prevEdges, prevNodes, pos.col);
+        auto fromNodes = findNRemoveEdgesToSlash(prevEdges, collector.getPrevNodes(), pos.col);
         if (fromNodes.size() == 1) {
           currEdges.left[pos.col] = fromNodes.front();
         } else if (fromNodes.size() == 0) {
