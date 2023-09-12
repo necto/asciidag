@@ -242,7 +242,9 @@ public:
 
   void addNodeChar(char c) { partialNode.push_back(c); }
 
-  bool curLineNonEmpty() const { return !partialNode.empty(); }
+  bool isPartOfANode(size_t col) const {
+    return !partialNode.empty() && prevNodes.count(col - 1) != 0 && prevNodes.count(col) != 0;
+  }
 
   DAG buildDAG() && { return {std::move(nodes)}; }
 
@@ -363,7 +365,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
   };
   for (char c : str) {
     ++pos.col;
-    if (c != '\n' && collector.curLineNonEmpty() && collector.getPrevNodes().count(pos.col - 1) != 0 && collector.getPrevNodes().count(pos.col) != 0) {
+    if (c != '\n' && collector.isPartOfANode(pos.col)) {
       // Keep accumulating at least for as long as the node-line above
       collector.addNodeChar(c);
       continue;
