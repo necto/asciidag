@@ -432,7 +432,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
   return collector.buildDAG();
 }
 
-std::string parseCodeToStr(ParseError::Code code) {
+std::string parseErrorCodeToStr(ParseError::Code code) {
   using Code = ParseError::Code;
   switch (code) {
     case Code::DanglingEdge:
@@ -455,5 +455,5 @@ std::ostream& operator<<(std::ostream& os, Position const& pos) {
 }
 
 std::ostream& operator<<(std::ostream& os, ParseError const& err) {
-  return os << "ERROR: " << parseCodeToStr(err.code) << " at " << err.pos << ":" << err.message;
+  return os << "ERROR: " << parseErrorCodeToStr(err.code) << " at " << err.pos << ":" << err.message;
 }

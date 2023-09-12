@@ -36,10 +36,10 @@ struct ParseError {
 };
 
 std::ostream& operator<<(std::ostream& os, ParseError const& err);
-std::string parseCodeToStr(ParseError::Code code);
+std::string parseErrorCodeToStr(ParseError::Code code);
 
 inline std::ostream& operator<<(std::ostream& os, ParseError::Code code) {
-  return os << parseCodeToStr(code);
+  return os << parseErrorCodeToStr(code);
 }
 
 std::string renderDAG(DAG const& dag);
