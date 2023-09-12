@@ -221,78 +221,85 @@ std::optional<ParseError> findDanglingEdge(EdgesInFlight const& edges, size_t li
 }
 
 class NodeCollector {
-  std::optional<size_t> findNodeAbove(size_t col) {
-    if (auto iter = prevNodes.find(col - partialNode.size()); iter != prevNodes.end()) {
-      return iter->second;
-    }
-    return {};
-  }
-public:
-  // TODO: can it take a const ref to prevEdges or currEdges?
-  std::optional<ParseError> addNode(EdgesInFlight& prevEdges, Position const& pos) {
-    if (partialNode.empty()) {
-      return {};
-    }
+  std::optional<ParseError> startNewNode(EdgesInFlight& prevEdges, Position const& pos) {
     size_t id = nodes.size();
-    std::optional<size_t> const nodeAbove = findNodeAbove(pos.col);
     for (size_t p = pos.col - partialNode.size(); p < pos.col; ++p) {
       if (auto iter = prevNodes.find(p); iter != prevNodes.end()) {
-        if (!nodeAbove) {
-          return {ParseError{
-            ParseError::Code::NonRectangularNode,
-            "Node-line above started midway node-line below.",
-            {pos.line, p}
-          }};
-        } else {
-          // Node above can change only after a gap,
-          // Two nodes "AA" and "BB" cannot follow each other immediately.
-          // "AABB" would have been treated as a single node.
-          assert(*nodeAbove == iter->second);
-        }
-      } else if (nodeAbove) {
+        return {ParseError{
+          ParseError::Code::NonRectangularNode,
+          "Node-line above started midway node-line below.",
+          {pos.line, p}
+        }};
+      }
+      for (auto p : findNRemoveEdgesToNode(prevEdges, p)) {
+        nodes[p].outEdges.push_back({id});
+      }
+      currNodes[p] = id;
+    }
+    nodes.push_back({});
+    nodes[id].text = partialNode;
+    partialNode.clear();
+    return {};
+  }
+
+  std::optional<ParseError>
+  addNodeLine(size_t nodeAbove, EdgesInFlight& prevEdges, Position const& pos) {
+    for (size_t p = pos.col - partialNode.size(); p < pos.col; ++p) {
+      if (auto iter = prevNodes.find(p); iter != prevNodes.end()) {
+        // Node above can change only after a gap,
+        // Two nodes "AA" and "BB" cannot follow each other immediately.
+        // "AABB" would have been treated as a single node.
+        assert(nodeAbove == iter->second);
+      } else {
         return {ParseError{
           ParseError::Code::NonRectangularNode,
           "Node-line above ended midway node-line below.",
           {pos.line, p}
         }};
       }
-      if (nodeAbove) {
-        currNodes[p] = *nodeAbove;
-      } else {
-        for (auto p : findNRemoveEdgesToNode(prevEdges, p)) {
-          nodes[p].outEdges.push_back({id});
-        }
-        currNodes[p] = id;
-      }
+      currNodes[p] = nodeAbove;
     }
-    if (nodeAbove) {
-      for (auto edge : findNRemoveEdgesToNode(prevEdges, pos.col - partialNode.size())) {
-        nodes[edge].outEdges.push_back({*nodeAbove});
-      }
-      for (auto edge : findNRemoveEdgesToNode(prevEdges, pos.col - 1)) {
-        nodes[edge].outEdges.push_back({*nodeAbove});
-      }
-      if (prevNodes.count(pos.col - 1 - partialNode.size()) != 0) {
-        return ParseError{
-          ParseError::Code::NonRectangularNode,
-          "Previous node-line was longer on the left side.",
-          {pos.line, pos.col - 1 - partialNode.size()}
-        };
-      }
-      if (prevNodes.count(pos.col) != 0) {
-        return {ParseError{
-          ParseError::Code::NonRectangularNode,
-          "Previous node-line was longer on the right side.",
-          pos
-        }};
-      }
-      nodes[*nodeAbove].text += "\n" + partialNode;
-    } else {
-      nodes.push_back({});
-      nodes[id].text = partialNode;
+    for (auto edge : findNRemoveEdgesToNode(prevEdges, pos.col - partialNode.size())) {
+      nodes[edge].outEdges.push_back({nodeAbove});
     }
+    for (auto edge : findNRemoveEdgesToNode(prevEdges, pos.col - 1)) {
+      nodes[edge].outEdges.push_back({nodeAbove});
+    }
+    if (prevNodes.count(pos.col - 1 - partialNode.size()) != 0) {
+      return ParseError{
+        ParseError::Code::NonRectangularNode,
+        "Previous node-line was longer on the left side.",
+        {pos.line, pos.col - 1 - partialNode.size()}
+      };
+    }
+    if (prevNodes.count(pos.col) != 0) {
+      return {ParseError{
+        ParseError::Code::NonRectangularNode,
+        "Previous node-line was longer on the right side.",
+        pos
+      }};
+    }
+    nodes[nodeAbove].text += "\n" + partialNode;
     partialNode.clear();
     return {};
+  }
+
+  std::optional<size_t> findNodeAbove(size_t col) {
+    if (auto iter = prevNodes.find(col - partialNode.size()); iter != prevNodes.end()) {
+      return iter->second;
+    }
+    return {};
+  }
+
+public:
+  std::optional<ParseError> addNode(EdgesInFlight& prevEdges, Position const& pos) {
+    if (partialNode.empty()) {
+      return {};
+    }
+    if (auto nodeAbove = findNodeAbove(pos.col)) {
+      return addNodeLine(*nodeAbove, prevEdges, pos);
+    }
+    return startNewNode(prevEdges, pos);
   }
 
   void addNodeChar(char c) { partialNode.push_back(c); }
