@@ -306,7 +306,7 @@ public:
 
   bool curLineNonEmpty() const { return !partialNode.empty(); }
 
-  DAG buildDAG() { return {nodes}; }
+  DAG buildDAG() && { return {std::move(nodes)}; }
 
   EdgeMap const& getPrevNodes() const { return prevNodes; }
 
@@ -432,7 +432,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
     err = *dangling;
     return std::nullopt;
   }
-  return collector.buildDAG();
+  return std::move(collector).buildDAG();
 }
 
 std::string parseErrorCodeToStr(ParseError::Code code) {
