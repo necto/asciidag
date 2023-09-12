@@ -221,6 +221,12 @@ std::optional<ParseError> findDanglingEdge(EdgesInFlight const& edges, size_t li
 }
 
 class NodeCollector {
+  std::optional<size_t> findNodeAbove(size_t col) {
+    if (auto iter = prevNodes.find(col - partialNode.size()); iter != prevNodes.end()) {
+      return iter->second;
+    }
+    return {};
+  }
 public:
   // TODO: can it take a const ref to prevEdges or currEdges?
   std::optional<ParseError> addNode(EdgesInFlight& prevEdges, Position const& pos) {
@@ -228,14 +234,10 @@ public:
       return {};
     }
     size_t id = nodes.size();
-    std::optional<size_t> nodeAbove;
-    bool first = true;
+    std::optional<size_t> const nodeAbove = findNodeAbove(pos.col);
     for (size_t p = pos.col - partialNode.size(); p < pos.col; ++p) {
       if (auto iter = prevNodes.find(p); iter != prevNodes.end()) {
-        if (first) {
-          assert(!nodeAbove);
-          nodeAbove = iter->second;
-        } else if (!nodeAbove) {
+        if (!nodeAbove) {
           return {ParseError{
             ParseError::Code::NonRectangularNode,
             "Node-line above started midway node-line below.",
@@ -254,17 +256,14 @@ public:
           {pos.line, p}
         }};
       }
-      if (!nodeAbove) {
-        for (auto p : findNRemoveEdgesToNode(prevEdges, p)) {
-          nodes[p].outEdges.push_back({id});
-        }
-      }
       if (nodeAbove) {
         currNodes[p] = *nodeAbove;
       } else {
+        for (auto p : findNRemoveEdgesToNode(prevEdges, p)) {
+          nodes[p].outEdges.push_back({id});
+        }
         currNodes[p] = id;
       }
-      first = false;
     }
     if (nodeAbove) {
       for (auto edge : findNRemoveEdgesToNode(prevEdges, pos.col - partialNode.size())) {
