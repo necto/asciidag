@@ -133,69 +133,69 @@ struct EdgesInFlight {
   EdgeMap right;
 };
 
-std::vector<size_t> findNRemoveEdgesToNode(EdgesInFlight& prevEdges, size_t pos) {
+std::vector<size_t> findNRemoveEdgesToNode(EdgesInFlight& prevEdges, size_t col) {
   std::vector<size_t> ret;
-  if (auto to = findAndEraseIf(prevEdges.straight, pos)) {
+  if (auto to = findAndEraseIf(prevEdges.straight, col)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.left, pos + 1)) {
+  if (auto to = findAndEraseIf(prevEdges.left, col + 1)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.right, pos - 1)) {
+  if (auto to = findAndEraseIf(prevEdges.right, col - 1)) {
     ret.push_back(*to);
   }
   return ret;
 }
 
 std::vector<size_t>
-findNRemoveEdgesToPipe(EdgesInFlight& prevEdges, EdgeMap const& prevNodes, size_t pos) {
+findNRemoveEdgesToPipe(EdgesInFlight& prevEdges, EdgeMap const& prevNodes, size_t col) {
   std::vector<size_t> ret;
-  if (auto to = getIf(prevNodes, pos)) {
+  if (auto to = getIf(prevNodes, col)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.straight, pos)) {
+  if (auto to = findAndEraseIf(prevEdges.straight, col)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.left, pos)) {
+  if (auto to = findAndEraseIf(prevEdges.left, col)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.right, pos)) {
+  if (auto to = findAndEraseIf(prevEdges.right, col)) {
     ret.push_back(*to);
   }
   return ret;
 }
 
 std::vector<size_t>
-findNRemoveEdgesToBackslash(EdgesInFlight& prevEdges, EdgeMap const& prevNodes, size_t pos) {
+findNRemoveEdgesToBackslash(EdgesInFlight& prevEdges, EdgeMap const& prevNodes, size_t col) {
   std::vector<size_t> ret;
-  if (auto to = getIf(prevNodes, pos - 1)) {
+  if (auto to = getIf(prevNodes, col - 1)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.straight, pos)) {
+  if (auto to = findAndEraseIf(prevEdges.straight, col)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.left, pos)) {
+  if (auto to = findAndEraseIf(prevEdges.left, col)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.right, pos - 1)) {
+  if (auto to = findAndEraseIf(prevEdges.right, col - 1)) {
     ret.push_back(*to);
   }
   return ret;
 }
 
 std::vector<size_t>
-findNRemoveEdgesToSlash(EdgesInFlight& prevEdges, EdgeMap const& prevNodes, size_t pos) {
+findNRemoveEdgesToSlash(EdgesInFlight& prevEdges, EdgeMap const& prevNodes, size_t col) {
   std::vector<size_t> ret;
-  if (auto to = getIf(prevNodes, pos + 1)) {
+  if (auto to = getIf(prevNodes, col + 1)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.straight, pos)) {
+  if (auto to = findAndEraseIf(prevEdges.straight, col)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.left, pos + 1)) {
+  if (auto to = findAndEraseIf(prevEdges.left, col + 1)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.right, pos)) {
+  if (auto to = findAndEraseIf(prevEdges.right, col)) {
     ret.push_back(*to);
   }
   return ret;
@@ -270,8 +270,8 @@ private:
   void startNewNode(EdgesInFlight& prevEdges, Position const& pos) {
     size_t id = nodes.size();
     for (size_t p = pos.col - partialNode.size(); p < pos.col; ++p) {
-      for (auto p : findNRemoveEdgesToNode(prevEdges, p)) {
-        nodes[p].outEdges.push_back({id});
+      for (auto from : findNRemoveEdgesToNode(prevEdges, p)) {
+        nodes[from].outEdges.push_back({id});
       }
       currNodes[p] = id;
     }
@@ -348,7 +348,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
   auto makeSuspendedError = [&pos](char edgeChar) {
     return ParseError{
       ParseError::Code::SuspendedEdge,
-      "Edge"s + edgeChar + "is suspended (not attached to any source node)",
+      "Edge "s + edgeChar + " is suspended (not attached to any source node)",
       pos
     };
   };
