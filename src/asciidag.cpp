@@ -345,15 +345,21 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
   EdgesInFlight currEdges;
   err.code = ParseError::Code::None;
   Position pos{0, 0};
-  auto makeSuspendedError = [&pos](char edgeChar) {
+  auto updateOrError =
+    [&pos](EdgeMap& refToUpdate, std::vector<size_t> const& fromNodes, char edgeChar)
+    -> std::optional<ParseError> {
+    if (fromNodes.size() == 1) {
+      refToUpdate[pos.col] = fromNodes.front();
+      return {};
+    }
+    if (fromNodes.size() != 0) {
+      return ParseError{ParseError::Code::MergingEdge, "Edges merged into one edge", pos};
+    }
     return ParseError{
       ParseError::Code::SuspendedEdge,
       "Edge "s + edgeChar + " is suspended (not attached to any source node)",
       pos
     };
-  };
-  auto makeMergeError = [&pos]() {
-    return ParseError{ParseError::Code::MergingEdge, "Edges merged into one edge", pos};
   };
   for (char c : str) {
     ++pos.col;
@@ -391,13 +397,8 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
           return std::nullopt;
         }
         auto fromNodes = findNRemoveEdgesToPipe(prevEdges, collector.getPrevNodes(), pos.col);
-        if (fromNodes.size() == 1) {
-          currEdges.straight[pos.col] = fromNodes.front();
-        } else if (fromNodes.size() == 0) {
-          err = makeSuspendedError(c);
-          return std::nullopt;
-        } else {
-          err = makeMergeError();
+        if (auto e = updateOrError(currEdges.straight, fromNodes, c)) {
+          err = *e;
           return std::nullopt;
         }
         break;
@@ -408,13 +409,8 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
           return std::nullopt;
         }
         auto fromNodes = findNRemoveEdgesToBackslash(prevEdges, collector.getPrevNodes(), pos.col);
-        if (fromNodes.size() == 1) {
-          currEdges.right[pos.col] = fromNodes.front();
-        } else if (fromNodes.size() == 0) {
-          err = makeSuspendedError(c);
-          return std::nullopt;
-        } else {
-          err = makeMergeError();
+        if (auto e = updateOrError(currEdges.right, fromNodes, c)) {
+          err = *e;
           return std::nullopt;
         }
         break;
@@ -425,13 +421,8 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
           return std::nullopt;
         }
         auto fromNodes = findNRemoveEdgesToSlash(prevEdges, collector.getPrevNodes(), pos.col);
-        if (fromNodes.size() == 1) {
-          currEdges.left[pos.col] = fromNodes.front();
-        } else if (fromNodes.size() == 0) {
-          err = makeSuspendedError(c);
-          return std::nullopt;
-        } else {
-          err = makeMergeError();
+        if (auto e = updateOrError(currEdges.left, fromNodes, c)) {
+          err = *e;
           return std::nullopt;
         }
         break;
