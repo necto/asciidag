@@ -220,15 +220,11 @@ std::optional<ParseError> findDanglingEdge(EdgesInFlight const& edges, size_t li
   return ret;
 }
 
-std::optional<DAG> parseDAG(std::string str, ParseError& err) {
-  std::vector<DAG::Node> nodes;
-  std::string partialNode;
-  EdgesInFlight prevEdges;
-  EdgesInFlight currEdges;
-  err.code = ParseError::Code::None;
-  Position pos{0, 0};
-  auto addNode =
-    [&nodes, &partialNode, &prevEdges, &currEdges](Position const& pos) -> std::optional<ParseError> {
+class NodeCollector {
+public:
+  // TODO: can it take a const ref to prevEdges or currEdges?
+  std::optional<ParseError>
+  addNode(EdgesInFlight& prevEdges, EdgesInFlight& currEdges, Position const& pos) {
     if (partialNode.empty()) {
       return {};
     }
@@ -245,8 +241,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
             return {ParseError{
               ParseError::Code::NonRectangularNode,
               "Node-line above started midway node-line below.",
-              {pos.line,
-              p}
+              {pos.line, p}
             }};
           } else {
             // Node above can change only after a gap,
@@ -259,8 +254,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
         return {ParseError{
           ParseError::Code::NonRectangularNode,
           "Node-line above ended midway node-line below.",
-          {pos.line,
-          p}
+          {pos.line, p}
         }};
       }
       if (!nodeAbove) {
@@ -286,16 +280,14 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
         return ParseError{
           ParseError::Code::NonRectangularNode,
           "Previous node-line was longer on the left side.",
-          {pos.line,
-          pos.col - partialNode.size()}
+          {pos.line, pos.col - partialNode.size()}
         };
       }
       if (prevEdges.still.count(pos.col + 1) != 0) {
         return {ParseError{
           ParseError::Code::NonRectangularNode,
           "Previous node-line was longer on the right side.",
-          {pos.line,
-          pos.col + 1}
+          {pos.line, pos.col + 1}
         }};
       }
       nodes[*nodeAbove].text += "\n" + partialNode;
@@ -305,7 +297,25 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
     }
     partialNode.clear();
     return {};
-  };
+  }
+
+  void addNodeChar(char c) { partialNode.push_back(c); }
+
+  bool curLineNonEmpty() const { return !partialNode.empty(); }
+
+  DAG buildDAG() { return {nodes}; }
+
+private:
+  std::vector<DAG::Node> nodes = {};
+  std::string partialNode = "";
+};
+
+std::optional<DAG> parseDAG(std::string str, ParseError& err) {
+  NodeCollector collector;
+  EdgesInFlight prevEdges;
+  EdgesInFlight currEdges;
+  err.code = ParseError::Code::None;
+  Position pos{0, 0};
   auto makeSuspendedError = [&pos](char edgeChar) {
     return ParseError{
       ParseError::Code::SuspendedEdge,
@@ -318,21 +328,21 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
   };
   for (char c : str) {
     ++pos.col;
-    if (c != '\n' && !partialNode.empty() && prevEdges.still.count(pos.col - 1) != 0 && prevEdges.still.count(pos.col) != 0) {
+    if (c != '\n' && collector.curLineNonEmpty() && prevEdges.still.count(pos.col - 1) != 0 && prevEdges.still.count(pos.col) != 0) {
       // Keep accumulating at least for as long as the node-line above
-      partialNode.push_back(c);
+      collector.addNodeChar(c);
       continue;
     }
     switch (c) {
       case ' ': {
-        if (auto nodeErr = addNode({pos.line, pos.col - 1})) {
+        if (auto nodeErr = collector.addNode(prevEdges, currEdges, {pos.line, pos.col - 1})) {
           err = *nodeErr;
           return std::nullopt;
         }
         break;
       }
       case '\n':
-        if (auto nodeErr = addNode({pos.line, pos.col - 1})) {
+        if (auto nodeErr = collector.addNode(prevEdges, currEdges, {pos.line, pos.col - 1})) {
           err = *nodeErr;
           return std::nullopt;
         }
@@ -346,7 +356,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
         ++pos.line;
         break;
       case '|': {
-        if (auto nodeErr = addNode({pos.line, pos.col - 1})) {
+        if (auto nodeErr = collector.addNode(prevEdges, currEdges, {pos.line, pos.col - 1})) {
           err = *nodeErr;
           return std::nullopt;
         }
@@ -363,7 +373,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
         break;
       }
       case '\\': {
-        if (auto nodeErr = addNode({pos.line, pos.col - 1})) {
+        if (auto nodeErr = collector.addNode(prevEdges, currEdges, {pos.line, pos.col - 1})) {
           err = *nodeErr;
           return std::nullopt;
         }
@@ -380,7 +390,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
         break;
       }
       case '/': {
-        if (auto nodeErr = addNode({pos.line, pos.col - 1})) {
+        if (auto nodeErr = collector.addNode(prevEdges, currEdges, {pos.line, pos.col - 1})) {
           err = *nodeErr;
           return std::nullopt;
         }
@@ -397,7 +407,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
         break;
       }
       default:
-        partialNode.push_back(c);
+        collector.addNodeChar(c);
         break;
     }
   }
@@ -409,7 +419,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
     err = *dangling;
     return std::nullopt;
   }
-  return {{nodes}};
+  return collector.buildDAG();
 }
 
 std::string parseCodeToStr(ParseError::Code code) {
@@ -431,11 +441,9 @@ std::string parseCodeToStr(ParseError::Code code) {
 }
 
 std::ostream& operator<<(std::ostream& os, Position const& pos) {
-  return os << pos.line << ":" <<pos.col;
+  return os << pos.line << ":" << pos.col;
 }
 
 std::ostream& operator<<(std::ostream& os, ParseError const& err) {
-  return os
-      << "ERROR: " << parseCodeToStr(err.code) << " at " << err.pos << ":"
-      << err.message;
+  return os << "ERROR: " << parseCodeToStr(err.code) << " at " << err.pos << ":" << err.message;
 }
