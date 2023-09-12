@@ -230,24 +230,22 @@ public:
     size_t id = nodes.size();
     std::optional<size_t> nodeAbove;
     bool first = true;
-    for (size_t p = pos.col - partialNode.size() + 1; p <= pos.col; ++p) {
+    for (size_t p = pos.col - partialNode.size(); p < pos.col; ++p) {
       if (auto iter = prevNodes.find(p); iter != prevNodes.end()) {
         if (first) {
           assert(!nodeAbove);
           nodeAbove = iter->second;
+        } else if (!nodeAbove) {
+          return {ParseError{
+            ParseError::Code::NonRectangularNode,
+            "Node-line above started midway node-line below.",
+            {pos.line, p}
+          }};
         } else {
-          if (!nodeAbove) {
-            return {ParseError{
-              ParseError::Code::NonRectangularNode,
-              "Node-line above started midway node-line below.",
-              {pos.line, p}
-            }};
-          } else {
-            // Node above can change only after a gap,
-            // Two nodes "AA" and "BB" cannot follow each other immediately.
-            // "AABB" would have been treated as a single node.
-            assert(*nodeAbove == iter->second);
-          }
+          // Node above can change only after a gap,
+          // Two nodes "AA" and "BB" cannot follow each other immediately.
+          // "AABB" would have been treated as a single node.
+          assert(*nodeAbove == iter->second);
         }
       } else if (nodeAbove) {
         return {ParseError{
@@ -269,24 +267,24 @@ public:
       first = false;
     }
     if (nodeAbove) {
-      for (auto edge : findNRemoveEdgesToNode(prevEdges, pos.col - partialNode.size() + 1)) {
+      for (auto edge : findNRemoveEdgesToNode(prevEdges, pos.col - partialNode.size())) {
         nodes[edge].outEdges.push_back({*nodeAbove});
       }
-      for (auto edge : findNRemoveEdgesToNode(prevEdges, pos.col)) {
+      for (auto edge : findNRemoveEdgesToNode(prevEdges, pos.col - 1)) {
         nodes[edge].outEdges.push_back({*nodeAbove});
       }
-      if (prevNodes.count(pos.col - partialNode.size()) != 0) {
+      if (prevNodes.count(pos.col - 1 - partialNode.size()) != 0) {
         return ParseError{
           ParseError::Code::NonRectangularNode,
           "Previous node-line was longer on the left side.",
-          {pos.line, pos.col - partialNode.size()}
+          {pos.line, pos.col - 1 - partialNode.size()}
         };
       }
-      if (prevNodes.count(pos.col + 1) != 0) {
+      if (prevNodes.count(pos.col) != 0) {
         return {ParseError{
           ParseError::Code::NonRectangularNode,
           "Previous node-line was longer on the right side.",
-          {pos.line, pos.col + 1}
+          pos
         }};
       }
       nodes[*nodeAbove].text += "\n" + partialNode;
@@ -343,14 +341,14 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
     }
     switch (c) {
       case ' ': {
-        if (auto nodeErr = collector.addNode(prevEdges, {pos.line, pos.col - 1})) {
+        if (auto nodeErr = collector.addNode(prevEdges, pos)) {
           err = *nodeErr;
           return std::nullopt;
         }
         break;
       }
       case '\n':
-        if (auto nodeErr = collector.addNode(prevEdges, {pos.line, pos.col - 1})) {
+        if (auto nodeErr = collector.addNode(prevEdges, pos)) {
           err = *nodeErr;
           return std::nullopt;
         }
@@ -365,7 +363,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
         ++pos.line;
         break;
       case '|': {
-        if (auto nodeErr = collector.addNode(prevEdges, {pos.line, pos.col - 1})) {
+        if (auto nodeErr = collector.addNode(prevEdges, pos)) {
           err = *nodeErr;
           return std::nullopt;
         }
@@ -382,7 +380,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
         break;
       }
       case '\\': {
-        if (auto nodeErr = collector.addNode(prevEdges, {pos.line, pos.col - 1})) {
+        if (auto nodeErr = collector.addNode(prevEdges, pos)) {
           err = *nodeErr;
           return std::nullopt;
         }
@@ -399,7 +397,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
         break;
       }
       case '/': {
-        if (auto nodeErr = collector.addNode(prevEdges, {pos.line, pos.col - 1})) {
+        if (auto nodeErr = collector.addNode(prevEdges, pos)) {
           err = *nodeErr;
           return std::nullopt;
         }
