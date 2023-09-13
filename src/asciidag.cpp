@@ -127,75 +127,113 @@ V const* getIf(std::unordered_map<K, V> const& map, K const& k) {
 
 using EdgeMap = std::unordered_map<size_t, size_t>;
 
-struct EdgesInFlight {
+class EdgesInFlight {
+public:
+  std::vector<size_t> findNRemoveEdgesToNode(size_t col);
+  std::vector<size_t> findNRemoveEdgesToPipe(EdgeMap const& prevNodes, size_t col);
+  std::vector<size_t> findNRemoveEdgesToBackslash(EdgeMap const& prevNodes, size_t col);
+  std::vector<size_t> findNRemoveEdgesToSlash(EdgeMap const& prevNodes, size_t col);
+  std::optional<ParseError> findDanglingEdge(size_t line) const;
+  friend std::ostream& operator<<(std::ostream& os, EdgesInFlight const& edges);
+
+  std::optional<ParseError>
+  updateOrError(std::vector<size_t> const& fromNodes, char edgeChar, Position const& pos);
+
+private:
+
   EdgeMap straight;
   EdgeMap left;
   EdgeMap right;
 };
 
-std::vector<size_t> findNRemoveEdgesToNode(EdgesInFlight& prevEdges, size_t col) {
+std::optional<ParseError> EdgesInFlight::
+  updateOrError(std::vector<size_t> const& fromNodes, char edgeChar, Position const& pos) {
+  if (fromNodes.size() == 1) {
+    switch (edgeChar) {
+      case '|':
+        straight[pos.col] = fromNodes.front();
+        return {};
+      case '/':
+        left[pos.col] = fromNodes.front();
+        return {};
+      case '\\':
+        right[pos.col] = fromNodes.front();
+        return {};
+    }
+    assert(false && "Unexpected edge char");
+    return {};
+  }
+  if (fromNodes.size() != 0) {
+    return ParseError{ParseError::Code::MergingEdge, "Edges merged into one edge", pos};
+  }
+  return ParseError{
+    ParseError::Code::SuspendedEdge,
+    "Edge "s + edgeChar + " is suspended (not attached to any source node)",
+    pos
+  };
+}
+
+std::vector<size_t> EdgesInFlight::findNRemoveEdgesToNode(size_t col) {
   std::vector<size_t> ret;
-  if (auto to = findAndEraseIf(prevEdges.straight, col)) {
+  if (auto to = findAndEraseIf(straight, col)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.left, col + 1)) {
+  if (auto to = findAndEraseIf(left, col + 1)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.right, col - 1)) {
+  if (auto to = findAndEraseIf(right, col - 1)) {
     ret.push_back(*to);
   }
   return ret;
 }
 
-std::vector<size_t>
-findNRemoveEdgesToPipe(EdgesInFlight& prevEdges, EdgeMap const& prevNodes, size_t col) {
+std::vector<size_t> EdgesInFlight::findNRemoveEdgesToPipe(EdgeMap const& prevNodes, size_t col) {
   std::vector<size_t> ret;
   if (auto to = getIf(prevNodes, col)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.straight, col)) {
+  if (auto to = findAndEraseIf(straight, col)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.left, col)) {
+  if (auto to = findAndEraseIf(left, col)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.right, col)) {
+  if (auto to = findAndEraseIf(right, col)) {
     ret.push_back(*to);
   }
   return ret;
 }
 
 std::vector<size_t>
-findNRemoveEdgesToBackslash(EdgesInFlight& prevEdges, EdgeMap const& prevNodes, size_t col) {
+EdgesInFlight::findNRemoveEdgesToBackslash(EdgeMap const& prevNodes, size_t col) {
   std::vector<size_t> ret;
   if (auto to = getIf(prevNodes, col - 1)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.straight, col)) {
+  if (auto to = findAndEraseIf(straight, col)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.left, col)) {
+  if (auto to = findAndEraseIf(left, col)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.right, col - 1)) {
+  if (auto to = findAndEraseIf(right, col - 1)) {
     ret.push_back(*to);
   }
   return ret;
 }
 
-std::vector<size_t>
-findNRemoveEdgesToSlash(EdgesInFlight& prevEdges, EdgeMap const& prevNodes, size_t col) {
+std::vector<size_t> EdgesInFlight::findNRemoveEdgesToSlash(EdgeMap const& prevNodes, size_t col) {
   std::vector<size_t> ret;
   if (auto to = getIf(prevNodes, col + 1)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.straight, col)) {
+  if (auto to = findAndEraseIf(straight, col)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.left, col + 1)) {
+  if (auto to = findAndEraseIf(left, col + 1)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(prevEdges.right, col)) {
+  if (auto to = findAndEraseIf(right, col)) {
     ret.push_back(*to);
   }
   return ret;
@@ -205,7 +243,7 @@ std::ostream& operator<<(std::ostream& os, EdgesInFlight const& edges) {
   return os << " |" << edges.straight << " /" << edges.left << " \\" << edges.right;
 }
 
-std::optional<ParseError> findDanglingEdge(EdgesInFlight const& edges, size_t line) {
+std::optional<ParseError> EdgesInFlight::findDanglingEdge(size_t line) const {
   std::optional<ParseError> ret;
   auto keepLeftmost = [&ret, line](EdgeMap const& edgeMap, std::string prefix) {
     for (auto const& [col, src] : edgeMap) {
@@ -214,9 +252,9 @@ std::optional<ParseError> findDanglingEdge(EdgesInFlight const& edges, size_t li
       }
     }
   };
-  keepLeftmost(edges.straight, "Dangling edge | from ");
-  keepLeftmost(edges.left, "Dangling edge / from ");
-  keepLeftmost(edges.right, "Dangling edge \\ from ");
+  keepLeftmost(straight, "Dangling edge | from ");
+  keepLeftmost(left, "Dangling edge / from ");
+  keepLeftmost(right, "Dangling edge \\ from ");
   return ret;
 }
 
@@ -272,7 +310,7 @@ private:
   void startNewNode(EdgesInFlight& prevEdges, Position const& pos) {
     size_t id = nodes.size();
     for (size_t p = pos.col - partialNode.size(); p < pos.col; ++p) {
-      for (auto from : findNRemoveEdgesToNode(prevEdges, p)) {
+      for (auto from : prevEdges.findNRemoveEdgesToNode(p)) {
         nodes[from].outEdges.push_back({id});
       }
       currNodes[p] = id;
@@ -318,10 +356,10 @@ private:
     for (size_t p = pos.col - partialNode.size(); p < pos.col; ++p) {
       currNodes[p] = nodeAbove;
     }
-    for (auto edge : findNRemoveEdgesToNode(prevEdges, pos.col - partialNode.size())) {
+    for (auto edge : prevEdges.findNRemoveEdgesToNode(pos.col - partialNode.size())) {
       nodes[edge].outEdges.push_back({nodeAbove});
     }
-    for (auto edge : findNRemoveEdgesToNode(prevEdges, pos.col - 1)) {
+    for (auto edge : prevEdges.findNRemoveEdgesToNode(pos.col - 1)) {
       nodes[edge].outEdges.push_back({nodeAbove});
     }
     nodes[nodeAbove].text += "\n" + partialNode;
@@ -347,22 +385,6 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
   EdgesInFlight currEdges;
   err.code = ParseError::Code::None;
   Position pos{0, 0};
-  auto updateOrError =
-    [&pos](EdgeMap& refToUpdate, std::vector<size_t> const& fromNodes, char edgeChar)
-    -> std::optional<ParseError> {
-    if (fromNodes.size() == 1) {
-      refToUpdate[pos.col] = fromNodes.front();
-      return {};
-    }
-    if (fromNodes.size() != 0) {
-      return ParseError{ParseError::Code::MergingEdge, "Edges merged into one edge", pos};
-    }
-    return ParseError{
-      ParseError::Code::SuspendedEdge,
-      "Edge "s + edgeChar + " is suspended (not attached to any source node)",
-      pos
-    };
-  };
   for (char c : str) {
     ++pos.col;
     if (c != '\n' && collector.isPartOfANode(pos.col)) {
@@ -383,7 +405,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
           err = *nodeErr;
           return std::nullopt;
         }
-        if (auto dangling = findDanglingEdge(prevEdges, pos.line - 1)) {
+        if (auto dangling = prevEdges.findDanglingEdge(pos.line - 1)) {
           err = *dangling;
           return std::nullopt;
         }
@@ -398,8 +420,8 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
           err = *nodeErr;
           return std::nullopt;
         }
-        auto fromNodes = findNRemoveEdgesToPipe(prevEdges, collector.getPrevNodes(), pos.col);
-        if (auto e = updateOrError(currEdges.straight, fromNodes, c)) {
+        auto fromNodes = prevEdges.findNRemoveEdgesToPipe(collector.getPrevNodes(), pos.col);
+        if (auto e = currEdges.updateOrError(fromNodes, c, pos)) {
           err = *e;
           return std::nullopt;
         }
@@ -410,8 +432,8 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
           err = *nodeErr;
           return std::nullopt;
         }
-        auto fromNodes = findNRemoveEdgesToBackslash(prevEdges, collector.getPrevNodes(), pos.col);
-        if (auto e = updateOrError(currEdges.right, fromNodes, c)) {
+        auto fromNodes = prevEdges.findNRemoveEdgesToBackslash(collector.getPrevNodes(), pos.col);
+        if (auto e = currEdges.updateOrError(fromNodes, c, pos)) {
           err = *e;
           return std::nullopt;
         }
@@ -422,8 +444,8 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
           err = *nodeErr;
           return std::nullopt;
         }
-        auto fromNodes = findNRemoveEdgesToSlash(prevEdges, collector.getPrevNodes(), pos.col);
-        if (auto e = updateOrError(currEdges.left, fromNodes, c)) {
+        auto fromNodes = prevEdges.findNRemoveEdgesToSlash(collector.getPrevNodes(), pos.col);
+        if (auto e = currEdges.updateOrError(fromNodes, c, pos)) {
           err = *e;
           return std::nullopt;
         }
@@ -434,11 +456,11 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
         break;
     }
   }
-  if (auto dangling = findDanglingEdge(prevEdges, pos.line - 1)) {
+  if (auto dangling = prevEdges.findDanglingEdge(pos.line - 1)) {
     err = *dangling;
     return std::nullopt;
   }
-  if (auto dangling = findDanglingEdge(currEdges, pos.line)) {
+  if (auto dangling = currEdges.findDanglingEdge(pos.line)) {
     err = *dangling;
     return std::nullopt;
   }
