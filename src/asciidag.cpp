@@ -222,7 +222,7 @@ std::optional<ParseError> findDanglingEdge(EdgesInFlight const& edges, size_t li
 
 class NodeCollector {
 public:
-  std::optional<ParseError> addNode(EdgesInFlight& prevEdges, Position const& pos) {
+  std::optional<ParseError> tryAddNode(EdgesInFlight& prevEdges, Position const& pos) {
     if (partialNode.empty()) {
       return {};
     }
@@ -372,14 +372,14 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
     }
     switch (c) {
       case ' ': {
-        if (auto nodeErr = collector.addNode(prevEdges, pos)) {
+        if (auto nodeErr = collector.tryAddNode(prevEdges, pos)) {
           err = *nodeErr;
           return std::nullopt;
         }
         break;
       }
       case '\n':
-        if (auto nodeErr = collector.addNode(prevEdges, pos)) {
+        if (auto nodeErr = collector.tryAddNode(prevEdges, pos)) {
           err = *nodeErr;
           return std::nullopt;
         }
@@ -394,7 +394,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
         ++pos.line;
         break;
       case '|': {
-        if (auto nodeErr = collector.addNode(prevEdges, pos)) {
+        if (auto nodeErr = collector.tryAddNode(prevEdges, pos)) {
           err = *nodeErr;
           return std::nullopt;
         }
@@ -406,7 +406,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
         break;
       }
       case '\\': {
-        if (auto nodeErr = collector.addNode(prevEdges, pos)) {
+        if (auto nodeErr = collector.tryAddNode(prevEdges, pos)) {
           err = *nodeErr;
           return std::nullopt;
         }
@@ -418,7 +418,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
         break;
       }
       case '/': {
-        if (auto nodeErr = collector.addNode(prevEdges, pos)) {
+        if (auto nodeErr = collector.tryAddNode(prevEdges, pos)) {
           err = *nodeErr;
           return std::nullopt;
         }
