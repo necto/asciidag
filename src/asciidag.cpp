@@ -196,10 +196,10 @@ std::optional<ParseError> EdgesInFlight::
 
 /// [Node, Left, Straight, Right]
 static int columnShift[/* line above */ 4][/* line below */ 4] = {
-  {0,  +1, 0, -1},
-  {+1, +1, 0,  0},
-  {0,   0, 0,  0},
-  {-1,  0, 0, -1},
+  {0, +1, 0, -1},
+  {+1, +1, 0, 0},
+  {0, 0, 0, 0},
+  {-1, 0, 0, -1},
 };
 
 std::vector<size_t> EdgesInFlight::findNRemoveEdgesToNode(size_t col) {
@@ -212,14 +212,14 @@ std::vector<size_t> EdgesInFlight::findNRemoveEdgesToNode(size_t col) {
   return ret;
 }
 
-
 std::vector<size_t>
 EdgesInFlight::findNRemoveEdgesToEdge(Direction dirBelow, EdgeMap const& prevNodes, size_t col) {
   std::vector<size_t> ret;
   if (auto to = getIf(prevNodes, col + columnShift[0][toInt(dirBelow)])) {
     ret.push_back(*to);
   }
-  for (auto dirAbove : {toInt(Direction::Left), toInt(Direction::Straight), toInt(Direction::Right)}) {
+  for (auto dirAbove :
+       {toInt(Direction::Left), toInt(Direction::Straight), toInt(Direction::Right)}) {
     if (auto to = findAndEraseIf(edges[dirAbove], col + columnShift[dirAbove][toInt(dirBelow)])) {
       ret.push_back(*to);
     }
@@ -229,10 +229,13 @@ EdgesInFlight::findNRemoveEdgesToEdge(Direction dirBelow, EdgeMap const& prevNod
 
 std::ostream& operator<<(std::ostream& os, EdgesInFlight const& edges) {
   bool first = true;
-  for (auto dir : {EdgesInFlight::Direction::Left, EdgesInFlight::Direction::Straight, EdgesInFlight::Direction::Right}) {
-    os << EdgesInFlight::edgeChar(dir) <<' ' << edges.edges[toInt(dir)];
+  for (auto dir :
+       {EdgesInFlight::Direction::Left,
+        EdgesInFlight::Direction::Straight,
+        EdgesInFlight::Direction::Right}) {
+    os << EdgesInFlight::edgeChar(dir) << ' ' << edges.edges[toInt(dir)];
     if (!first) {
-      os <<' ';
+      os << ' ';
     }
     first = false;
   }
@@ -245,7 +248,11 @@ std::optional<ParseError> EdgesInFlight::findDanglingEdge(size_t line) const {
   for (auto dir : {Direction::Left, Direction::Straight, Direction::Right}) {
     for (auto const& [col, src] : edges[toInt(dir)]) {
       if (!ret || col < ret->pos.col) {
-        ret = ParseError{ParseError::Code::DanglingEdge, "Dangling edge "s + edgeChar(dir) + " from " + std::to_string(src), {line, col}};
+        ret = ParseError{
+          ParseError::Code::DanglingEdge,
+          "Dangling edge "s + edgeChar(dir) + " from " + std::to_string(src),
+          {line, col}
+        };
       }
     }
   }
@@ -391,8 +398,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
         err = *nodeErr;
         return std::nullopt;
       }
-      auto fromNodes =
-        prevEdges.findNRemoveEdgesToEdge(*dir, collector.getPrevNodes(), pos.col);
+      auto fromNodes = prevEdges.findNRemoveEdgesToEdge(*dir, collector.getPrevNodes(), pos.col);
       if (auto e = currEdges.updateOrError(fromNodes, *dir, pos)) {
         err = *e;
         return std::nullopt;
