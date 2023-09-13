@@ -129,19 +129,18 @@ using EdgeMap = std::unordered_map<size_t, size_t>;
 
 class EdgesInFlight {
 public:
-  enum class Direction { Straight, Left, Right };
+  enum class Direction : int { Left = 1, Straight = 2, Right = 3 };
 
   static std::optional<Direction> edgeChar(char c);
+  static char edgeChar(Direction dir);
 
   std::vector<size_t> findNRemoveEdgesToNode(size_t col);
-  std::vector<size_t> findNRemoveEdgesToPipe(EdgeMap const& prevNodes, size_t col);
-  std::vector<size_t> findNRemoveEdgesToBackslash(EdgeMap const& prevNodes, size_t col);
-  std::vector<size_t> findNRemoveEdgesToSlash(EdgeMap const& prevNodes, size_t col);
+  std::vector<size_t> findNRemoveEdgesToEdge(Direction dir, EdgeMap const& prevNodes, size_t col);
   std::optional<ParseError> findDanglingEdge(size_t line) const;
   friend std::ostream& operator<<(std::ostream& os, EdgesInFlight const& edges);
 
   std::optional<ParseError>
-  updateOrError(std::vector<size_t> const& fromNodes, char edgeChar, Position const& pos);
+  updateOrError(std::vector<size_t> const& fromNodes, Direction dir, Position const& pos);
 
 private:
 
@@ -158,22 +157,34 @@ std::optional<EdgesInFlight::Direction> EdgesInFlight::edgeChar(char c) {
       return Direction::Right;
     case '/':
       return Direction::Left;
-    default:
-      return {};
   }
+  return {};
+}
+
+char EdgesInFlight::edgeChar(Direction dir) {
+  switch (dir) {
+    case Direction::Left:
+      return '/';
+    case Direction::Straight:
+      return '|';
+    case Direction::Right:
+      return '\\';
+  }
+  assert(false && "Unexpected direction");
+  return '?';
 }
 
 std::optional<ParseError> EdgesInFlight::
-  updateOrError(std::vector<size_t> const& fromNodes, char edgeChar, Position const& pos) {
+  updateOrError(std::vector<size_t> const& fromNodes, Direction dir, Position const& pos) {
   if (fromNodes.size() == 1) {
-    switch (edgeChar) {
-      case '|':
-        straight[pos.col] = fromNodes.front();
-        return {};
-      case '/':
+    switch (dir) {
+      case Direction::Left:
         left[pos.col] = fromNodes.front();
         return {};
-      case '\\':
+      case Direction::Straight:
+        straight[pos.col] = fromNodes.front();
+        return {};
+      case Direction::Right:
         right[pos.col] = fromNodes.front();
         return {};
     }
@@ -185,7 +196,7 @@ std::optional<ParseError> EdgesInFlight::
   }
   return ParseError{
     ParseError::Code::SuspendedEdge,
-    "Edge "s + edgeChar + " is suspended (not attached to any source node)",
+    "Edge "s + edgeChar(dir) + " is suspended (not attached to any source node)",
     pos
   };
 }
@@ -204,53 +215,31 @@ std::vector<size_t> EdgesInFlight::findNRemoveEdgesToNode(size_t col) {
   return ret;
 }
 
-std::vector<size_t> EdgesInFlight::findNRemoveEdgesToPipe(EdgeMap const& prevNodes, size_t col) {
-  std::vector<size_t> ret;
-  if (auto to = getIf(prevNodes, col)) {
-    ret.push_back(*to);
-  }
-  if (auto to = findAndEraseIf(straight, col)) {
-    ret.push_back(*to);
-  }
-  if (auto to = findAndEraseIf(left, col)) {
-    ret.push_back(*to);
-  }
-  if (auto to = findAndEraseIf(right, col)) {
-    ret.push_back(*to);
-  }
-  return ret;
+/// [Node, Left, Straight, Right]
+static int columnShift[/* line above */ 4][/* line below */ 4] = {
+  {0,  +1, 0, -1},
+  {+1, +1, 0,  0},
+  {0,   0, 0,  0},
+  {-1,  0, 0, -1},
+};
+
+int toInt(EdgesInFlight::Direction dir) {
+  return static_cast<int>(dir);
 }
 
 std::vector<size_t>
-EdgesInFlight::findNRemoveEdgesToBackslash(EdgeMap const& prevNodes, size_t col) {
+EdgesInFlight::findNRemoveEdgesToEdge(Direction dir, EdgeMap const& prevNodes, size_t col) {
   std::vector<size_t> ret;
-  if (auto to = getIf(prevNodes, col - 1)) {
+  if (auto to = getIf(prevNodes, col + columnShift[0][toInt(dir)])) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(straight, col)) {
+  if (auto to = findAndEraseIf(left, columnShift[toInt(Direction::Left)][toInt(dir)] + col)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(left, col)) {
+  if (auto to = findAndEraseIf(straight, columnShift[toInt(Direction::Straight)][toInt(dir)] + col)) {
     ret.push_back(*to);
   }
-  if (auto to = findAndEraseIf(right, col - 1)) {
-    ret.push_back(*to);
-  }
-  return ret;
-}
-
-std::vector<size_t> EdgesInFlight::findNRemoveEdgesToSlash(EdgeMap const& prevNodes, size_t col) {
-  std::vector<size_t> ret;
-  if (auto to = getIf(prevNodes, col + 1)) {
-    ret.push_back(*to);
-  }
-  if (auto to = findAndEraseIf(straight, col)) {
-    ret.push_back(*to);
-  }
-  if (auto to = findAndEraseIf(left, col + 1)) {
-    ret.push_back(*to);
-  }
-  if (auto to = findAndEraseIf(right, col)) {
+  if (auto to = findAndEraseIf(right, columnShift[toInt(Direction::Right)][toInt(dir)] + col)) {
     ret.push_back(*to);
   }
   return ret;
@@ -416,8 +405,9 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
             err = *nodeErr;
             return std::nullopt;
           }
-          auto fromNodes = prevEdges.findNRemoveEdgesToPipe(collector.getPrevNodes(), pos.col);
-          if (auto e = currEdges.updateOrError(fromNodes, c, pos)) {
+          auto fromNodes =
+            prevEdges.findNRemoveEdgesToEdge(*dir, collector.getPrevNodes(), pos.col);
+          if (auto e = currEdges.updateOrError(fromNodes, *dir, pos)) {
             err = *e;
             return std::nullopt;
           }
@@ -428,8 +418,9 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
             err = *nodeErr;
             return std::nullopt;
           }
-          auto fromNodes = prevEdges.findNRemoveEdgesToBackslash(collector.getPrevNodes(), pos.col);
-          if (auto e = currEdges.updateOrError(fromNodes, c, pos)) {
+          auto fromNodes =
+            prevEdges.findNRemoveEdgesToEdge(*dir, collector.getPrevNodes(), pos.col);
+          if (auto e = currEdges.updateOrError(fromNodes, *dir, pos)) {
             err = *e;
             return std::nullopt;
           }
@@ -440,8 +431,9 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
             err = *nodeErr;
             return std::nullopt;
           }
-          auto fromNodes = prevEdges.findNRemoveEdgesToSlash(collector.getPrevNodes(), pos.col);
-          if (auto e = currEdges.updateOrError(fromNodes, c, pos)) {
+          auto fromNodes =
+            prevEdges.findNRemoveEdgesToEdge(*dir, collector.getPrevNodes(), pos.col);
+          if (auto e = currEdges.updateOrError(fromNodes, *dir, pos)) {
             err = *e;
             return std::nullopt;
           }
