@@ -3,6 +3,8 @@
 #include <tuple>
 #include <vector>
 
+namespace asciidag {
+
 struct DAG {
   struct OutEdge {
     size_t to;
@@ -23,6 +25,7 @@ struct Position {
 };
 
 std::ostream& operator<<(std::ostream& os, Position const& pos);
+
 inline bool operator==(Position const& p1, Position const& p2) {
   return std::tie(p1.line, p1.col) == std::tie(p2.line, p2.col);
 }
@@ -45,3 +48,5 @@ inline std::ostream& operator<<(std::ostream& os, ParseError::Code code) {
 std::string renderDAG(DAG const& dag);
 
 std::optional<DAG> parseDAG(std::string str, ParseError& err);
+
+} // namespace asciidag

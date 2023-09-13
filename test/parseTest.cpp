@@ -3,6 +3,8 @@
 #include <gtest/gtest.h>
 #include <string>
 
+using namespace asciidag;
+
 void checkRectangularString(std::string const& s) {
   size_t lastLine = 0;
   size_t lineLen = 0;

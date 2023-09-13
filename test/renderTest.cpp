@@ -2,6 +2,8 @@
 
 #include "asciidag.h"
 
+using namespace asciidag;
+
 TEST(render, singleNode) {
   DAG test;
   test.nodes.push_back(DAG::Node{{{1}, {2}, {3}}, {}});
