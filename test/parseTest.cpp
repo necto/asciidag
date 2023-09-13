@@ -50,6 +50,8 @@ DAG parseSuccessfully(std::string str) {
   if (err.code != ParseError::Code::None) {
     // Print error message by violating an assertion
     EXPECT_EQ(err.message, "");
+    // Print error location by violating an assertion
+    EXPECT_EQ(err.pos, (Position{0, 0}));
   }
   EXPECT_TRUE(dag.has_value());
   if (dag) {
@@ -1283,6 +1285,36 @@ TEST(parse, sideEdgeTurnAwayFromNodeRight) {
   EXPECT_EQ(dag.nodes[2].text, "CCC");
 }
 
+TEST(parse, edgeUndercuttingNodeRight) {
+  std::string str = R"(
+   1
+    \2
+     \
+      3
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.nodes.size(), 3U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 2U);
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+  EXPECT_EQ(dag.nodes[2].outEdges.size(), 0U);
+}
+
+TEST(parse, edgeUndercuttingNodeLeft) {
+  std::string str = R"(
+       1
+     2/
+     /
+    3
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.nodes.size(), 3U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 2U);
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+  EXPECT_EQ(dag.nodes[2].outEdges.size(), 0U);
+}
+
 TEST(parse, sideEdgeSquiglyPipe) {
   std::string str = R"(
      ###
@@ -1301,11 +1333,27 @@ TEST(parse, sideEdgeSquiglyPipe) {
   EXPECT_EQ(dag.nodes[2].outEdges.size(), 0U);
 }
 
-// TODO:
-//     ###\
-//     ###\\
-//     ###|###
-//     ###/###
-//     ###\|
-//         ###
-//
+TEST(parse, parallelSideEdges) {
+  std::string str = R"(
+     #
+     #\
+     #\\
+     #\\\
+     #\###
+     #\###
+     #\\|
+       ###
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.nodes.size(), 3U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 6U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[1].to, 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[2].to, 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[3].to, 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[4].to, 2U);
+  EXPECT_EQ(dag.nodes[0].outEdges[5].to, 2U);
+  ASSERT_EQ(dag.nodes[1].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[1].outEdges[0].to, 2U);
+  EXPECT_EQ(dag.nodes[2].outEdges.size(), 0U);
+}

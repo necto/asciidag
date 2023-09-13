@@ -217,8 +217,8 @@ EdgesInFlight::findNRemoveEdgesToEdge(Direction dirBelow, EdgeMap const& prevNod
   std::vector<size_t> ret;
   for (auto dirAbove :
        {toInt(Direction::Left), toInt(Direction::Straight), toInt(Direction::Right)}) {
-    if (auto to = findAndEraseIf(edges[dirAbove], col + columnShift[dirAbove][toInt(dirBelow)])) {
-      ret.push_back(*to);
+    if (auto from = findAndEraseIf(edges[dirAbove], col + columnShift[dirAbove][toInt(dirBelow)])) {
+      ret.push_back(*from);
     }
   }
   // Avoid connecting an edge to a node if it is already connected to an edge
