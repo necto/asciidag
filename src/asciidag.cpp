@@ -388,12 +388,24 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
   Position pos{0, 0};
   for (char c : str) {
     ++pos.col;
-    if (c != '\n' && collector.isPartOfANode(pos.col)) {
+    if (c == '\n') {
+      if (auto nodeErr = collector.tryAddNode(prevEdges, pos)) {
+        err = *nodeErr;
+        return std::nullopt;
+      }
+      if (auto dangling = prevEdges.findDanglingEdge(pos.line - 1)) {
+        err = *dangling;
+        return std::nullopt;
+      }
+      prevEdges = std::move(currEdges);
+      currEdges = {};
+      collector.newLine();
+      pos.col = 0;
+      ++pos.line;
+    } else if (collector.isPartOfANode(pos.col)) {
       // Keep accumulating at least for as long as the node-line above
       collector.addNodeChar(c);
-      continue;
-    }
-    if (auto dir = EdgesInFlight::edgeChar(c)) {
+    } else if (auto dir = EdgesInFlight::edgeChar(c)) {
       if (auto nodeErr = collector.tryAddNode(prevEdges, pos)) {
         err = *nodeErr;
         return std::nullopt;
@@ -404,33 +416,13 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
         return std::nullopt;
       }
       continue;
-    }
-    switch (c) {
-      case ' ': {
-        if (auto nodeErr = collector.tryAddNode(prevEdges, pos)) {
-          err = *nodeErr;
-          return std::nullopt;
-        }
-        break;
+    } else if (c == ' ') {
+      if (auto nodeErr = collector.tryAddNode(prevEdges, pos)) {
+        err = *nodeErr;
+        return std::nullopt;
       }
-      case '\n':
-        if (auto nodeErr = collector.tryAddNode(prevEdges, pos)) {
-          err = *nodeErr;
-          return std::nullopt;
-        }
-        if (auto dangling = prevEdges.findDanglingEdge(pos.line - 1)) {
-          err = *dangling;
-          return std::nullopt;
-        }
-        prevEdges = std::move(currEdges);
-        currEdges = {};
-        collector.newLine();
-        pos.col = 0;
-        ++pos.line;
-        break;
-      default:
-        collector.addNodeChar(c);
-        break;
+    } else {
+      collector.addNodeChar(c);
     }
   }
   if (auto dangling = prevEdges.findDanglingEdge(pos.line - 1)) {
