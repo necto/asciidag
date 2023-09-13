@@ -129,6 +129,10 @@ using EdgeMap = std::unordered_map<size_t, size_t>;
 
 class EdgesInFlight {
 public:
+  enum class Direction { Straight, Left, Right };
+
+  static std::optional<Direction> edgeChar(char c);
+
   std::vector<size_t> findNRemoveEdgesToNode(size_t col);
   std::vector<size_t> findNRemoveEdgesToPipe(EdgeMap const& prevNodes, size_t col);
   std::vector<size_t> findNRemoveEdgesToBackslash(EdgeMap const& prevNodes, size_t col);
@@ -145,6 +149,19 @@ private:
   EdgeMap left;
   EdgeMap right;
 };
+
+std::optional<EdgesInFlight::Direction> EdgesInFlight::edgeChar(char c) {
+  switch (c) {
+    case '|':
+      return Direction::Straight;
+    case '\\':
+      return Direction::Right;
+    case '/':
+      return Direction::Left;
+    default:
+      return {};
+  }
+}
 
 std::optional<ParseError> EdgesInFlight::
   updateOrError(std::vector<size_t> const& fromNodes, char edgeChar, Position const& pos) {
@@ -392,6 +409,47 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
       collector.addNodeChar(c);
       continue;
     }
+    if (auto dir = EdgesInFlight::edgeChar(c)) {
+      switch (*dir) {
+        case EdgesInFlight::Direction::Straight: {
+          if (auto nodeErr = collector.tryAddNode(prevEdges, pos)) {
+            err = *nodeErr;
+            return std::nullopt;
+          }
+          auto fromNodes = prevEdges.findNRemoveEdgesToPipe(collector.getPrevNodes(), pos.col);
+          if (auto e = currEdges.updateOrError(fromNodes, c, pos)) {
+            err = *e;
+            return std::nullopt;
+          }
+          break;
+        }
+        case EdgesInFlight::Direction::Right: {
+          if (auto nodeErr = collector.tryAddNode(prevEdges, pos)) {
+            err = *nodeErr;
+            return std::nullopt;
+          }
+          auto fromNodes = prevEdges.findNRemoveEdgesToBackslash(collector.getPrevNodes(), pos.col);
+          if (auto e = currEdges.updateOrError(fromNodes, c, pos)) {
+            err = *e;
+            return std::nullopt;
+          }
+          break;
+        }
+        case EdgesInFlight::Direction::Left: {
+          if (auto nodeErr = collector.tryAddNode(prevEdges, pos)) {
+            err = *nodeErr;
+            return std::nullopt;
+          }
+          auto fromNodes = prevEdges.findNRemoveEdgesToSlash(collector.getPrevNodes(), pos.col);
+          if (auto e = currEdges.updateOrError(fromNodes, c, pos)) {
+            err = *e;
+            return std::nullopt;
+          }
+          break;
+        }
+      }
+      continue;
+    }
     switch (c) {
       case ' ': {
         if (auto nodeErr = collector.tryAddNode(prevEdges, pos)) {
@@ -415,42 +473,6 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
         pos.col = 0;
         ++pos.line;
         break;
-      case '|': {
-        if (auto nodeErr = collector.tryAddNode(prevEdges, pos)) {
-          err = *nodeErr;
-          return std::nullopt;
-        }
-        auto fromNodes = prevEdges.findNRemoveEdgesToPipe(collector.getPrevNodes(), pos.col);
-        if (auto e = currEdges.updateOrError(fromNodes, c, pos)) {
-          err = *e;
-          return std::nullopt;
-        }
-        break;
-      }
-      case '\\': {
-        if (auto nodeErr = collector.tryAddNode(prevEdges, pos)) {
-          err = *nodeErr;
-          return std::nullopt;
-        }
-        auto fromNodes = prevEdges.findNRemoveEdgesToBackslash(collector.getPrevNodes(), pos.col);
-        if (auto e = currEdges.updateOrError(fromNodes, c, pos)) {
-          err = *e;
-          return std::nullopt;
-        }
-        break;
-      }
-      case '/': {
-        if (auto nodeErr = collector.tryAddNode(prevEdges, pos)) {
-          err = *nodeErr;
-          return std::nullopt;
-        }
-        auto fromNodes = prevEdges.findNRemoveEdgesToSlash(collector.getPrevNodes(), pos.col);
-        if (auto e = currEdges.updateOrError(fromNodes, c, pos)) {
-          err = *e;
-          return std::nullopt;
-        }
-        break;
-      }
       default:
         collector.addNodeChar(c);
         break;
