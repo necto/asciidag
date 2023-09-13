@@ -1224,13 +1224,24 @@ TEST(parse, sideEdgePipes) {
   EXPECT_EQ(dag.nodes[2].text, "###");
 }
 
+TEST(parse, sideEdgeSquiggle) {
+  std::string str = R"(
+       ###
+      /###
+   ###\###
+   ###/###
+   ###
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.nodes.size(), 2U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
+  EXPECT_EQ(dag.nodes[0].text, "###\n###\n###\n###");
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 0U);
+  EXPECT_EQ(dag.nodes[1].text, "###\n###\n###");
+}
+
 // TODO:
-//     ###
-//    /###
-// ###\###
-// ###/###
-// ###
-//
 //     ###\
 //     ###\\
 //     ###|###

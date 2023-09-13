@@ -215,12 +215,15 @@ std::vector<size_t> EdgesInFlight::findNRemoveEdgesToNode(size_t col) {
 std::vector<size_t>
 EdgesInFlight::findNRemoveEdgesToEdge(Direction dirBelow, EdgeMap const& prevNodes, size_t col) {
   std::vector<size_t> ret;
-  if (auto to = getIf(prevNodes, col + columnShift[0][toInt(dirBelow)])) {
-    ret.push_back(*to);
-  }
   for (auto dirAbove :
        {toInt(Direction::Left), toInt(Direction::Straight), toInt(Direction::Right)}) {
     if (auto to = findAndEraseIf(edges[dirAbove], col + columnShift[dirAbove][toInt(dirBelow)])) {
+      ret.push_back(*to);
+    }
+  }
+  // Avoid connecting an edge to a node if it is already connected to an edge
+  if (ret.empty()) {
+    if (auto to = getIf(prevNodes, col + columnShift[0][toInt(dirBelow)])) {
       ret.push_back(*to);
     }
   }
@@ -406,16 +409,16 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
       // Keep accumulating at least for as long as the node-line above
       collector.addNodeChar(c);
     } else if (auto dir = EdgesInFlight::edgeChar(c)) {
-      if (auto nodeErr = collector.tryAddNode(prevEdges, pos)) {
-        err = *nodeErr;
-        return std::nullopt;
-      }
+      // Continue the edge, if possible, before attaching one to a node
       auto fromNodes = prevEdges.findNRemoveEdgesToEdge(*dir, collector.getPrevNodes(), pos.col);
       if (auto e = currEdges.updateOrError(fromNodes, *dir, pos)) {
         err = *e;
         return std::nullopt;
       }
-      continue;
+      if (auto nodeErr = collector.tryAddNode(prevEdges, pos)) {
+        err = *nodeErr;
+        return std::nullopt;
+      }
     } else if (c == ' ') {
       if (auto nodeErr = collector.tryAddNode(prevEdges, pos)) {
         err = *nodeErr;
