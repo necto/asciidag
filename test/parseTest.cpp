@@ -1241,6 +1241,66 @@ TEST(parse, sideEdgeSquiggle) {
   EXPECT_EQ(dag.nodes[1].text, "###\n###\n###");
 }
 
+TEST(parse, sideEdgeTurnAwayFromNodeLeft) {
+  std::string str = R"(
+    AAA
+     ||
+     |B
+     /|
+    CCC
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.nodes.size(), 3U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 2U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[1].to, 2U);
+  EXPECT_EQ(dag.nodes[0].text, "AAA");
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[1].outEdges[0].to, 2U);
+  EXPECT_EQ(dag.nodes[1].text, "B");
+  EXPECT_EQ(dag.nodes[2].outEdges.size(), 0U);
+  EXPECT_EQ(dag.nodes[2].text, "CCC");
+}
+
+TEST(parse, sideEdgeTurnAwayFromNodeRight) {
+  std::string str = R"(
+     AAA
+     ||
+     B|
+     |\
+     CCC
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.nodes.size(), 3U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 2U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[1].to, 2U);
+  EXPECT_EQ(dag.nodes[0].text, "AAA");
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[1].outEdges[0].to, 2U);
+  EXPECT_EQ(dag.nodes[1].text, "B");
+  EXPECT_EQ(dag.nodes[2].outEdges.size(), 0U);
+  EXPECT_EQ(dag.nodes[2].text, "CCC");
+}
+
+TEST(parse, sideEdgeSquiglyPipe) {
+  std::string str = R"(
+     ###
+     ###\
+     ###|###
+     ###/###
+     ###\|
+         ###
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.nodes.size(), 3U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 2U);
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[1].outEdges[0].to, 2U);
+  EXPECT_EQ(dag.nodes[2].outEdges.size(), 0U);
+}
+
 // TODO:
 //     ###\
 //     ###\\
@@ -1249,8 +1309,3 @@ TEST(parse, sideEdgeSquiggle) {
 //     ###\|
 //         ###
 //
-//     ###
-//     ||
-//     #|
-//     |\
-//     ###
