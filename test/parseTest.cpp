@@ -1403,3 +1403,123 @@ TEST(parse, simpleEdgeCross) {
   EXPECT_EQ(dag.nodes[1].text, "B");
   EXPECT_EQ(dag.nodes[2].text, "C");
 }
+
+TEST(parseError, crossMissingLeftBottomEdge) {
+  std::string str = R"(
+    A   B
+     \ /
+      X
+       \
+        D
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::DanglingEdge);
+  EXPECT_EQ(err.pos, (Position{3U, 8U}));
+}
+
+TEST(parseError, crossMissingRightBottomEdge) {
+  std::string str = R"(
+    A   B
+     \ /
+      X
+     /
+    C   D
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::DanglingEdge);
+  EXPECT_EQ(err.pos, (Position{3U, 8U}));
+}
+
+TEST(parseError, crossMissingBothBottomEdges) {
+  std::string str = R"(
+    A   B
+     \ /
+      X
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::DanglingEdge);
+  EXPECT_EQ(err.pos, (Position{3U, 8U}));
+}
+
+TEST(parseError, crossMissingLeftTopEdge) {
+  std::string str = R"(
+    A   B
+       /
+      X
+     / \
+    C   D
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::SuspendedEdge);
+  EXPECT_EQ(err.pos, (Position{3U, 8U}));
+}
+
+TEST(parseError, crossMissingRightTopEdge) {
+  std::string str = R"(
+    A
+     \
+      X
+     / \
+    C   D
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::SuspendedEdge);
+  EXPECT_EQ(err.pos, (Position{3U, 8U}));
+}
+
+TEST(parseError, crossMissingBothTopEdges) {
+  std::string str = R"(
+      X
+     / \
+    A   B
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::SuspendedEdge);
+  EXPECT_EQ(err.pos, (Position{1U, 8U}));
+}
+
+// TODO: double crossed edges:
+//
+// \\//
+//  XX
+// //\\
+//
+// TODO: X adjacent to some nodes
+// With attached edges and without
+//
+// ###X
+//   \ /
+// ###X
+//   / \
+//
+// X###
+//
+//  X
+// ###
+//
+// ###
+//  X
+//
+//  X
+//  #
+//  #
+//  X
+//
+// Node from "X"es
+//
+// XXX
+//
+// XXX
+// XXX

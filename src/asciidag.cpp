@@ -283,6 +283,7 @@ private:
   std::optional<size_t> findNodeAbove(size_t col);
 
   std::vector<DAG::Node> nodes = {};
+  std::vector<Position> nodePositions = {};
   std::string partialNode = "";
   EdgeMap prevNodes;
   EdgeMap currNodes;
@@ -301,30 +302,45 @@ void replace(std::vector<DAG::OutEdge>& edges, size_t dated, size_t updated) {
   }
 }
 
-std::vector<DAG::Node> resolveCrossEdges(std::vector<DAG::Node> && nodes, ParseError &err) {
-  err.code = ParseError::Code::None;
+std::optional<ParseError> validateEdgeCrossings(
+  std::vector<DAG::Node> const& nodes,
+  std::vector<Position> const& nodePositions
+) {
+  assert(nodes.size() == nodePositions.size());
+  std::unordered_map<size_t, std::vector<size_t>> fromEdges;
+  for (size_t i = 0; i < nodes.size(); ++i) {
+    if (nodes[i].text == "X") {
+      auto fromIter = fromEdges.find(i);
+      if (fromIter == fromEdges.end()) {
+        return {{ParseError::Code::SuspendedEdge, "Edge crossing misses both incoming edges.", nodePositions[i]}};
+      }
+      auto& from = fromIter->second;
+      if (from.size() != 2) {
+        return {{ParseError::Code::SuspendedEdge, "Edge crossing misses an incoming edge.", nodePositions[i]}};
+      }
+      if (nodes[i].outEdges.size() != 2) {
+        return {{ParseError::Code::DanglingEdge, "Edge crossing misses an outgoing edge.", nodePositions[i]}};
+      }
+    }
+    for (auto const& e : nodes[i].outEdges) {
+      fromEdges[e.to].push_back(i);
+    }
+  }
+  return {};
+}
+
+std::vector<DAG::Node> resolveCrossEdges(std::vector<DAG::Node> && nodes) {
   size_t nSkipped = 0;
   std::unordered_map<size_t, std::vector<size_t>> fromEdges;
   std::vector<size_t> idMap(nodes.size());
   for (size_t i = 0; i < nodes.size(); ++i) {
     if (nodes[i].text == "X") {
-      auto fromIter = fromEdges.find(i);
-      if (fromIter == fromEdges.end()) {
-        std::cout << "perror 1\n";
-        // parsing error
-        break;
-      }
-      auto& from = fromIter->second;
-      if (from.size() != 2) {
-        std::cout << "perror 2\n";
-        // parsing error
-        break;
-      }
-      if (nodes[i].outEdges.size() != 2) {
-        std::cout << "perror 3\n";
-        // parsing error
-        break;
-      }
+      // Assertions are ensured by "validateEdgeCrossings"
+      assert(fromEdges.count(i) != 0);
+      auto& from = fromEdges[i];
+      assert(from.size() == 2);
+      assert(nodes[i].outEdges.size() == 2);
+
       replace(nodes[from[0]].outEdges, i, nodes[i].outEdges[1].to);
       replace(nodes[from[1]].outEdges, i, nodes[i].outEdges[0].to);
       ++nSkipped;
@@ -348,11 +364,10 @@ std::vector<DAG::Node> resolveCrossEdges(std::vector<DAG::Node> && nodes, ParseE
 
 std::optional<ParseError> NodeCollector::finalize() {
   if (hasCrossEdges(nodes)) {
-    ParseError err;
-    nodes = resolveCrossEdges(std::move(nodes), err);
-    if (err.code != ParseError::Code::None) {
+    if (auto err = validateEdgeCrossings(nodes, nodePositions)) {
       return err;
     }
+    nodes = resolveCrossEdges(std::move(nodes));
   }
   finalized = true;
   return {};
@@ -409,6 +424,7 @@ void NodeCollector::startNewNode(EdgesInFlight& prevEdges, Position const& pos) 
   nodes.push_back({});
   nodes[id].text = partialNode;
   partialNode.clear();
+  nodePositions.push_back(pos);
 }
 
 std::optional<ParseError>
@@ -534,7 +550,10 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
     err = *dangling;
     return std::nullopt;
   }
-  collector.finalize();
+  if (auto inconsistent = collector.finalize()) {
+    err = *inconsistent;
+    return std::nullopt;
+  }
   return std::move(collector).buildDAG();
 }
 
