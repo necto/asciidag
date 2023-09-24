@@ -1490,36 +1490,96 @@ TEST(parseError, crossMissingBothTopEdges) {
   EXPECT_EQ(err.pos, (Position{1U, 8U}));
 }
 
-// TODO: double crossed edges:
-//
-// \\//
-//  XX
-// //\\
-//
-// TODO: X adjacent to some nodes
-// With attached edges and without
-//
-// ###X
-//   \ /
-// ###X
-//   / \
-//
-// X###
-//
-//  X
-// ###
-//
-// ###
-//  X
-//
-//  X
-//  #
-//  #
-//  X
-//
-// Node from "X"es
-//
-// XXX
-//
-// XXX
-// XXX
+TEST(parseError, standaloneX) {
+  std::string str = R"(
+      X
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  ASSERT_EQ(err.code, ParseError::Code::SuspendedEdge);
+  EXPECT_EQ(err.pos, (Position{1U, 8U}));
+}
+
+TEST(parse, standaloneXX) {
+  std::string str = R"(
+      XX
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.nodes.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].text, "XX");
+}
+
+TEST(parse, crossAdjacentToNodeLeft) {
+  // When adjacent to a node, 'X' is part of the node
+  // and it does not represent edge crossing.
+  std::string str = R"(
+    A   B
+     \ /
+      X#
+     / \
+    C   D
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.nodes.size(), 5U);
+}
+
+TEST(parse, crossAdjacentToNodeRight) {
+  // When adjacent to a node, 'X' is part of the node
+  // and it does not represent edge crossing.
+  std::string str = R"(
+    A   B
+     \ /
+     #X
+     / \
+    C   D
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.nodes.size(), 5U);
+}
+
+TEST(parse, crossAdjacentToNodeTop) {
+  // When adjacent to a node, 'X' is part of the node
+  // and it does not represent edge crossing.
+  std::string str = R"(
+    A   B
+     \ /
+      X
+     /#\
+    C   D
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.nodes.size(), 5U);
+}
+
+TEST(parse, crossAdjacentToNodeBottom) {
+  // When adjacent to a node, 'X' is part of the node
+  // and it does not represent edge crossing.
+  std::string str = R"(
+    A   B
+     \#/
+      X
+     / \
+    C   D
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.nodes.size(), 5U);
+}
+
+TEST(parse, doubleXIsNotCrossing) {
+  // "XX" is a regular node and not a double-edge crossing
+  std::string str = R"(
+    A B C  D
+    | | | /
+    \ | //
+     \\//
+      XX
+     //\\
+    ######
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.nodes.size(), 6);
+  EXPECT_EQ(std::count_if(std::begin(dag.nodes), std::end(dag.nodes), [](auto const& n) {
+    return n.text == "XX";
+  }), 1U);
+}
