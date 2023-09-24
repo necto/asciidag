@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstddef>
 #include <iostream>
 #include <optional>
 #include <set>
@@ -222,7 +223,8 @@ EdgesInFlight::findNRemoveEdgesToEdge(Direction dirBelow, EdgeMap const& prevNod
 }
 
 [[maybe_unused]]
-std::ostream& operator<<(std::ostream& os, EdgesInFlight const& edges) {
+std::ostream&
+operator<<(std::ostream& os, EdgesInFlight const& edges) {
   bool first = true;
   for (auto dir :
        {EdgesInFlight::Direction::Left,
@@ -262,7 +264,10 @@ public:
 
   bool isPartOfANode(size_t col) const;
 
-  DAG buildDAG() && { assert(finalized); return {std::move(nodes)}; }
+  DAG buildDAG() && {
+    assert(finalized);
+    return {std::move(nodes)};
+  }
 
   EdgeMap const& getPrevNodes() const { return prevNodes; }
 
@@ -284,7 +289,71 @@ private:
   bool finalized = false;
 };
 
+bool hasCrossEdges(std::vector<DAG::Node> const& nodes) {
+  return std::any_of(nodes.begin(), nodes.end(), [](DAG::Node const& n) { return n.text == "X"; });
+}
+
+void replace(std::vector<DAG::OutEdge>& edges, size_t dated, size_t updated) {
+  for (auto& e : edges) {
+    if (e.to == dated) {
+      e.to = updated;
+    }
+  }
+}
+
+std::vector<DAG::Node> resolveCrossEdges(std::vector<DAG::Node> && nodes, ParseError &err) {
+  err.code = ParseError::Code::None;
+  size_t nSkipped = 0;
+  std::unordered_map<size_t, std::vector<size_t>> fromEdges;
+  std::vector<size_t> idMap(nodes.size());
+  for (size_t i = 0; i < nodes.size(); ++i) {
+    if (nodes[i].text == "X") {
+      auto fromIter = fromEdges.find(i);
+      if (fromIter == fromEdges.end()) {
+        std::cout << "perror 1\n";
+        // parsing error
+        break;
+      }
+      auto& from = fromIter->second;
+      if (from.size() != 2) {
+        std::cout << "perror 2\n";
+        // parsing error
+        break;
+      }
+      if (nodes[i].outEdges.size() != 2) {
+        std::cout << "perror 3\n";
+        // parsing error
+        break;
+      }
+      replace(nodes[from[0]].outEdges, i, nodes[i].outEdges[1].to);
+      replace(nodes[from[1]].outEdges, i, nodes[i].outEdges[0].to);
+      ++nSkipped;
+    }
+    for (auto const& e : nodes[i].outEdges) {
+      fromEdges[e.to].push_back(i);
+    }
+    idMap[i] = i - nSkipped;
+  }
+  nodes.erase(
+    std::remove_if(nodes.begin(), nodes.end(), [](DAG::Node const& n) { return n.text == "X"; }),
+    nodes.end()
+  );
+  for (auto& n : nodes) {
+    for (auto& e : n.outEdges) {
+      e.to = idMap[e.to];
+    }
+  }
+  return nodes;
+}
+
 std::optional<ParseError> NodeCollector::finalize() {
+  if (hasCrossEdges(nodes)) {
+    ParseError err;
+    nodes = resolveCrossEdges(std::move(nodes), err);
+    if (err.code != ParseError::Code::None) {
+      return err;
+    }
+  }
   finalized = true;
   return {};
 }

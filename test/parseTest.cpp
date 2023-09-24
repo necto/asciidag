@@ -1373,6 +1373,7 @@ TEST(parse, selfLoop) {
     ##
 )";
   ParseError err;
+  // Cannot use "parseSuccessfully" here because it does not admin self-loops
   auto dag = parseDAG(str, err);
   EXPECT_EQ(err.code, ParseError::Code::None);
   ASSERT_TRUE(dag.has_value());
@@ -1380,4 +1381,25 @@ TEST(parse, selfLoop) {
   ASSERT_EQ(dag->nodes[0].outEdges.size(), 2U);
   EXPECT_EQ(dag->nodes[0].outEdges[0].to, 0U);
   EXPECT_EQ(dag->nodes[0].outEdges[1].to, 0U);
+}
+
+TEST(parse, simpleEdgeCross) {
+  std::string str = R"(
+    A   B
+     \ /
+      X
+     / \
+    C   D
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.nodes.size(), 4U);
+  ASSERT_EQ(dag.nodes[0].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[0].outEdges[0].to, 3U);
+  EXPECT_EQ(dag.nodes[0].text, "A");
+  EXPECT_EQ(dag.nodes[3].text, "D");
+
+  EXPECT_EQ(dag.nodes[1].outEdges.size(), 1U);
+  EXPECT_EQ(dag.nodes[1].outEdges[0].to, 2U);
+  EXPECT_EQ(dag.nodes[1].text, "B");
+  EXPECT_EQ(dag.nodes[2].text, "C");
 }
