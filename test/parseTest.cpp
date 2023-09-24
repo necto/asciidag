@@ -1359,3 +1359,21 @@ TEST(parse, parallelSideEdges) {
   EXPECT_EQ(dag.nodes[1].outEdges[0].to, 2U);
   EXPECT_EQ(dag.nodes[2].outEdges.size(), 0U);
 }
+
+TEST(parse, selfLoop) {
+  // This is not a DAG because it includes a self-loop
+  // the parsing algorithm accepts it even though it does not have to
+  std::string str = R"(
+    ##
+    ##\
+    ##/
+    ##
+)";
+  ParseError err;
+  auto dag = parseDAG(str, err);
+  EXPECT_EQ(err.code, ParseError::Code::None);
+  ASSERT_TRUE(dag.has_value());
+  ASSERT_EQ(dag->nodes.size(), 1U);
+  ASSERT_EQ(dag->nodes[0].outEdges.size(), 1U);
+  EXPECT_EQ(dag->nodes[0].outEdges[0].to, 0U);
+}
