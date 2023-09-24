@@ -1366,6 +1366,9 @@ TEST(parse, selfLoop) {
   std::string str = R"(
     ##
     ##\
+    ##\\
+    ##/|
+    ## /
     ##/
     ##
 )";
@@ -1374,6 +1377,7 @@ TEST(parse, selfLoop) {
   EXPECT_EQ(err.code, ParseError::Code::None);
   ASSERT_TRUE(dag.has_value());
   ASSERT_EQ(dag->nodes.size(), 1U);
-  ASSERT_EQ(dag->nodes[0].outEdges.size(), 1U);
+  ASSERT_EQ(dag->nodes[0].outEdges.size(), 2U);
   EXPECT_EQ(dag->nodes[0].outEdges[0].to, 0U);
+  EXPECT_EQ(dag->nodes[0].outEdges[1].to, 0U);
 }
