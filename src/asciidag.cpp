@@ -134,8 +134,8 @@ public:
 
 private:
 
-  /// 0 - empty map, just for padding
-  /// The rest corresponds to Direction options
+  /// edges[0] stores an empty map (just for padding)
+  /// The edges[1]..edges[3] corresponds to the Direction options
   EdgeMap edges[4];
 };
 
@@ -212,6 +212,7 @@ EdgesInFlight::findNRemoveEdgesToEdge(Direction dirBelow, EdgeMap const& prevNod
     }
   }
   // Avoid connecting an edge to a node if it is already connected to an edge
+  // so only register the connection if there is no connection to an edge
   if (ret.empty()) {
     if (auto to = getIf(prevNodes, col + columnShift[0][toInt(dirBelow)])) {
       ret.push_back(*to);
@@ -261,11 +262,13 @@ public:
 
   bool isPartOfANode(size_t col) const;
 
-  DAG buildDAG() && { return {std::move(nodes)}; }
+  DAG buildDAG() && { assert(finalized); return {std::move(nodes)}; }
 
   EdgeMap const& getPrevNodes() const { return prevNodes; }
 
   void newLine();
+
+  std::optional<ParseError> finalize();
 
 private:
   std::optional<ParseError> checkRectangularNewNode(Position const& pos);
@@ -278,7 +281,13 @@ private:
   std::string partialNode = "";
   EdgeMap prevNodes;
   EdgeMap currNodes;
+  bool finalized = false;
 };
+
+std::optional<ParseError> NodeCollector::finalize() {
+  finalized = true;
+  return {};
+}
 
 std::optional<ParseError> NodeCollector::tryAddNode(EdgesInFlight& prevEdges, Position const& pos) {
   if (partialNode.empty()) {
@@ -456,6 +465,7 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
     err = *dangling;
     return std::nullopt;
   }
+  collector.finalize();
   return std::move(collector).buildDAG();
 }
 
