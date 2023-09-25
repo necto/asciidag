@@ -84,13 +84,18 @@ public:
   }
 
   NodeInfo node(std::string const& text) const {
-    auto iter = std::find_if(nodes.begin(), nodes.end(), [text](DAG::Node const& n) {
-      return n.text == text;
-    });
+    auto findFrom = [text, this](auto fromIter) {
+      return std::find_if(fromIter, nodes.end(), [text](DAG::Node const& n) {
+        return n.text == text;
+      });
+    };
+    auto iter = findFrom(nodes.begin());
     EXPECT_NE(iter, nodes.end());
     if (iter == nodes.end()) {
       return {this, 0};
     }
+    // Make sure the node is unique
+    EXPECT_EQ(findFrom(iter + 1), nodes.end());
     return {this, static_cast<size_t>(iter - nodes.begin())};
   }
 };
@@ -126,7 +131,7 @@ TEST(parse, empty) {
 
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 0U);
+  EXPECT_EQ(dag.nodes.size(), 0U);
 }
 
 TEST(parse, singleNode) {
@@ -136,9 +141,8 @@ TEST(parse, singleNode) {
 
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs.size(), 0U);
-  EXPECT_EQ(dag.nodes[0].text, ".");
+  EXPECT_EQ(dag.allNodes(), nodes("."));
+  EXPECT_TRUE(dag.node(".").succs().empty());
 }
 
 TEST(parse, singleWideNode) {
@@ -148,19 +152,18 @@ TEST(parse, singleWideNode) {
 
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs.size(), 0U);
-  EXPECT_EQ(dag.nodes[0].text, "###");
+  EXPECT_EQ(dag.allNodes(), nodes("###"));
+  EXPECT_TRUE(dag.node("###").succs().empty());
 }
 
 TEST(parse, twoDisconnectedNodes) {
   std::string str = R"(
-    . .
+    1 2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  EXPECT_EQ(dag.nodes[0].succs.size(), 0U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2"));
+  EXPECT_TRUE(dag.node("1").succs().empty());
+  EXPECT_TRUE(dag.node("2").succs().empty());
 }
 
 TEST(parse, twoWideNodes) {
@@ -168,11 +171,9 @@ TEST(parse, twoWideNodes) {
     AA BB
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  EXPECT_EQ(dag.nodes[0].succs.size(), 0U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
-  EXPECT_EQ(dag.nodes[0].text, "AA");
-  EXPECT_EQ(dag.nodes[1].text, "BB");
+  EXPECT_EQ(dag.allNodes(), nodes("AA", "BB"));
+  EXPECT_TRUE(dag.node("AA").succs().empty());
+  EXPECT_TRUE(dag.node("BB").succs().empty());
 }
 
 TEST(parse, twoLineNode) {
@@ -182,9 +183,8 @@ TEST(parse, twoLineNode) {
 )";
 
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 1);
-  EXPECT_EQ(dag.nodes[0].text, ".\n.");
-  EXPECT_TRUE(dag.nodes[0].succs.empty());
+  EXPECT_EQ(dag.allNodes(), nodes(".\n."));
+  EXPECT_TRUE(dag.node(".\n.").succs().empty());
 }
 
 TEST(parse, nodeSquare2) {
@@ -194,9 +194,8 @@ TEST(parse, nodeSquare2) {
 )";
 
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 1);
-  EXPECT_EQ(dag.nodes[0].text, "12\n34");
-  EXPECT_TRUE(dag.nodes[0].succs.empty());
+  EXPECT_EQ(dag.allNodes(), nodes("12\n34"));
+  EXPECT_TRUE(dag.node("12\n34").succs().empty());
 }
 
 TEST(parse, fourFatNodes) {
@@ -209,15 +208,11 @@ TEST(parse, fourFatNodes) {
 )";
 
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 4);
-  EXPECT_EQ(dag.nodes[0].text, "12\n34");
-  EXPECT_TRUE(dag.nodes[0].succs.empty());
-  EXPECT_EQ(dag.nodes[1].text, "56\n78");
-  EXPECT_TRUE(dag.nodes[1].succs.empty());
-  EXPECT_EQ(dag.nodes[2].text, "ab\ncd");
-  EXPECT_TRUE(dag.nodes[2].succs.empty());
-  EXPECT_EQ(dag.nodes[3].text, "AB\nCD");
-  EXPECT_TRUE(dag.nodes[3].succs.empty());
+  EXPECT_EQ(dag.allNodes(), nodes("12\n34", "56\n78", "ab\ncd", "AB\nCD"));
+  EXPECT_TRUE(dag.node("12\n34").succs().empty());
+  EXPECT_TRUE(dag.node("56\n78").succs().empty());
+  EXPECT_TRUE(dag.node("ab\ncd").succs().empty());
+  EXPECT_TRUE(dag.node("AB\nCD").succs().empty());
 }
 
 TEST(parse, checkered) {
@@ -231,315 +226,288 @@ TEST(parse, checkered) {
 )";
 
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 5);
-  EXPECT_EQ(dag.nodes[0].text, "34\n56");
-  EXPECT_TRUE(dag.nodes[0].succs.empty());
-  EXPECT_EQ(dag.nodes[1].text, "12");
-  EXPECT_TRUE(dag.nodes[1].succs.empty());
-  EXPECT_EQ(dag.nodes[2].text, "AB\nCD");
-  EXPECT_TRUE(dag.nodes[2].succs.empty());
-  EXPECT_EQ(dag.nodes[3].text, ".\n.");
-  EXPECT_TRUE(dag.nodes[3].succs.empty());
-  EXPECT_EQ(dag.nodes[4].text, "#");
-  EXPECT_TRUE(dag.nodes[4].succs.empty());
+  EXPECT_EQ(dag.allNodes(), nodes("12", "34\n56", ".\n.", "AB\nCD", "#"));
+  EXPECT_TRUE(dag.node("12").succs().empty());
+  EXPECT_TRUE(dag.node("34\n56").succs().empty());
+  EXPECT_TRUE(dag.node(".\n.").succs().empty());
+  EXPECT_TRUE(dag.node("AB\nCD").succs().empty());
+  EXPECT_TRUE(dag.node("#").succs().empty());
 }
 
 TEST(parse, twoConnectedNodesPipe) {
   std::string str = R"(
-    .
+    1
     |
-    .
+    2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2"));
+  EXPECT_EQ(dag.node("1").succs(), nodes("2"));
+  EXPECT_TRUE(dag.node("2").succs().empty());
 }
 
 TEST(parse, twoConnectedWideNodesPipeLeft) {
   std::string str = R"(
-    ##
+    1#
     |
-    ##
+    #2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1#", "#2"));
+  EXPECT_EQ(dag.node("1#").succs(), nodes("#2"));
+  EXPECT_TRUE(dag.node("#2").succs().empty());
 }
 
 TEST(parse, twoConnectedWideNodesPipeRight) {
   std::string str = R"(
-    ##
+    1#
      |
-    ##
+    #2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1#", "#2"));
+  EXPECT_EQ(dag.node("1#").succs(), nodes("#2"));
+  EXPECT_TRUE(dag.node("#2").succs().empty());
 }
 
 TEST(parse, twoConnectedWideNodesPipeRightSkew) {
   std::string str = R"(
-    ##
+    1#
      |
-     ##
+     #2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1#", "#2"));
+  EXPECT_EQ(dag.node("1#").succs(), nodes("#2"));
+  EXPECT_TRUE(dag.node("#2").succs().empty());
 }
 
 TEST(parse, twoConnectedWideNodesPipeLeftSkew) {
   std::string str = R"(
-     ##
+     1#
      |
-    ##
+    #2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1#", "#2"));
+  EXPECT_EQ(dag.node("1#").succs(), nodes("#2"));
+  EXPECT_TRUE(dag.node("#2").succs().empty());
 }
 
 TEST(parse, twoConnectedNodesSlash) {
   std::string str = R"(
-     .
+     1
     /
-   .
+   2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2"));
+  EXPECT_EQ(dag.node("1").succs(), nodes("2"));
+  EXPECT_TRUE(dag.node("2").succs().empty());
 }
 
 TEST(parse, twoConnectedWideNodesSlashRightSkew) {
   std::string str = R"(
-    ##
+    1#
     /
-   ##
+   #2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1#", "#2"));
+  EXPECT_EQ(dag.node("1#").succs(), nodes("#2"));
+  EXPECT_TRUE(dag.node("#2").succs().empty());
 }
 
 TEST(parse, twoConnectedWideNodesSlashRightDoubleSkewLeft) {
   std::string str = R"(
-    ##
+    1#
    /
-  ##
+  #2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1#", "#2"));
+  EXPECT_EQ(dag.node("1#").succs(), nodes("#2"));
+  EXPECT_TRUE(dag.node("#2").succs().empty());
 }
 
 TEST(parse, twoConnectedWideNodesSlashRightDoubleSkewRight) {
   std::string str = R"(
-    ##
+    1#
     /
-  ##
+  #2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1#", "#2"));
+  EXPECT_EQ(dag.node("1#").succs(), nodes("#2"));
+  EXPECT_TRUE(dag.node("#2").succs().empty());
 }
 
 TEST(parse, twoConnectedWideNodesSlashRightTripleSkew) {
   std::string str = R"(
-     ##
+     1#
     /
-  ##
+  #2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1#", "#2"));
+  EXPECT_EQ(dag.node("1#").succs(), nodes("#2"));
+  EXPECT_TRUE(dag.node("#2").succs().empty());
 }
 
 TEST(parse, twoConnectedNodesBackslash) {
   std::string str = R"(
-   .
+   1
     \
-     .
+     2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2"));
+  EXPECT_EQ(dag.node("1").succs(), nodes("2"));
+  EXPECT_TRUE(dag.node("2").succs().empty());
 }
 
 TEST(parse, twoConnectedWideNodesBackslashRightSkew) {
   std::string str = R"(
-   ##
+   1#
     \
-    ##
+    #2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1#", "#2"));
+  EXPECT_EQ(dag.node("1#").succs(), nodes("#2"));
+  EXPECT_TRUE(dag.node("#2").succs().empty());
 }
 
 TEST(parse, twoConnectedWideNodesBackslashRightDoubleSkewLeft) {
   std::string str = R"(
-  ##
+  1#
    \
-    ##
+    #2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1#", "#2"));
+  EXPECT_EQ(dag.node("1#").succs(), nodes("#2"));
+  EXPECT_TRUE(dag.node("#2").succs().empty());
 }
 
 TEST(parse, twoConnectedWideNodesBackslashRightDoubleSkewRight) {
   std::string str = R"(
-   ##
+   1#
     \
-    ##
+    #2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1#", "#2"));
+  EXPECT_EQ(dag.node("1#").succs(), nodes("#2"));
+  EXPECT_TRUE(dag.node("#2").succs().empty());
 }
 
 TEST(parse, twoConnectedWideNodesBackslashRightTripleSkew) {
   std::string str = R"(
-  ##
+  1#
     \
-     ##
+     #2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1#", "#2"));
+  EXPECT_EQ(dag.node("1#").succs(), nodes("#2"));
+  EXPECT_TRUE(dag.node("#2").succs().empty());
 }
 
 TEST(parse, longEdgePipe) {
   std::string str = R"(
-   .
+   1
    |
    |
-   .
+   2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2"));
+  EXPECT_EQ(dag.node("1").succs(), nodes("2"));
+  EXPECT_TRUE(dag.node("2").succs().empty());
 }
 
 TEST(parse, longSlash) {
   std::string str = R"(
-    .
+    1
    /
   /
- .
+ 2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2"));
+  EXPECT_EQ(dag.node("1").succs(), nodes("2"));
+  EXPECT_TRUE(dag.node("2").succs().empty());
 }
 
 TEST(parse, longEdgeBackslash) {
   std::string str = R"(
-   .
+   1
     \
      \
-      .
+      2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2"));
+  EXPECT_EQ(dag.node("1").succs(), nodes("2"));
+  EXPECT_TRUE(dag.node("2").succs().empty());
 }
 
 TEST(parse, longEdgeSlashPipe) {
   std::string str = R"(
-     .
+     1
     /
     |
-    .
+    2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2"));
+  EXPECT_EQ(dag.node("1").succs(), nodes("2"));
+  EXPECT_TRUE(dag.node("2").succs().empty());
 }
 
 TEST(parse, longEdgeBackslashPipe) {
   std::string str = R"(
-   .
+   1
     \
     |
-    .
+    2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2"));
+  EXPECT_EQ(dag.node("1").succs(), nodes("2"));
+  EXPECT_TRUE(dag.node("2").succs().empty());
 }
 
 TEST(parse, longEdgePipeSlash) {
   std::string str = R"(
-     .
+     1
      |
      /
-    .
+    2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2"));
+  EXPECT_EQ(dag.node("1").succs(), nodes("2"));
+  EXPECT_TRUE(dag.node("2").succs().empty());
 }
 
 TEST(parse, longEdgePipeBackslash) {
   std::string str = R"(
-   .
+   1
    |
    \
-    .
+    2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2"));
+  EXPECT_EQ(dag.node("1").succs(), nodes("2"));
+  EXPECT_TRUE(dag.node("2").succs().empty());
 }
 
 TEST(parse, longEdgeWiggly) {
   std::string str = R"(
-   .
+   1
    |
    \
     \
@@ -553,83 +521,72 @@ TEST(parse, longEdgeWiggly) {
    |
    /
   /
- .
+ 2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2"));
+  EXPECT_EQ(dag.node("1").succs(), nodes("2"));
+  EXPECT_TRUE(dag.node("2").succs().empty());
 }
 
 TEST(parse, twoEdges) {
   std::string str = R"(
-   .
+   1
   / \
- .   .
+ 2   3
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 3U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 2U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[0].succs[1], 2U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
-  EXPECT_EQ(dag.nodes[2].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2", "3"));
+  EXPECT_EQ(dag.node("1").succs(), nodes("2", "3"));
+  EXPECT_TRUE(dag.node("2").succs().empty());
+  EXPECT_TRUE(dag.node("3").succs().empty());
 }
 
 TEST(parse, hammock) {
   std::string str = R"(
-   .
+   1
   / \
- .   .
+ 2   3
   \ /
-   .
+   4
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 4U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 2U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[0].succs[1], 2U);
-  ASSERT_EQ(dag.nodes[1].succs.size(), 1U);
-  ASSERT_EQ(dag.nodes[2].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[1].succs[0], 3U);
-  EXPECT_EQ(dag.nodes[2].succs[0], 3U);
-  EXPECT_EQ(dag.nodes[3].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2", "3", "4"));
+  EXPECT_EQ(dag.node("1").succs(), nodes("2", "3"));
+  EXPECT_EQ(dag.node("2").succs(), nodes("4"));
+  EXPECT_EQ(dag.node("3").succs(), nodes("4"));
+  EXPECT_TRUE(dag.node("4").succs().empty());
 }
 
 TEST(parse, skewedHammock) {
   std::string str = R"(
-   .
+   1
   / \
- .   .
+ 2   3
  |   |
  |   /
  |  /
  | /
  | |
  \ /
-  .
+  4
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 4U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 2U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[0].succs[1], 2U);
-  ASSERT_EQ(dag.nodes[1].succs.size(), 1U);
-  ASSERT_EQ(dag.nodes[2].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[1].succs[0], 3U);
-  EXPECT_EQ(dag.nodes[2].succs[0], 3U);
-  EXPECT_EQ(dag.nodes[3].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2", "3", "4"));
+  EXPECT_EQ(dag.node("1").succs(), nodes("2", "3"));
+  EXPECT_EQ(dag.node("2").succs(), nodes("4"));
+  EXPECT_EQ(dag.node("3").succs(), nodes("4"));
+  EXPECT_TRUE(dag.node("4").succs().empty());
 }
 
 TEST(parse, wigglyHammock) {
   std::string str = R"(
-   .
+   1
   / \
   \ |
   | \
   \  \
-   .  .
+   2  3
   /   |
  /    \
  \     \
@@ -638,38 +595,30 @@ TEST(parse, wigglyHammock) {
   \   /
    \ /
    |/
-   .
+   4
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 4U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 2U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[0].succs[1], 2U);
-  ASSERT_EQ(dag.nodes[1].succs.size(), 1U);
-  ASSERT_EQ(dag.nodes[2].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[1].succs[0], 3U);
-  EXPECT_EQ(dag.nodes[2].succs[0], 3U);
-  EXPECT_EQ(dag.nodes[3].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2", "3", "4"));
+  EXPECT_EQ(dag.node("1").succs(), nodes("2", "3"));
+  EXPECT_EQ(dag.node("2").succs(), nodes("4"));
+  EXPECT_EQ(dag.node("3").succs(), nodes("4"));
+  EXPECT_TRUE(dag.node("4").succs().empty());
 }
 
 TEST(parse, wideNodeHammock) {
   std::string str = R"(
-   ###
+   #1#
    | |
- ### ###
+ #2# #3#
   \   /
-   ###
+   #4#
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 4U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 2U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[0].succs[1], 2U);
-  ASSERT_EQ(dag.nodes[1].succs.size(), 1U);
-  ASSERT_EQ(dag.nodes[2].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[1].succs[0], 3U);
-  EXPECT_EQ(dag.nodes[2].succs[0], 3U);
-  EXPECT_EQ(dag.nodes[3].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("#1#", "#2#", "#3#", "#4#"));
+  EXPECT_EQ(dag.node("#1#").succs(), nodes("#2#", "#3#"));
+  EXPECT_EQ(dag.node("#2#").succs(), nodes("#4#"));
+  EXPECT_EQ(dag.node("#3#").succs(), nodes("#4#"));
+  EXPECT_TRUE(dag.node("#4#").succs().empty());
 }
 
 TEST(parseError, danglingPipeEOS) {
@@ -1061,18 +1010,13 @@ TEST(parseError, nodeWithOpenHoleAbove) {
   EXPECT_EQ(err.pos, (Position{2U, 6U}));
 }
 
-TEST(parseError, nodeWithOpenHoleBelow) {
+TEST(parse, nodeWithOpenHoleBelow) {
   std::string str = R"(
     ###
     # #
 )";
-  ParseError err;
-  auto result = parseDAG(str, err);
-  EXPECT_TRUE(result.has_value());
-  ASSERT_EQ(err.code, ParseError::Code::None);
-  ASSERT_EQ(result->nodes.size(), 1U);
-  EXPECT_TRUE(result->nodes[0].succs.empty());
-  EXPECT_EQ(result->nodes[0].text, "###\n# #");
+  auto dag = parseSuccessfully(str);
+  EXPECT_EQ(dag.allNodes(), nodes("###\n# #"));
 }
 
 TEST(parseError, nodeWithOpenHoleLeft) {
@@ -1101,19 +1045,14 @@ TEST(parseError, nodeWithOpenHoleRight) {
   EXPECT_EQ(err.pos, (Position{2U, 7U}));
 }
 
-TEST(parseError, nodeWithClosedHoleFalseAlarm) {
+TEST(parse, nodeWithClosedHole) {
   std::string str = R"(
     ###
     # #
     ###
 )";
-  ParseError err;
-  auto result = parseDAG(str, err);
-  EXPECT_TRUE(result.has_value());
-  ASSERT_EQ(err.code, ParseError::Code::None);
-  ASSERT_EQ(result->nodes.size(), 1U);
-  EXPECT_TRUE(result->nodes[0].succs.empty());
-  EXPECT_EQ(result->nodes[0].text, "###\n# #\n###");
+  auto dag = parseSuccessfully(str);
+  EXPECT_EQ(dag.allNodes(), nodes("###\n# #\n###"));
 }
 
 TEST(parseError, nodeWithEdgeCharMidLeftNonrecNode) {
@@ -1140,149 +1079,120 @@ TEST(parseError, nodeWithEdgeCharMidLeftSuspendedEdge) {
   EXPECT_EQ(err.pos, (Position{2U, 5U}));
 }
 
-TEST(parseError, nodeWithEdgeCharMidCenter) {
+TEST(parse, nodeWithEdgeCharMidCenter) {
   std::string str = R"(
     ###
     #\#
 )";
-  ParseError err;
-  auto result = parseDAG(str, err);
-  EXPECT_TRUE(result.has_value());
-  ASSERT_EQ(err.code, ParseError::Code::None);
-  ASSERT_EQ(result->nodes.size(), 1U);
-  EXPECT_TRUE(result->nodes[0].succs.empty());
-  EXPECT_EQ(result->nodes[0].text, "###\n#\\#");
+  auto dag = parseSuccessfully(str);
+  EXPECT_EQ(dag.allNodes(), nodes("###\n#\\#"));
 }
 
-TEST(parseError, nodeWithEdgeCharMidRightPipe) {
+TEST(parse, nodeWithEdgeCharMidRightPipe) {
   std::string str = R"(
     ###
     ##|
 )";
-  ParseError err;
-  auto result = parseDAG(str, err);
-  EXPECT_TRUE(result.has_value());
-  ASSERT_EQ(err.code, ParseError::Code::None);
-  ASSERT_EQ(result->nodes.size(), 1U);
-  EXPECT_TRUE(result->nodes[0].succs.empty());
-  EXPECT_EQ(result->nodes[0].text, "###\n##|");
+  auto dag = parseSuccessfully(str);
+  EXPECT_EQ(dag.allNodes(), nodes("###\n##|"));
 }
 
-TEST(parseError, nodeWithEdgeCharMidRightSlash) {
+TEST(parse, nodeWithEdgeCharMidRightSlash) {
   std::string str = R"(
     ###
     ##/
 )";
-  ParseError err;
-  auto result = parseDAG(str, err);
-  EXPECT_TRUE(result.has_value());
-  ASSERT_EQ(err.code, ParseError::Code::None);
-  ASSERT_EQ(result->nodes.size(), 1U);
-  EXPECT_TRUE(result->nodes[0].succs.empty());
-  EXPECT_EQ(result->nodes[0].text, "###\n##/");
+  auto dag = parseSuccessfully(str);
+  EXPECT_EQ(dag.allNodes(), nodes("###\n##/"));
 }
 
 TEST(parse, sideEdgeRight1) {
   std::string str = R"(
-    ###
-    ###\###
+    #A#
+    ###\#B#
         ###
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[0].text, "###\n###");
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
-  EXPECT_EQ(dag.nodes[1].text, "###\n###");
+  std::string a = "#A#\n###";
+  std::string b = "#B#\n###";
+  EXPECT_EQ(dag.allNodes(), nodes(a, b));
+  EXPECT_EQ(dag.node(a).succs(), nodes(b));
+  EXPECT_TRUE(dag.node(b).succs().empty());
 }
 
 TEST(parse, sideEdgeRight2) {
   std::string str = R"(
     ###
-    ###\ ###
-    ### \###
+    #A#\ ###
+    ### \#B#
          ###
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[0].text, "###\n###\n###");
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
-  EXPECT_EQ(dag.nodes[1].text, "###\n###\n###");
+  std::string a = "###\n#A#\n###";
+  std::string b = "###\n#B#\n###";
+  EXPECT_EQ(dag.allNodes(), nodes(a, b));
+  EXPECT_EQ(dag.node(a).succs(), nodes(b));
+  EXPECT_TRUE(dag.node(b).succs().empty());
 }
 
 TEST(parse, sideEdgeLeft1) {
   std::string str = R"(
-        ###
-    ###/###
+        #A#
+    #B#/###
     ###
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[0].text, "###\n###");
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
-  EXPECT_EQ(dag.nodes[1].text, "###\n###");
+  std::string a = "#A#\n###";
+  std::string b = "#B#\n###";
+  EXPECT_EQ(dag.allNodes(), nodes(a, b));
+  EXPECT_EQ(dag.node(a).succs(), nodes(b));
+  EXPECT_TRUE(dag.node(b).succs().empty());
 }
 
 TEST(parse, sideEdgeLeft2) {
   std::string str = R"(
          ###
-    ### /###
-    ###/ ###
+    ### /#A#
+    #B#/ ###
     ###
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[0].text, "###\n###\n###");
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
-  EXPECT_EQ(dag.nodes[1].text, "###\n###\n###");
+  std::string a = "###\n#A#\n###";
+  std::string b = "###\n#B#\n###";
+  EXPECT_EQ(dag.allNodes(), nodes(a, b));
+  EXPECT_EQ(dag.node(a).succs(), nodes(b));
+  EXPECT_TRUE(dag.node(b).succs().empty());
 }
 
 TEST(parse, sideEdgePipe) {
   std::string str = R"(
-       .
-       |###
-    ###|###
+       1
+       |A##
+    B##|###
     ###|
-       .
+       2
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 4U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 3U);
-  EXPECT_EQ(dag.nodes[0].text, ".");
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
-  EXPECT_EQ(dag.nodes[1].text, "###\n###");
-  EXPECT_EQ(dag.nodes[2].succs.size(), 0U);
-  EXPECT_EQ(dag.nodes[2].text, "###\n###");
-  ASSERT_EQ(dag.nodes[3].succs.size(), 0U);
-  EXPECT_EQ(dag.nodes[3].text, ".");
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2", "A##\n###", "B##\n###"));
+  EXPECT_EQ(dag.node("1").succs(), nodes("2"));
+  EXPECT_TRUE(dag.node("2").succs().empty());
+  EXPECT_TRUE(dag.node("A##\n###").succs().empty());
+  EXPECT_TRUE(dag.node("B##\n###").succs().empty());
 }
 
 TEST(parse, sideEdgePipes) {
   std::string str = R"(
-    ###
+    #1#
     | |
-    |#|
+    |2|
     | |
-    ###
+    #3#
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 3U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 2U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 2U);
-  EXPECT_EQ(dag.nodes[0].succs[1], 2U);
-  EXPECT_EQ(dag.nodes[0].text, "###");
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
-  EXPECT_EQ(dag.nodes[1].text, "#");
-  ASSERT_EQ(dag.nodes[2].succs.size(), 0U);
-  EXPECT_EQ(dag.nodes[2].text, "###");
+  EXPECT_EQ(dag.allNodes(), nodes("#1#", "2", "#3#"));
+  EXPECT_EQ(dag.node("#1#").succs(), nodes("#3#", "#3#"));
+  EXPECT_TRUE(dag.node("2").succs().empty());
+  EXPECT_TRUE(dag.node("#3#").succs().empty());
 }
 
 TEST(parse, sideEdgeSquiggle) {
@@ -1294,12 +1204,11 @@ TEST(parse, sideEdgeSquiggle) {
    ###
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 2U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[0].text, "###\n###\n###\n###");
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
-  EXPECT_EQ(dag.nodes[1].text, "###\n###\n###");
+  std::string first = "###\n###\n###\n###";
+  std::string second = "###\n###\n###";
+  EXPECT_EQ(dag.allNodes(), nodes(first, second));
+  EXPECT_EQ(dag.node(first).succs(), nodes(second));
+  EXPECT_TRUE(dag.node(second).succs().empty());
 }
 
 TEST(parse, sideEdgeTurnAwayFromNodeLeft) {
@@ -1311,16 +1220,10 @@ TEST(parse, sideEdgeTurnAwayFromNodeLeft) {
     CCC
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 3U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 2U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[0].succs[1], 2U);
-  EXPECT_EQ(dag.nodes[0].text, "AAA");
-  EXPECT_EQ(dag.nodes[1].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[1].succs[0], 2U);
-  EXPECT_EQ(dag.nodes[1].text, "B");
-  EXPECT_EQ(dag.nodes[2].succs.size(), 0U);
-  EXPECT_EQ(dag.nodes[2].text, "CCC");
+  EXPECT_EQ(dag.allNodes(), nodes("AAA", "B", "CCC"));
+  EXPECT_EQ(dag.node("AAA").succs(), nodes("B", "CCC"));
+  EXPECT_EQ(dag.node("B").succs(), nodes("CCC"));
+  EXPECT_TRUE(dag.node("CCC").succs().empty());
 }
 
 TEST(parse, sideEdgeTurnAwayFromNodeRight) {
@@ -1332,16 +1235,10 @@ TEST(parse, sideEdgeTurnAwayFromNodeRight) {
      CCC
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 3U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 2U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[0].succs[1], 2U);
-  EXPECT_EQ(dag.nodes[0].text, "AAA");
-  EXPECT_EQ(dag.nodes[1].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[1].succs[0], 2U);
-  EXPECT_EQ(dag.nodes[1].text, "B");
-  EXPECT_EQ(dag.nodes[2].succs.size(), 0U);
-  EXPECT_EQ(dag.nodes[2].text, "CCC");
+  EXPECT_EQ(dag.allNodes(), nodes("AAA", "B", "CCC"));
+  EXPECT_EQ(dag.node("AAA").succs(), nodes("B", "CCC"));
+  EXPECT_EQ(dag.node("B").succs(), nodes("CCC"));
+  EXPECT_TRUE(dag.node("CCC").succs().empty());
 }
 
 TEST(parse, edgeUndercuttingNodeRight) {
@@ -1352,11 +1249,10 @@ TEST(parse, edgeUndercuttingNodeRight) {
       3
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 3U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 2U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
-  EXPECT_EQ(dag.nodes[2].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2", "3"));
+  EXPECT_EQ(dag.node("1").succs(), nodes("3"));
+  EXPECT_TRUE(dag.node("2").succs().empty());
+  EXPECT_TRUE(dag.node("3").succs().empty());
 }
 
 TEST(parse, edgeUndercuttingNodeLeft) {
@@ -1367,11 +1263,10 @@ TEST(parse, edgeUndercuttingNodeLeft) {
     3
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 3U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 2U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 0U);
-  EXPECT_EQ(dag.nodes[2].succs.size(), 0U);
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2", "3"));
+  EXPECT_EQ(dag.node("1").succs(), nodes("3"));
+  EXPECT_TRUE(dag.node("2").succs().empty());
+  EXPECT_TRUE(dag.node("3").succs().empty());
 }
 
 TEST(parse, sideEdgeSquiglyPipe) {
@@ -1384,12 +1279,10 @@ TEST(parse, sideEdgeSquiglyPipe) {
          ###
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 3U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 2U);
-  EXPECT_EQ(dag.nodes[1].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[1].succs[0], 2U);
-  EXPECT_EQ(dag.nodes[2].succs.size(), 0U);
+  std::string bigNode = "###\n###\n###\n###\n###";
+  EXPECT_EQ(dag.allNodes(), nodes(bigNode, "###\n###", "###"));
+  EXPECT_EQ(dag.node(bigNode).succs(), nodes("###"));
+  EXPECT_EQ(dag.node("###\n###").succs(), nodes("###"));
 }
 
 TEST(parse, parallelSideEdges) {
@@ -1404,17 +1297,11 @@ TEST(parse, parallelSideEdges) {
        ###
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 3U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 6U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 1U);
-  EXPECT_EQ(dag.nodes[0].succs[1], 1U);
-  EXPECT_EQ(dag.nodes[0].succs[2], 1U);
-  EXPECT_EQ(dag.nodes[0].succs[3], 1U);
-  EXPECT_EQ(dag.nodes[0].succs[4], 2U);
-  EXPECT_EQ(dag.nodes[0].succs[5], 2U);
-  ASSERT_EQ(dag.nodes[1].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[1].succs[0], 2U);
-  EXPECT_EQ(dag.nodes[2].succs.size(), 0U);
+  std::string longNode = "#\n#\n#\n#\n#\n#\n#";
+  std::string largeNode = "###\n###";
+  EXPECT_EQ(dag.allNodes(), nodes(longNode, largeNode, "###"));
+  EXPECT_EQ(dag.node(longNode).succs(), nodes(largeNode, largeNode, largeNode, largeNode, "###", "###"));
+  EXPECT_EQ(dag.node(largeNode).succs(), nodes("###"));
 }
 
 TEST(parse, selfLoop) {
@@ -1430,14 +1317,14 @@ TEST(parse, selfLoop) {
     ##
 )";
   ParseError err;
-  // Cannot use "parseSuccessfully" here because it does not admin self-loops
-  auto dag = parseDAG(str, err);
+  // Cannot use "parseSuccessfully" here because it does not admit self-loops
+  auto dagOpt = parseDAG(str, err);
   EXPECT_EQ(err.code, ParseError::Code::None);
-  ASSERT_TRUE(dag.has_value());
-  ASSERT_EQ(dag->nodes.size(), 1U);
-  ASSERT_EQ(dag->nodes[0].succs.size(), 2U);
-  EXPECT_EQ(dag->nodes[0].succs[0], 0U);
-  EXPECT_EQ(dag->nodes[0].succs[1], 0U);
+  ASSERT_TRUE(dagOpt.has_value());
+  auto dag = DAGWithFunctions{*dagOpt};
+  std::string node = "##\n##\n##\n##\n##\n##\n##";
+  ASSERT_EQ(dag.allNodes(), nodes(node));
+  ASSERT_EQ(dag.node(node).succs(), nodes(node, node));
 }
 
 TEST(parse, simpleEdgeCross) {
@@ -1449,16 +1336,9 @@ TEST(parse, simpleEdgeCross) {
     C   D
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 4U);
-  ASSERT_EQ(dag.nodes[0].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].succs[0], 3U);
-  EXPECT_EQ(dag.nodes[0].text, "A");
-  EXPECT_EQ(dag.nodes[3].text, "D");
-
-  EXPECT_EQ(dag.nodes[1].succs.size(), 1U);
-  EXPECT_EQ(dag.nodes[1].succs[0], 2U);
-  EXPECT_EQ(dag.nodes[1].text, "B");
-  EXPECT_EQ(dag.nodes[2].text, "C");
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("D"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("C"));
 }
 
 TEST(parseError, crossMissingLeftBottomEdge) {
@@ -1577,8 +1457,7 @@ TEST(parse, crossAdjacentToNodeLeft) {
     C   D
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 5U);
-  EXPECT_TRUE(dag.hasNode("X#"));
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "X#"));
 }
 
 TEST(parse, crossAdjacentToNodeRight) {
@@ -1592,8 +1471,7 @@ TEST(parse, crossAdjacentToNodeRight) {
     C   D
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 5U);
-  EXPECT_TRUE(dag.hasNode("#X"));
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "#X"));
 }
 
 TEST(parse, crossAdjacentToNodeTop) {
@@ -1607,8 +1485,7 @@ TEST(parse, crossAdjacentToNodeTop) {
     C   D
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 5U);
-  EXPECT_TRUE(dag.hasNode("X\n#"));
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "X\n#"));
 }
 
 TEST(parse, crossAdjacentToNodeBottom) {
@@ -1622,8 +1499,7 @@ TEST(parse, crossAdjacentToNodeBottom) {
     C   D
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 5U);
-  EXPECT_TRUE(dag.hasNode("#\nX"));
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "#\nX"));
 }
 
 TEST(parse, doubleXIsNotCrossing) {
@@ -1656,3 +1532,9 @@ TEST(parse, doubleXIsNotCrossing) {
 //  \|/
 //   X
 //  /|\
+
+// TODO: hemed in
+// 1
+//  \2
+//  4\
+//    3
