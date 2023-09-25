@@ -45,7 +45,64 @@ void checkValidEdges(DAG const& dag) {
   }
 }
 
-DAG parseSuccessfully(std::string str) {
+class NodeInfo {
+public:
+    NodeInfo(DAG const* dag, size_t id) : dag(dag), id(id) {}
+
+    std::vector<std::string> succs() const {
+      std::vector<std::string> ret;
+      for (auto const& e : dag->nodes[id].succs) {
+        std::string const& text = dag->nodes[e].text;
+        ret.push_back(text);
+      }
+      std::sort(ret.begin(), ret.end());
+      return ret;
+    }
+
+private:
+  DAG const* dag;
+  size_t id;
+};
+
+class DAGWithFunctions : public DAG {
+public:
+  bool hasNode(std::string const& text) const {
+    auto iter = std::find_if(nodes.begin(), nodes.end(), [text](DAG::Node const& n) {
+      return n.text == text;
+    });
+    return iter != nodes.end();
+  }
+
+  std::vector<std::string> allNodes() const {
+    std::vector<std::string> ret;
+    for (auto const& n : nodes) {
+      std::string const& text = n.text;
+      ret.push_back(text);
+    }
+    std::sort(ret.begin(), ret.end());
+    return ret;
+  }
+
+  NodeInfo node(std::string const& text) const {
+    auto iter = std::find_if(nodes.begin(), nodes.end(), [text](DAG::Node const& n) {
+      return n.text == text;
+    });
+    EXPECT_NE(iter, nodes.end());
+    if (iter == nodes.end()) {
+      return {this, 0};
+    }
+    return {this, static_cast<size_t>(iter - nodes.begin())};
+  }
+};
+
+template<typename... Arg>
+std::vector<std::string> nodes(Arg ...args) {
+  std::vector<std::string> ret{args...};
+  std::sort(ret.begin(), ret.end());
+  return ret;
+}
+
+DAGWithFunctions parseSuccessfully(std::string str) {
   ParseError err;
   auto dag = parseDAG(str, err);
   EXPECT_EQ(err.code, ParseError::Code::None);
@@ -59,9 +116,9 @@ DAG parseSuccessfully(std::string str) {
   if (dag) {
     checkRectangularNodes(*dag);
     checkValidEdges(*dag);
-    return *dag;
+    return {*dag};
   }
-  return DAG{};
+  return DAGWithFunctions{};
 }
 
 TEST(parse, empty) {
@@ -1506,8 +1563,7 @@ TEST(parse, standaloneXX) {
       XX
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 1U);
-  EXPECT_EQ(dag.nodes[0].text, "XX");
+  ASSERT_EQ(dag.allNodes(), nodes("XX"));
 }
 
 TEST(parse, crossAdjacentToNodeLeft) {
@@ -1522,6 +1578,7 @@ TEST(parse, crossAdjacentToNodeLeft) {
 )";
   auto dag = parseSuccessfully(str);
   ASSERT_EQ(dag.nodes.size(), 5U);
+  EXPECT_TRUE(dag.hasNode("X#"));
 }
 
 TEST(parse, crossAdjacentToNodeRight) {
@@ -1536,6 +1593,7 @@ TEST(parse, crossAdjacentToNodeRight) {
 )";
   auto dag = parseSuccessfully(str);
   ASSERT_EQ(dag.nodes.size(), 5U);
+  EXPECT_TRUE(dag.hasNode("#X"));
 }
 
 TEST(parse, crossAdjacentToNodeTop) {
@@ -1550,6 +1608,7 @@ TEST(parse, crossAdjacentToNodeTop) {
 )";
   auto dag = parseSuccessfully(str);
   ASSERT_EQ(dag.nodes.size(), 5U);
+  EXPECT_TRUE(dag.hasNode("X\n#"));
 }
 
 TEST(parse, crossAdjacentToNodeBottom) {
@@ -1564,6 +1623,7 @@ TEST(parse, crossAdjacentToNodeBottom) {
 )";
   auto dag = parseSuccessfully(str);
   ASSERT_EQ(dag.nodes.size(), 5U);
+  EXPECT_TRUE(dag.hasNode("#\nX"));
 }
 
 TEST(parse, doubleXIsNotCrossing) {
@@ -1578,8 +1638,21 @@ TEST(parse, doubleXIsNotCrossing) {
     ######
 )";
   auto dag = parseSuccessfully(str);
-  ASSERT_EQ(dag.nodes.size(), 6);
-  EXPECT_EQ(std::count_if(std::begin(dag.nodes), std::end(dag.nodes), [](auto const& n) {
-    return n.text == "XX";
-  }), 1U);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "XX", "######"));
 }
+
+// TODO:
+// test for skewed cross:
+//   |/
+//   X
+//  /|
+//
+//  \|
+//   X
+//   |\
+//
+//TODO:
+//  test for triple cross:
+//  \|/
+//   X
+//  /|\
