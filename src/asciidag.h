@@ -6,12 +6,8 @@
 namespace asciidag {
 
 struct DAG {
-  struct OutEdge {
-    size_t to;
-  };
-
   struct Node {
-    std::vector<OutEdge> outEdges;
+    std::vector<size_t> outEdges;
     std::string text;
   };
 

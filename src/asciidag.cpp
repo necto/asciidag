@@ -24,9 +24,9 @@ std::vector<std::vector<size_t>> dagLayers(DAG const& dag) {
     changed = false;
     for (size_t n = 0; n < dag.nodes.size(); ++n) {
       for (auto const& e : dag.nodes[n].outEdges) {
-        if (rank[e.to] < rank[n] + 1) {
+        if (rank[e] < rank[n] + 1) {
           changed = true;
-          rank[e.to] = rank[n] + 1;
+          rank[e] = rank[n] + 1;
         }
       }
     }
@@ -294,10 +294,10 @@ bool hasCrossEdges(std::vector<DAG::Node> const& nodes) {
   return std::any_of(nodes.begin(), nodes.end(), [](DAG::Node const& n) { return n.text == "X"; });
 }
 
-void replace(std::vector<DAG::OutEdge>& edges, size_t dated, size_t updated) {
+void replace(std::vector<size_t>& edges, size_t dated, size_t updated) {
   for (auto& e : edges) {
-    if (e.to == dated) {
-      e.to = updated;
+    if (e == dated) {
+      e = updated;
     }
   }
 }
@@ -335,7 +335,7 @@ std::optional<ParseError> validateEdgeCrossings(
       }
     }
     for (auto const& e : nodes[i].outEdges) {
-      fromEdges[e.to].push_back(i);
+      fromEdges[e].push_back(i);
     }
   }
   return {};
@@ -353,12 +353,12 @@ std::vector<DAG::Node> resolveCrossEdges(std::vector<DAG::Node>&& nodes) {
       assert(from.size() == 2);
       assert(nodes[i].outEdges.size() == 2);
 
-      replace(nodes[from[0]].outEdges, i, nodes[i].outEdges[1].to);
-      replace(nodes[from[1]].outEdges, i, nodes[i].outEdges[0].to);
+      replace(nodes[from[0]].outEdges, i, nodes[i].outEdges[1]);
+      replace(nodes[from[1]].outEdges, i, nodes[i].outEdges[0]);
       ++nSkipped;
     }
     for (auto const& e : nodes[i].outEdges) {
-      fromEdges[e.to].push_back(i);
+      fromEdges[e].push_back(i);
     }
     idMap[i] = i - nSkipped;
   }
@@ -368,7 +368,7 @@ std::vector<DAG::Node> resolveCrossEdges(std::vector<DAG::Node>&& nodes) {
   );
   for (auto& n : nodes) {
     for (auto& e : n.outEdges) {
-      e.to = idMap[e.to];
+      e = idMap[e];
     }
   }
   return nodes;
