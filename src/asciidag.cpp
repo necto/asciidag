@@ -23,7 +23,7 @@ std::vector<std::vector<size_t>> dagLayers(DAG const& dag) {
   do {
     changed = false;
     for (size_t n = 0; n < dag.nodes.size(); ++n) {
-      for (auto const& e : dag.nodes[n].outEdges) {
+      for (auto const& e : dag.nodes[n].succs) {
         if (rank[e] < rank[n] + 1) {
           changed = true;
           rank[e] = rank[n] + 1;
@@ -326,7 +326,7 @@ std::optional<ParseError> validateEdgeCrossings(
            nodePositions[i]}
         };
       }
-      if (nodes[i].outEdges.size() != 2) {
+      if (nodes[i].succs.size() != 2) {
         return {
           {ParseError::Code::DanglingEdge,
            "Edge crossing misses an outgoing edge.",
@@ -334,7 +334,7 @@ std::optional<ParseError> validateEdgeCrossings(
         };
       }
     }
-    for (auto const& e : nodes[i].outEdges) {
+    for (auto const& e : nodes[i].succs) {
       fromEdges[e].push_back(i);
     }
   }
@@ -351,13 +351,13 @@ std::vector<DAG::Node> resolveCrossEdges(std::vector<DAG::Node>&& nodes) {
       assert(fromEdges.count(i) != 0);
       auto& from = fromEdges[i];
       assert(from.size() == 2);
-      assert(nodes[i].outEdges.size() == 2);
+      assert(nodes[i].succs.size() == 2);
 
-      replace(nodes[from[0]].outEdges, i, nodes[i].outEdges[1]);
-      replace(nodes[from[1]].outEdges, i, nodes[i].outEdges[0]);
+      replace(nodes[from[0]].succs, i, nodes[i].succs[1]);
+      replace(nodes[from[1]].succs, i, nodes[i].succs[0]);
       ++nSkipped;
     }
-    for (auto const& e : nodes[i].outEdges) {
+    for (auto const& e : nodes[i].succs) {
       fromEdges[e].push_back(i);
     }
     idMap[i] = i - nSkipped;
@@ -367,7 +367,7 @@ std::vector<DAG::Node> resolveCrossEdges(std::vector<DAG::Node>&& nodes) {
     nodes.end()
   );
   for (auto& n : nodes) {
-    for (auto& e : n.outEdges) {
+    for (auto& e : n.succs) {
       e = idMap[e];
     }
   }
@@ -429,7 +429,7 @@ void NodeCollector::startNewNode(EdgesInFlight& prevEdges, Position const& pos) 
   size_t id = nodes.size();
   for (size_t p = pos.col - partialNode.size(); p < pos.col; ++p) {
     for (auto from : prevEdges.findNRemoveEdgesToNode(p)) {
-      nodes[from].outEdges.push_back({id});
+      nodes[from].succs.push_back({id});
     }
     currNodes[p] = id;
   }
@@ -477,10 +477,10 @@ void NodeCollector::addNodeLine(size_t nodeAbove, EdgesInFlight& prevEdges, Posi
     currNodes[p] = nodeAbove;
   }
   for (auto edge : prevEdges.findNRemoveEdgesToNode(pos.col - partialNode.size())) {
-    nodes[edge].outEdges.push_back({nodeAbove});
+    nodes[edge].succs.push_back({nodeAbove});
   }
   for (auto edge : prevEdges.findNRemoveEdgesToNode(pos.col - 1)) {
-    nodes[edge].outEdges.push_back({nodeAbove});
+    nodes[edge].succs.push_back({nodeAbove});
   }
   nodes[nodeAbove].text += "\n" + partialNode;
   partialNode.clear();

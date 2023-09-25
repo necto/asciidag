@@ -7,7 +7,7 @@ namespace asciidag {
 
 struct DAG {
   struct Node {
-    std::vector<size_t> outEdges;
+    std::vector<size_t> succs;
     std::string text;
   };
 
