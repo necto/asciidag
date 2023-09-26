@@ -41,7 +41,15 @@ inline std::ostream& operator<<(std::ostream& os, ParseError::Code code) {
   return os << parseErrorCodeToStr(code);
 }
 
-std::string renderDAG(DAG const& dag);
+struct RenderError {
+  enum class Code { None, Unsupported };
+
+  Code code;
+  std::string message;
+  size_t nodeId;
+};
+
+std::optional<std::string> renderDAG(DAG const& dag, RenderError& err);
 
 std::optional<DAG> parseDAG(std::string str, ParseError& err);
 

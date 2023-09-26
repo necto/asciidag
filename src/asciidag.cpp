@@ -495,14 +495,26 @@ std::optional<size_t> NodeCollector::findNodeAbove(size_t col) {
 
 } // namespace
 
-std::string renderDAG(DAG const& dag) {
+std::optional<std::string> renderDAG(DAG const& dag, RenderError& err) {
+  err.code = RenderError::Code::None;
   std::ostringstream ret;
   // TODO: draw edges
   // TODO: find proper order of nodes
   // TODO: find best horisontal position of nodes
   for (auto const& layer : dagLayers(dag)) {
+    bool first = true;
     for (size_t n : layer) {
-      ret << n << " ";
+      if (dag.nodes[n].text.size() != 1) {
+        err.code = RenderError::Code::Unsupported;
+        err.message = "Zero- or multi-character nodes are not supported.";
+        err.nodeId = n;
+        return std::nullopt;
+      }
+      if (!first) {
+        ret <<' ';
+      }
+      first = false;
+      ret << dag.nodes[n].text;
     }
     ret << "\n";
   }
