@@ -18,6 +18,8 @@ namespace {
 using namespace std::string_literals;
 
 std::vector<std::vector<size_t>> dagLayers(DAG const& dag) {
+  // TODO: optimize using a queue (linear in edges)
+  // instead of a fix-point (quadratic in edges)
   std::vector<size_t> rank(dag.nodes.size(), 0);
   bool changed = false;
   do {
@@ -37,6 +39,45 @@ std::vector<std::vector<size_t>> dagLayers(DAG const& dag) {
     ret[rank[n]].push_back(n);
   }
   return ret;
+}
+
+std::optional<RenderError> insertEdgeWaypoints(DAG& dag, std::vector<std::vector<size_t>>& layers) {
+  size_t const realNodeN = dag.nodes.size();
+  std::vector<size_t> rank(realNodeN, 0);
+  for (size_t layerI = 0; layerI < layers.size(); ++layerI) {
+    for (size_t n : layers[layerI]) {
+      rank[n] = layerI;
+    }
+  }
+  for (size_t layerI = 0; layerI < layers.size(); ++layerI) {
+    for (size_t n : layers[layerI]) {
+      if (realNodeN <= n) {
+        // This is a waypoint that by construction has its edge targeting the next layer
+        assert(dag.nodes[n].succs.size() == 1);
+        assert(realNodeN <= dag.nodes[n].succs[0] || rank[dag.nodes[n].succs[0]] == layerI + 1);
+        continue;
+      }
+      for (size_t & e : dag.nodes[n].succs) {
+        assert(layerI < rank[e]);
+        // TODO: optimization:
+        // if (layerI + 1 == rank[e]) {
+        //   continue;
+        // }
+        size_t finalSucc = e;
+        size_t *lastEdge = &e;
+        for (auto l = layerI + 1; l < rank[finalSucc]; ++l) {
+          size_t nodeId = dag.nodes.size();
+          *lastEdge = nodeId;
+          dag.nodes.push_back({{0}, "."});
+          layers[l].push_back(nodeId);
+          lastEdge = &dag.nodes.back().succs.back();
+          // No need to add it to rank
+        }
+        *lastEdge = finalSucc;
+      }
+    }
+  }
+  return {};
 }
 
 template <typename A>
@@ -495,12 +536,17 @@ std::optional<size_t> NodeCollector::findNodeAbove(size_t col) {
 
 } // namespace
 
-std::optional<std::string> renderDAG(DAG const& dag, RenderError& err) {
+std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
   err.code = RenderError::Code::None;
   std::ostringstream ret;
   // TODO: draw edges
   // TODO: find proper order of nodes
   // TODO: find best horisontal position of nodes
+  auto layers = dagLayers(dag);
+  if (auto waypointErr = insertEdgeWaypoints(dag, layers)) {
+    err = *waypointErr;
+    return {};
+  }
   for (auto const& layer : dagLayers(dag)) {
     bool first = true;
     for (size_t n : layer) {

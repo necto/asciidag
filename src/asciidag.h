@@ -49,7 +49,7 @@ struct RenderError {
   size_t nodeId;
 };
 
-std::optional<std::string> renderDAG(DAG const& dag, RenderError& err);
+std::optional<std::string> renderDAG(DAG dag, RenderError& err);
 
 std::optional<DAG> parseDAG(std::string str, ParseError& err);
 

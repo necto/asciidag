@@ -17,6 +17,68 @@ std::string renderSuccessfully(DAG const& dag) {
 
 TEST(render, singleNode) {
   DAG test;
+  test.nodes.push_back(DAG::Node{{}, "#"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+#
+)");
+}
+
+TEST(render, singleEdge) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{1}, "0"});
+  test.nodes.push_back(DAG::Node{{}, "1"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+0
+1
+)");
+}
+
+TEST(render, multiLayerEdge) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{1, 2}, "0"});
+  test.nodes.push_back(DAG::Node{{2}, "1"});
+  test.nodes.push_back(DAG::Node{{}, "2"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+0
+1 .
+2
+)");
+}
+
+TEST(render, twoMultiLayerEdges) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{1, 2, 3}, "0"});
+  test.nodes.push_back(DAG::Node{{2, 3}, "1"});
+  test.nodes.push_back(DAG::Node{{}, "2"});
+  test.nodes.push_back(DAG::Node{{}, "3"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+0
+1 . .
+2 3
+)");
+}
+
+TEST(render, twoLayerEdge) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{1, 3}, "0"});
+  test.nodes.push_back(DAG::Node{{2}, "1"});
+  test.nodes.push_back(DAG::Node{{3}, "2"});
+  test.nodes.push_back(DAG::Node{{}, "3"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+0
+1 .
+2 .
+3
+)");
+}
+
+TEST(render, fourLayers) {
+  DAG test;
   test.nodes.push_back(DAG::Node{{1, 2, 3}, "#"});
   test.nodes.push_back(DAG::Node{{4}, "1"});
   test.nodes.push_back(DAG::Node{{4}, "2"});
@@ -27,7 +89,7 @@ TEST(render, singleNode) {
             R"(
 #
 1 2 3
-4
+4 .
 .
 )");
 }
