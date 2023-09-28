@@ -534,19 +534,47 @@ std::optional<size_t> NodeCollector::findNodeAbove(size_t col) {
   return {};
 }
 
+size_t minDistBetweenLayers(
+  DAG const& dag,
+  std::vector<size_t> const& upper,
+  std::vector<Position> const& positions
+) {
+  size_t ret = 1; // At least 1 '|' must separate any two connected nodes
+  for (auto n : upper) {
+    size_t ncol = positions[n].col;
+    for (auto e : dag.nodes[n].succs) {
+      size_t ecol = positions[e].col;
+      size_t shift = ncol < ecol ? ecol - ncol : ncol - ecol;
+      if (ret < shift) {
+        ret = shift;
+      }
+    }
+  }
+  if (ret > 1) {
+    // series of N oblique chars ('/' or '\\') shift by N+1 positions
+    --ret;
+  }
+  return ret;
+}
+
 std::vector<Position> computeNodeCoordinates(DAG const& dag, std::vector<std::vector<size_t>> const& layers) {
   std::vector<Position> ret(dag.nodes.size(), Position{0, 0});
-  size_t line = 0;
   for (auto const& layer : layers) {
     size_t col = 0;
     for (size_t n : layer) {
       assert(dag.nodes[n].text.size() == 1);
-      ret[n].line = line;
       ret[n].col = col;
       // 1 for space + 1 for the node text (single-character)
       col += 2;
     }
-    line += 1;
+  }
+  size_t line = 0;
+  for (size_t i = 0; i < layers.size(); ++i) {
+    for (auto n : layers[i]) {
+      ret[n].line = line;
+    }
+    // 1 for the node height
+    line += 1 + minDistBetweenLayers(dag, layers[i], ret);
   }
   return ret;
 }

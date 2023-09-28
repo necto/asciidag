@@ -31,6 +31,7 @@ TEST(render, singleEdge) {
   EXPECT_EQ(renderSuccessfully(test),
             R"(
 0
+
 1
 )");
 }
@@ -43,7 +44,9 @@ TEST(render, multiLayerEdge) {
   EXPECT_EQ(renderSuccessfully(test),
             R"(
 0
+
 1 .
+
 2
 )");
 }
@@ -57,7 +60,11 @@ TEST(render, twoMultiLayerEdges) {
   EXPECT_EQ(renderSuccessfully(test),
             R"(
 0
+
+
+
 1 . .
+
 2 3
 )");
 }
@@ -71,8 +78,11 @@ TEST(render, twoLayerEdge) {
   EXPECT_EQ(renderSuccessfully(test),
             R"(
 0
+
 1 .
+
 2 .
+
 3
 )");
 }
@@ -88,8 +98,13 @@ TEST(render, fourLayers) {
   EXPECT_EQ(renderSuccessfully(test),
             R"(
 #
+
+
+
 1 2 3
+
 4 .
+
 .
 )");
 }
