@@ -601,6 +601,18 @@ void drawEdge(Position cur, Position const& to, std::vector<std::string>& canvas
     }
     return;
   }
+  if (cur.col < to.col) {
+    assert(to.col - cur.col <= to.line - cur.line + 1);
+    if (to.col - cur.col == to.line - cur.line + 1) {
+      for (; cur.line < to.line; ++cur.line) {
+        ++cur.col;
+        canvas[cur.line][cur.col] = '\\';
+      }
+    }
+    // TODO: non-straight edges
+    return;
+  }
+  // TODO: left edges: /
 }
 
 void placeEdges(
