@@ -534,37 +534,88 @@ std::optional<size_t> NodeCollector::findNodeAbove(size_t col) {
   return {};
 }
 
+std::vector<Position> computeNodeCoordinates(DAG const& dag, std::vector<std::vector<size_t>> const& layers) {
+  std::vector<Position> ret(dag.nodes.size(), Position{0, 0});
+  size_t line = 0;
+  for (auto const& layer : layers) {
+    size_t col = 0;
+    for (size_t n : layer) {
+      assert(dag.nodes[n].text.size() == 1);
+      ret[n].line = line;
+      ret[n].col = col;
+      // 1 for space + 1 for the node text (single-character)
+      col += 2;
+    }
+    line += 1;
+  }
+  return ret;
+}
+
+void placeNodes(DAG const& dag, std::vector<Position> const& coordinates, std::vector<std::string> &canvas) {
+  for (size_t n = 0; n < dag.nodes.size(); ++n) {
+    assert(dag.nodes[n].text.size() == 1);
+    canvas[coordinates[n].line][coordinates[n].col] = dag.nodes[n].text[0];
+  }
+}
+
+std::string rtrim(std::string s) {
+  s.erase(s.find_last_not_of(' ') + 1);
+  return s;
+}
+
+std::vector<std::string> createCanvas(std::vector<Position> const& coordinates) {
+  Position max{0, 0};
+  for (auto const& p : coordinates) {
+    if (max.line < p.line) {
+      max.line = p.line;
+    }
+    if (max.col < p.col) {
+      max.col = p.col;
+    }
+  }
+  // line + 1 - to accomodate the node height
+  // col + 1 - to accomodate the node width
+  return std::vector<std::string>(max.line + 1, std::string(max.col + 1, ' '));
+}
+
+std::string renderCanvas(std::vector<std::string> const& canvas) {
+  std::string ret;
+  ret.reserve(canvas.size() * (canvas[0].size() + 1));
+  for (auto const& line : canvas) {
+    ret += rtrim(line) + "\n";
+  }
+  return ret;
+}
+
+std::optional<RenderError> checkDAGCompat(DAG const& dag) {
+  for (size_t n = 0; n < dag.nodes.size(); ++n) {
+    if (dag.nodes[n].text.size() != 1) {
+      return {{RenderError::Code::Unsupported, "Zero- or multi-character nodes are not supported.", n}};
+    }
+  }
+  return {};
+}
+
 } // namespace
 
 std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
   err.code = RenderError::Code::None;
-  std::ostringstream ret;
   // TODO: draw edges
   // TODO: find proper order of nodes
   // TODO: find best horisontal position of nodes
+  if (auto compatErr = checkDAGCompat(dag)) {
+    err = *compatErr;
+    return {};
+  }
   auto layers = dagLayers(dag);
   if (auto waypointErr = insertEdgeWaypoints(dag, layers)) {
     err = *waypointErr;
     return {};
   }
-  for (auto const& layer : dagLayers(dag)) {
-    bool first = true;
-    for (size_t n : layer) {
-      if (dag.nodes[n].text.size() != 1) {
-        err.code = RenderError::Code::Unsupported;
-        err.message = "Zero- or multi-character nodes are not supported.";
-        err.nodeId = n;
-        return std::nullopt;
-      }
-      if (!first) {
-        ret <<' ';
-      }
-      first = false;
-      ret << dag.nodes[n].text;
-    }
-    ret << "\n";
-  }
-  return ret.str();
+  auto coords = computeNodeCoordinates(dag, layers);
+  auto canvas = createCanvas(coords);
+  placeNodes(dag, coords, canvas);
+  return renderCanvas(canvas);
 }
 
 std::optional<DAG> parseDAG(std::string str, ParseError& err) {
