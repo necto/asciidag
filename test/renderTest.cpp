@@ -31,8 +31,67 @@ TEST(render, singleEdge) {
   EXPECT_EQ(renderSuccessfully(test),
             R"(
 0
-
+|
 1
+)");
+}
+
+TEST(render, twoSimpleEdges) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{1, 2}, "0"});
+  test.nodes.push_back(DAG::Node{{}, "1"});
+  test.nodes.push_back(DAG::Node{{}, "2"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+0
+|
+1 2
+)");
+}
+
+TEST(render, threeSimpleEdges) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{1, 2, 3}, "0"});
+  test.nodes.push_back(DAG::Node{{}, "1"});
+  test.nodes.push_back(DAG::Node{{}, "2"});
+  test.nodes.push_back(DAG::Node{{}, "3"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+0
+|
+|
+|
+1 2 3
+)");
+}
+
+TEST(render, twoParallelSimpleEdges) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{1}, "0"});
+  test.nodes.push_back(DAG::Node{{}, "1"});
+  test.nodes.push_back(DAG::Node{{3}, "2"});
+  test.nodes.push_back(DAG::Node{{}, "3"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+0 2
+| |
+1 3
+)");
+}
+
+TEST(render, hammock) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{1, 2}, "0"});
+  test.nodes.push_back(DAG::Node{{3}, "1"});
+  test.nodes.push_back(DAG::Node{{3}, "2"});
+  test.nodes.push_back(DAG::Node{{}, "3"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+0
+|
+1 2
+|
+3
 )");
 }
 
@@ -44,9 +103,9 @@ TEST(render, multiLayerEdge) {
   EXPECT_EQ(renderSuccessfully(test),
             R"(
 0
-
+|
 1 .
-
+|
 2
 )");
 }
@@ -60,11 +119,11 @@ TEST(render, twoMultiLayerEdges) {
   EXPECT_EQ(renderSuccessfully(test),
             R"(
 0
-
-
-
+|
+|
+|
 1 . .
-
+|
 2 3
 )");
 }
@@ -78,11 +137,11 @@ TEST(render, twoLayerEdge) {
   EXPECT_EQ(renderSuccessfully(test),
             R"(
 0
-
+|
 1 .
-
+| |
 2 .
-
+|
 3
 )");
 }
@@ -98,13 +157,13 @@ TEST(render, fourLayers) {
   EXPECT_EQ(renderSuccessfully(test),
             R"(
 #
-
-
-
+|
+|
+|
 1 2 3
-
+|
 4 .
-
+|
 .
 )");
 }

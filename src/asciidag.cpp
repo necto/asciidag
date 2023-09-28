@@ -57,14 +57,14 @@ std::optional<RenderError> insertEdgeWaypoints(DAG& dag, std::vector<std::vector
         assert(realNodeN <= dag.nodes[n].succs[0] || rank[dag.nodes[n].succs[0]] == layerI + 1);
         continue;
       }
-      for (size_t & e : dag.nodes[n].succs) {
+      for (size_t& e : dag.nodes[n].succs) {
         assert(layerI < rank[e]);
         // TODO: optimization:
         // if (layerI + 1 == rank[e]) {
         //   continue;
         // }
         size_t finalSucc = e;
-        size_t *lastEdge = &e;
+        size_t* lastEdge = &e;
         for (auto l = layerI + 1; l < rank[finalSucc]; ++l) {
           size_t nodeId = dag.nodes.size();
           *lastEdge = nodeId;
@@ -557,7 +557,8 @@ size_t minDistBetweenLayers(
   return ret;
 }
 
-std::vector<Position> computeNodeCoordinates(DAG const& dag, std::vector<std::vector<size_t>> const& layers) {
+std::vector<Position>
+computeNodeCoordinates(DAG const& dag, std::vector<std::vector<size_t>> const& layers) {
   std::vector<Position> ret(dag.nodes.size(), Position{0, 0});
   for (auto const& layer : layers) {
     size_t col = 0;
@@ -579,10 +580,43 @@ std::vector<Position> computeNodeCoordinates(DAG const& dag, std::vector<std::ve
   return ret;
 }
 
-void placeNodes(DAG const& dag, std::vector<Position> const& coordinates, std::vector<std::string> &canvas) {
+void placeNodes(
+  DAG const& dag,
+  std::vector<Position> const& coordinates,
+  std::vector<std::string>& canvas
+) {
   for (size_t n = 0; n < dag.nodes.size(); ++n) {
     assert(dag.nodes[n].text.size() == 1);
     canvas[coordinates[n].line][coordinates[n].col] = dag.nodes[n].text[0];
+  }
+}
+
+void drawEdge(Position cur, Position const& to, std::vector<std::string>& canvas) {
+  assert(cur.line < to.line);
+  assert(to.line < canvas.size());
+  assert(cur.col < canvas[cur.line].size() && to.col < canvas[to.line].size());
+  if (cur.col == to.col) {
+    for (; cur.line < to.line; ++cur.line) {
+      canvas[cur.line][cur.col] = '|';
+    }
+    return;
+  }
+}
+
+void placeEdges(
+  DAG const& dag,
+  std::vector<Position> const& coordinates,
+  std::vector<std::string>& canvas
+) {
+  for (size_t n = 0; n < dag.nodes.size(); ++n) {
+    for (auto e : dag.nodes[n].succs) {
+      Position curPos = coordinates[n];
+      // Node height is 1:
+      assert(dag.nodes[n].text.size() == 1);
+      ++curPos.line; // Start the edge from right under the node
+      Position targetPos = coordinates[e];
+      drawEdge(curPos, targetPos, canvas);
+    }
   }
 }
 
@@ -618,7 +652,9 @@ std::string renderCanvas(std::vector<std::string> const& canvas) {
 std::optional<RenderError> checkDAGCompat(DAG const& dag) {
   for (size_t n = 0; n < dag.nodes.size(); ++n) {
     if (dag.nodes[n].text.size() != 1) {
-      return {{RenderError::Code::Unsupported, "Zero- or multi-character nodes are not supported.", n}};
+      return {
+        {RenderError::Code::Unsupported, "Zero- or multi-character nodes are not supported.", n}
+      };
     }
   }
   return {};
@@ -643,6 +679,7 @@ std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
   auto coords = computeNodeCoordinates(dag, layers);
   auto canvas = createCanvas(coords);
   placeNodes(dag, coords, canvas);
+  placeEdges(dag, coords, canvas);
   return renderCanvas(canvas);
 }
 
