@@ -60,7 +60,7 @@ TEST(render, threeSimpleEdges) {
 0
 |\
 | \
-|  \
+| |\
 1 2 3
 )");
 }
@@ -78,6 +78,25 @@ TEST(render, twoParallelSimpleEdges) {
 1 3
 )");
 }
+
+TEST(render, nonStraightRightEdge) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{1, 2}, "0"});
+  test.nodes.push_back(DAG::Node{{}, "1"});
+  test.nodes.push_back(DAG::Node{{}, "2"});
+  test.nodes.push_back(DAG::Node{{4, 5}, "3"});
+  test.nodes.push_back(DAG::Node{{}, "4"});
+  test.nodes.push_back(DAG::Node{{}, "5"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+0 3
+|\ \
+| \ \
+| | |\
+1 2 4 5
+)");
+}
+
 
 TEST(render, twoParallelRightEdges) {
   DAG test;
@@ -151,7 +170,7 @@ TEST(render, twoMultiLayerEdges) {
 0
 |\
 | \
-|  \
+| |\
 1 . .
 |\
 2 3
@@ -189,7 +208,7 @@ TEST(render, fourLayers) {
 #
 |\
 | \
-|  \
+| |\
 1 2 3
 |
 4 .
