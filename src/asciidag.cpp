@@ -622,7 +622,26 @@ void drawEdge(Position cur, Position const& to, std::vector<std::string>& canvas
     }
     return;
   }
-  // TODO: left edges: /
+  assert(to.col < cur.col);
+  assert(cur.col - to.col <= to.line - cur.line + 1);
+  if (cur.col - to.col == to.line - cur.line + 1) {
+    for (; cur.line < to.line; ++cur.line) {
+      --cur.col;
+      canvas[cur.line][cur.col] = '/';
+    }
+    return;
+  }
+  --cur.col;
+  for (; ; --cur.col) {
+    canvas[cur.line][cur.col] = '/';
+    ++cur.line;
+    if (to.col == cur.col) break;
+  }
+  assert(cur.col == to.col);
+  if (cur.line < to.line) {
+    drawEdge(cur, to, canvas);
+  }
+  return;
   // TODO: edge crossings
   // TODO: report when cant draw because another edge is there
 }
