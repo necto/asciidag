@@ -591,55 +591,36 @@ void placeNodes(
   }
 }
 
+Position drawStraightLine(Position cur, size_t targetLine, char edgeChar, int colShift, std::vector<std::string>& canvas) {
+  for (; cur.line < targetLine; ++cur.line) {
+    cur.col += colShift;
+    canvas[cur.line][cur.col] = edgeChar;
+  }
+  return cur;
+}
+
 void drawEdge(Position cur, Position const& to, std::vector<std::string>& canvas) {
   assert(cur.line < to.line);
   assert(to.line < canvas.size());
   assert(cur.col < canvas[cur.line].size() && to.col < canvas[to.line].size());
-  if (cur.col == to.col) {
-    for (; cur.line < to.line; ++cur.line) {
-      canvas[cur.line][cur.col] = '|';
-    }
-    return;
-  }
   if (cur.col < to.col) {
     assert(to.col - cur.col <= to.line - cur.line + 1);
     if (to.col - cur.col == to.line - cur.line + 1) {
-      for (; cur.line < to.line; ++cur.line) {
-        ++cur.col;
-        canvas[cur.line][cur.col] = '\\';
-      }
+      drawStraightLine(cur, to.line, '\\', 1,  canvas);
       return;
     }
-    do {
-      ++cur.col;
-      canvas[cur.line][cur.col] = '\\';
-      ++cur.line;
-    } while (to.col != cur.col);
-    assert(cur.col == to.col);
-    if (cur.line < to.line) {
-      drawEdge(cur, to, canvas);
+    cur = drawStraightLine(cur, cur.line + (to.col - cur.col), '\\', 1, canvas);
+  } else {
+    assert(to.col <= cur.col);
+    assert(cur.col - to.col <= to.line - cur.line + 1);
+    if (cur.col - to.col == to.line - cur.line + 1) {
+      drawStraightLine(cur, to.line, '/', -1, canvas);
+      return;
     }
-    return;
+    cur = drawStraightLine(cur, cur.line + (cur.col - to.col), '/', -1, canvas);
   }
-  assert(to.col < cur.col);
-  assert(cur.col - to.col <= to.line - cur.line + 1);
-  if (cur.col - to.col == to.line - cur.line + 1) {
-    for (; cur.line < to.line; ++cur.line) {
-      --cur.col;
-      canvas[cur.line][cur.col] = '/';
-    }
-    return;
-  }
-  do {
-    --cur.col;
-    canvas[cur.line][cur.col] = '/';
-    ++cur.line;
-  } while (to.col != cur.col);
   assert(cur.col == to.col);
-  if (cur.line < to.line) {
-    drawEdge(cur, to, canvas);
-  }
-  return;
+  drawStraightLine(cur, to.line, '|', 0, canvas);
   // TODO: edge crossings
   // TODO: report when cant draw because another edge is there
 }
