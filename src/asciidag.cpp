@@ -599,20 +599,23 @@ Position drawStraightLine(Position cur, size_t targetLine, char edgeChar, int co
   return cur;
 }
 
+size_t absDiff(size_t a, size_t b) {
+  return a > b ? a - b : b - a;
+}
+
 void drawEdge(Position cur, Position const& to, std::vector<std::string>& canvas) {
   assert(cur.line < to.line);
   assert(to.line < canvas.size());
   assert(cur.col < canvas[cur.line].size() && to.col < canvas[to.line].size());
+  assert(absDiff(to.col, cur.col) <= to.line - cur.line + 1);
+
   if (cur.col < to.col) {
-    assert(to.col - cur.col <= to.line - cur.line + 1);
     if (to.col - cur.col == to.line - cur.line + 1) {
-      drawStraightLine(cur, to.line, '\\', 1,  canvas);
+      drawStraightLine(cur, to.line, '\\', +1,  canvas);
       return;
     }
-    cur = drawStraightLine(cur, cur.line + (to.col - cur.col), '\\', 1, canvas);
+    cur = drawStraightLine(cur, cur.line + (to.col - cur.col), '\\', +1, canvas);
   } else {
-    assert(to.col <= cur.col);
-    assert(cur.col - to.col <= to.line - cur.line + 1);
     if (cur.col - to.col == to.line - cur.line + 1) {
       drawStraightLine(cur, to.line, '/', -1, canvas);
       return;
