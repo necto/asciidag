@@ -591,16 +591,24 @@ void placeNodes(
   }
 }
 
-Position drawStraightLine(Position cur, size_t targetLine, char edgeChar, int colShift, std::vector<std::string>& canvas) {
+void drawStraightLine(Position cur, size_t targetLine, char edgeChar, int colShift, std::vector<std::string>& canvas) {
   for (; cur.line < targetLine; ++cur.line) {
     cur.col += colShift;
     canvas[cur.line][cur.col] = edgeChar;
   }
-  return cur;
 }
 
 size_t absDiff(size_t a, size_t b) {
   return a > b ? a - b : b - a;
+}
+
+Position pivotPoint(Position const& cur, Position const& to) {
+  assert(absDiff(to.col, cur.col) <= to.line - cur.line + 1);
+  auto diff = absDiff(cur.col, to.col);
+  if (diff == to.line - cur.line + 1) {
+    return to;
+  }
+  return {cur.line + diff, to.col};
 }
 
 void drawEdge(Position cur, Position const& to, std::vector<std::string>& canvas) {
@@ -608,21 +616,11 @@ void drawEdge(Position cur, Position const& to, std::vector<std::string>& canvas
   assert(to.line < canvas.size());
   assert(cur.col < canvas[cur.line].size() && to.col < canvas[to.line].size());
   assert(absDiff(to.col, cur.col) <= to.line - cur.line + 1);
-
-  if (cur.col < to.col) {
-    if (to.col - cur.col == to.line - cur.line + 1) {
-      drawStraightLine(cur, to.line, '\\', +1,  canvas);
-      return;
-    }
-    cur = drawStraightLine(cur, cur.line + (to.col - cur.col), '\\', +1, canvas);
-  } else {
-    if (cur.col - to.col == to.line - cur.line + 1) {
-      drawStraightLine(cur, to.line, '/', -1, canvas);
-      return;
-    }
-    cur = drawStraightLine(cur, cur.line + (cur.col - to.col), '/', -1, canvas);
-  }
-  assert(cur.col == to.col);
+  char obliqueChar = cur.col < to.col ? '\\' : '/';
+  int colShift = cur.col < to.col ? +1 : -1;
+  auto pivot = pivotPoint(cur, to);
+  drawStraightLine(cur, pivot.line, obliqueChar, colShift, canvas);
+  cur = pivot;
   drawStraightLine(cur, to.line, '|', 0, canvas);
   // TODO: edge crossings
   // TODO: report when cant draw because another edge is there
