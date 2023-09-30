@@ -610,12 +610,11 @@ void drawEdge(Position cur, Position const& to, std::vector<std::string>& canvas
       }
       return;
     }
-    ++cur.col;
-    for (; cur.col <= to.col; ++cur.col) {
+    do {
+      ++cur.col;
       canvas[cur.line][cur.col] = '\\';
       ++cur.line;
-    }
-    --cur.col; // Compensate for the overshoot
+    } while (to.col != cur.col);
     assert(cur.col == to.col);
     if (cur.line < to.line) {
       drawEdge(cur, to, canvas);
@@ -631,12 +630,11 @@ void drawEdge(Position cur, Position const& to, std::vector<std::string>& canvas
     }
     return;
   }
-  --cur.col;
-  for (; ; --cur.col) {
+  do {
+    --cur.col;
     canvas[cur.line][cur.col] = '/';
     ++cur.line;
-    if (to.col == cur.col) break;
-  }
+  } while (to.col != cur.col);
   assert(cur.col == to.col);
   if (cur.line < to.line) {
     drawEdge(cur, to, canvas);
