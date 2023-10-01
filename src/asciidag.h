@@ -42,7 +42,7 @@ inline std::ostream& operator<<(std::ostream& os, ParseError::Code code) {
 }
 
 struct RenderError {
-  enum class Code { None, Unsupported };
+  enum class Code { None, Overcrowded, Unsupported };
 
   Code code;
   std::string message;

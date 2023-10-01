@@ -587,13 +587,22 @@ void placeNodes(
 ) {
   for (size_t n = 0; n < dag.nodes.size(); ++n) {
     assert(dag.nodes[n].text.size() == 1);
+    assert(canvas[coordinates[n].line][coordinates[n].col] == ' ' && "Nodes overlay.");
     canvas[coordinates[n].line][coordinates[n].col] = dag.nodes[n].text[0];
   }
 }
 
-void drawStraightLine(Position cur, size_t targetLine, char edgeChar, int colShift, std::vector<std::string>& canvas) {
+void drawStraightLine(
+  Position cur,
+  size_t targetLine,
+  char edgeChar,
+  int colShift,
+  std::vector<std::string>& canvas
+) {
   for (; cur.line < targetLine; ++cur.line) {
     cur.col += colShift;
+    // TODO: once free placement of edges is guaranteed:
+    // assert(canvas[cur.line][cur.col] == ' ');
     canvas[cur.line][cur.col] = edgeChar;
   }
 }
@@ -603,27 +612,25 @@ size_t absDiff(size_t a, size_t b) {
 }
 
 Position pivotPoint(Position const& cur, Position const& to) {
-  assert(absDiff(to.col, cur.col) <= to.line - cur.line + 1);
   auto diff = absDiff(cur.col, to.col);
   if (diff == to.line - cur.line + 1) {
+    // The oblique line will reach the target directly
     return to;
   }
+  assert(diff < to.line - cur.line + 1);
   return {cur.line + diff, to.col};
 }
 
-void drawEdge(Position cur, Position const& to, std::vector<std::string>& canvas) {
+void drawEdge(Position const& cur, Position const& to, std::vector<std::string>& canvas) {
   assert(cur.line < to.line);
   assert(to.line < canvas.size());
   assert(cur.col < canvas[cur.line].size() && to.col < canvas[to.line].size());
-  assert(absDiff(to.col, cur.col) <= to.line - cur.line + 1);
   char obliqueChar = cur.col < to.col ? '\\' : '/';
   int colShift = cur.col < to.col ? +1 : -1;
   auto pivot = pivotPoint(cur, to);
   drawStraightLine(cur, pivot.line, obliqueChar, colShift, canvas);
-  cur = pivot;
-  drawStraightLine(cur, to.line, '|', 0, canvas);
+  drawStraightLine(pivot, to.line, '|', 0, canvas);
   // TODO: edge crossings
-  // TODO: report when cant draw because another edge is there
 }
 
 void placeEdges(
@@ -683,15 +690,39 @@ std::optional<RenderError> checkDAGCompat(DAG const& dag) {
   return {};
 }
 
+std::optional<RenderError> checkIfEdgesFitOnNodes(DAG const& dag) {
+  size_t const N = dag.nodes.size();
+  std::vector<size_t> incomingEdgesPerNode(N, 0);
+
+  for (size_t i = 0; i < N; ++i) {
+    auto const& n = dag.nodes[i];
+    if (3 < n.succs.size()) {
+      return {{RenderError::Code::Overcrowded, "Too many outgoing edges from a node, they don't fit.", i}};
+    }
+    for (auto const& s : n.succs) {
+      ++incomingEdgesPerNode[s];
+    }
+  }
+  for (size_t i = 0; i < N; ++i) {
+    if (3 < incomingEdgesPerNode[i]) {
+      return {{RenderError::Code::Overcrowded, "Too many incoming edges to a node, they don't fit.", i}};
+    }
+  }
+  return {};
+}
+
 } // namespace
 
 std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
   err.code = RenderError::Code::None;
-  // TODO: draw edges
   // TODO: find proper order of nodes
   // TODO: find best horisontal position of nodes
   if (auto compatErr = checkDAGCompat(dag)) {
     err = *compatErr;
+    return {};
+  }
+  if (auto crowdedErr = checkIfEdgesFitOnNodes(dag)) {
+    err = *crowdedErr;
     return {};
   }
   auto layers = dagLayers(dag);

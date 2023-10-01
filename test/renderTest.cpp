@@ -284,3 +284,31 @@ TEST(renderError, wideStringNodeUnsupported) {
   EXPECT_EQ(err.code, RenderError::Code::Unsupported);
   EXPECT_EQ(err.nodeId, 1U);
 }
+
+TEST(renderError, tooManyOutgoingEdges) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{1, 2, 3, 4}, "."});
+  test.nodes.push_back(DAG::Node{{}, "1"});
+  test.nodes.push_back(DAG::Node{{}, "2"});
+  test.nodes.push_back(DAG::Node{{}, "3"});
+  test.nodes.push_back(DAG::Node{{}, "4"});
+  RenderError err;
+  auto result = renderDAG(test, err);
+  EXPECT_FALSE(result.has_value());
+  EXPECT_EQ(err.code, RenderError::Code::Overcrowded);
+  EXPECT_EQ(err.nodeId, 0U);
+}
+
+TEST(renderError, tooManyIncomingEdges) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{4}, "0"});
+  test.nodes.push_back(DAG::Node{{4}, "1"});
+  test.nodes.push_back(DAG::Node{{4}, "2"});
+  test.nodes.push_back(DAG::Node{{4}, "3"});
+  test.nodes.push_back(DAG::Node{{}, "4"});
+  RenderError err;
+  auto result = renderDAG(test, err);
+  EXPECT_FALSE(result.has_value());
+  EXPECT_EQ(err.code, RenderError::Code::Overcrowded);
+  EXPECT_EQ(err.nodeId, 4U);
+}
