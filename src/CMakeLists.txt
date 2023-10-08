@@ -3,6 +3,7 @@ add_library(asciidag)
 target_sources(asciidag
   PRIVATE
     asciidag.cpp
+    asciidagImpl.h
   PUBLIC
     asciidag.h
   )

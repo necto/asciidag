@@ -32,6 +32,8 @@ TEST(render, singleEdge) {
             R"(
 0
 |
+|
+|
 1
 )");
 }
@@ -45,6 +47,8 @@ TEST(render, twoSimpleEdgesDiverge) {
             R"(
 0
 |\
+| \
+| |
 1 2
 )");
 }
@@ -57,6 +61,8 @@ TEST(render, twoSimpleEdgesConverge) {
   EXPECT_EQ(renderSuccessfully(test),
             R"(
 0 1
+| |
+| /
 |/
 2
 )");
@@ -70,15 +76,18 @@ TEST(render, threeSimpleEdgesDiverge) {
   test.nodes.push_back(DAG::Node{{}, "3"});
   EXPECT_EQ(renderSuccessfully(test),
             R"(
-0
-|\
-| \
-| |\
+ 0
+/|\
+|| \
+|\  \
+| \ |
+| | |
 1 2 3
 )");
 }
 
 TEST(render, threeSimpleEdgesConverge) {
+  // FIXME: incorrect predecessor assignment to the fan-in of the bottom node
   DAG test;
   test.nodes.push_back(DAG::Node{{3}, "0"});
   test.nodes.push_back(DAG::Node{{3}, "1"});
@@ -87,10 +96,12 @@ TEST(render, threeSimpleEdgesConverge) {
   EXPECT_EQ(renderSuccessfully(test),
             R"(
 0 1 2
-|/ /
-/ /
-|/
-3
+| | |
+\ | /
+ \//
+ //
+\|/
+ 3
 )");
 }
 
@@ -104,11 +115,14 @@ TEST(render, twoParallelSimpleEdges) {
             R"(
 0 2
 | |
+| |
+| |
 1 3
 )");
 }
 
 TEST(render, nonStraightRightEdge) {
+  // FIXME: edges touch ambiguously
   DAG test;
   test.nodes.push_back(DAG::Node{{1, 2}, "0"});
   test.nodes.push_back(DAG::Node{{}, "1"});
@@ -118,10 +132,12 @@ TEST(render, nonStraightRightEdge) {
   test.nodes.push_back(DAG::Node{{}, "5"});
   EXPECT_EQ(renderSuccessfully(test),
             R"(
-0 3
-|\ \
-| \ \
-| | |\
+0  3
+|\ |\
+| \| \
+| |\  \
+| | \ |
+| | | |
 1 2 4 5
 )");
 }
@@ -137,15 +153,18 @@ TEST(render, nonStraightLeftEdge) {
   EXPECT_EQ(renderSuccessfully(test),
             R"(
 0 1 3 4
-|/ / /
-/ / /
-| |/
-2 5
+| | | |
+| | | |
+| | / /
+| // /
+|/ |/
+2  5
 )");
 }
 
 
 TEST(render, twoParallelRightEdges) {
+  // FIXME: space between the layers is not sufficient
   DAG test;
   test.nodes.push_back(DAG::Node{{1, 2}, "0"});
   test.nodes.push_back(DAG::Node{{}, "1"});
@@ -154,13 +173,16 @@ TEST(render, twoParallelRightEdges) {
   test.nodes.push_back(DAG::Node{{}, "4"});
   EXPECT_EQ(renderSuccessfully(test),
             R"(
-0 3
-|\ \
+0  3
+|\ |
+| \\
+| | |
 1 2 4
 )");
 }
 
 TEST(render, twoParallelLeftEdges) {
+  // FIXME: space between the layers is not sufficient
   DAG test;
   test.nodes.push_back(DAG::Node{{}, "0"});
   test.nodes.push_back(DAG::Node{{2}, "1"});
@@ -170,7 +192,9 @@ TEST(render, twoParallelLeftEdges) {
   EXPECT_EQ(renderSuccessfully(test),
             R"(
 0 1 3
- / /
+  | |
+  / /
+| |
 2 4
 )");
 }
@@ -185,7 +209,11 @@ TEST(render, hammock) {
             R"(
 0
 |\
+| \
+| |
 1 2
+| |
+| /
 |/
 3
 )");
@@ -200,7 +228,11 @@ TEST(render, multiLayerEdge) {
             R"(
 0
 |\
+| \
+| |
 1 .
+| |
+| /
 |/
 2
 )");
@@ -214,13 +246,17 @@ TEST(render, twoMultiLayerEdgesBroken) {
   test.nodes.push_back(DAG::Node{{}, "3"});
   EXPECT_EQ(renderSuccessfully(test),
             R"(
-0
-|\
-| \
-| |\
-1 . .
-|/ /
-2 3
+ 0
+/|\
+|\ \
+| \ \
+|  \ \
+|  | |
+1  . .
+|\ | |
+| \/ /
+|/ |/
+2  3
 )");
 }
 
@@ -234,15 +270,22 @@ TEST(render, twoLayerEdge) {
             R"(
 0
 |\
+| \
+| |
 1 .
 | |
+| |
+| |
 2 .
+| |
+| /
 |/
 3
 )");
 }
 
 TEST(render, fourLayers) {
+  // FIXME: Spacing on the last layer is not sufficient
   DAG test;
   test.nodes.push_back(DAG::Node{{1, 2, 3}, "#"});
   test.nodes.push_back(DAG::Node{{4}, "1"});
@@ -252,13 +295,19 @@ TEST(render, fourLayers) {
   test.nodes.push_back(DAG::Node{{}, "B"});
   EXPECT_EQ(renderSuccessfully(test),
             R"(
-#
-|\
-| \
-| |\
+ #
+/|\
+|| \
+|\  \
+| \ |
+| | |
 1 2 3
-|/ /
-4 .
+| | |
+| / /
+|/ |
+4  .
+|  |
+|  /
 |/
 B
 )");

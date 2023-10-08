@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.13)
 
 set(CMAKE_C_COMPILER "/usr/bin/clang-17")
 set(CMAKE_CXX_COMPILER "/usr/bin/clang++-17")
+set(CMAKE_BUILD_TYPE "Debug")
+
 
 project(gtest-demo LANGUAGES CXX)
 
@@ -11,6 +13,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Workaround to see stdlib debug symbols,
+# needed for pretty printing standard containers in GDB
+add_compile_options(-D_GLIBCXX_DEBUG)
 
 add_subdirectory(src)
 

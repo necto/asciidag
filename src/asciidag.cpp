@@ -1,5 +1,7 @@
 #include "asciidag.h"
 
+#include "asciidagImpl.h"
+
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -161,8 +163,6 @@ using EdgeMap = std::unordered_map<size_t, size_t>;
 
 class EdgesInFlight {
 public:
-  enum class Direction : int { Left = 1, Straight = 2, Right = 3 };
-
   static std::optional<Direction> edgeChar(char c);
   static char edgeChar(Direction dir);
 
@@ -181,7 +181,7 @@ private:
   EdgeMap edges[4];
 };
 
-std::optional<EdgesInFlight::Direction> EdgesInFlight::edgeChar(char c) {
+std::optional<Direction> EdgesInFlight::edgeChar(char c) {
   switch (c) {
     case '|':
       return Direction::Straight;
@@ -206,7 +206,7 @@ char EdgesInFlight::edgeChar(Direction dir) {
   return '?';
 }
 
-int toInt(EdgesInFlight::Direction dir) {
+int toInt(Direction dir) {
   return static_cast<int>(dir);
 }
 
@@ -267,10 +267,7 @@ EdgesInFlight::findNRemoveEdgesToEdge(Direction dirBelow, EdgeMap const& prevNod
 std::ostream&
 operator<<(std::ostream& os, EdgesInFlight const& edges) {
   bool first = true;
-  for (auto dir :
-       {EdgesInFlight::Direction::Left,
-        EdgesInFlight::Direction::Straight,
-        EdgesInFlight::Direction::Right}) {
+  for (auto dir : {Direction::Left, Direction::Straight, Direction::Right}) {
     os << EdgesInFlight::edgeChar(dir) << ' ' << edges.edges[toInt(dir)];
     if (!first) {
       os << ' ';
@@ -539,6 +536,7 @@ size_t minDistBetweenLayers(
   std::vector<size_t> const& upper,
   std::vector<Position> const& positions
 ) {
+  // FIXME: readjust accounting for new system of drawing edges (valency etc.)
   size_t ret = 1; // At least 1 '|' must separate any two connected nodes
   for (auto n : upper) {
     size_t ncol = positions[n].col;
@@ -553,6 +551,115 @@ size_t minDistBetweenLayers(
   if (ret > 1) {
     // series of N oblique chars ('/' or '\\') shift by N+1 positions
     --ret;
+  }
+  // TODO: It is not necessary to have whole lines for the exit/entry
+  // pieces of edges
+  ret += 2; // 1 for entry, 1 for exit edge pieces (these are placed separately)
+  return ret;
+}
+
+int directionShift(Direction dir) {
+  switch (dir) {
+    case Direction::Left:
+      return -1;
+    case Direction::Straight:
+      return 0;
+    case Direction::Right:
+      return +1;
+  }
+  assert(false && "Unexpected Direction");
+  return 0;
+}
+
+struct Connectivity {
+  struct Edge {
+    size_t from;
+    Direction exitAngle;
+    size_t to;
+    Direction entryAngle;
+  };
+
+  struct Valency {
+    bool topLeft = false;
+    bool topRight = false;
+    bool bottomLeft = false;
+    bool bottomRight = false;
+  };
+
+  std::vector<Edge> edges;
+  std::vector<Valency> nodeValencies;
+};
+
+Connectivity computeConnectivity(DAG const& dag, std::vector<Position> const& coords) {
+  (void)coords;
+  size_t const N = dag.nodes.size();
+  std::vector<std::vector<size_t>> preds(N);
+  std::vector<std::vector<size_t>> predEdges(N);
+  std::vector<std::vector<size_t>> succEdges(N);
+  Connectivity ret;
+  ret.nodeValencies.resize(N);
+  for (size_t i = 0; i < N; ++i) {
+    for (size_t e : dag.nodes[i].succs) {
+      preds[e].push_back(i);
+      size_t edgeId = ret.edges.size();
+      predEdges[e].push_back(edgeId);
+      succEdges[i].push_back(edgeId);
+      // The angles is not correct there yet
+      ret.edges.push_back({i, Direction::Straight, e, Direction::Straight});
+    }
+  }
+  for (auto& edge : ret.edges) {
+    assert(dag.nodes[edge.from].succs.size() <= 3 && "Overcrowded node");
+    assert(preds[edge.to].size() <= 3 && "Overcrowded node");
+    assert(1 <= dag.nodes[edge.from].succs.size() && "Fanthom edge");
+    assert(1 <= preds[edge.to].size() && "Fanthom edge");
+  }
+  for (size_t i = 0; i < N; ++i) {
+    // TODO: respect the order by coords
+    switch (predEdges[i].size()) {
+      case 0:
+        break;
+      case 1:
+        ret.edges[predEdges[i][0]].entryAngle = Direction::Straight;
+        break;
+      case 2:
+        ret.edges[predEdges[i][0]].entryAngle = Direction::Straight;
+        ret.edges[predEdges[i][1]].entryAngle = Direction::Left;
+        ret.nodeValencies[i].topRight = true;
+        break;
+      case 3:
+        ret.edges[predEdges[i][0]].entryAngle = Direction::Left;
+        ret.edges[predEdges[i][1]].entryAngle = Direction::Straight;
+        ret.edges[predEdges[i][2]].entryAngle = Direction::Right;
+        ret.nodeValencies[i].topLeft = true;
+        ret.nodeValencies[i].topRight = true;
+        break;
+      default:
+        assert(false && "Overcrowded node");
+        break;
+    }
+    switch (succEdges[i].size()) {
+      case 0:
+        break;
+      case 1:
+        ret.edges[succEdges[i][0]].exitAngle = Direction::Straight;
+        break;
+      case 2:
+        ret.edges[succEdges[i][0]].exitAngle = Direction::Straight;
+        ret.edges[succEdges[i][1]].exitAngle = Direction::Right;
+        ret.nodeValencies[i].bottomRight = true;
+        break;
+      case 3:
+        ret.edges[succEdges[i][0]].exitAngle = Direction::Left;
+        ret.edges[succEdges[i][1]].exitAngle = Direction::Straight;
+        ret.edges[succEdges[i][2]].exitAngle = Direction::Right;
+        ret.nodeValencies[i].bottomLeft = true;
+        ret.nodeValencies[i].bottomRight = true;
+        break;
+      default:
+        assert(false && "Overcrowded node");
+        break;
+    }
   }
   return ret;
 }
@@ -580,6 +687,26 @@ computeNodeCoordinates(DAG const& dag, std::vector<std::vector<size_t>> const& l
   return ret;
 }
 
+void adjustCoordsWithValencies(
+  std::vector<Position>& coords,
+  std::vector<Connectivity::Valency> const& valencies,
+  std::vector<std::vector<size_t>> const& layers
+) {
+  for (auto layer : layers) {
+    size_t lastCol = 0;
+    for (auto node : layer) {
+      if (valencies[node].bottomLeft || valencies[node].topLeft) {
+        lastCol += 1; // Accomodate left edge (incoming or outgoing)
+      }
+      coords[node].col = lastCol;
+      lastCol += 2; // Accomodate node width and mandatory space
+      if (valencies[node].bottomRight || valencies[node].topRight) {
+        lastCol += 1; // Accomodate right edge (incoming or outgoing)
+      }
+    }
+  }
+}
+
 void placeNodes(
   DAG const& dag,
   std::vector<Position> const& coordinates,
@@ -592,67 +719,19 @@ void placeNodes(
   }
 }
 
-void drawStraightLine(
-  Position cur,
-  size_t targetLine,
-  char edgeChar,
-  int colShift,
-  std::vector<std::string>& canvas
-) {
-  for (; cur.line < targetLine; ++cur.line) {
-    cur.col += colShift;
-    // TODO: once free placement of edges is guaranteed:
-    // assert(canvas[cur.line][cur.col] == ' ');
-    canvas[cur.line][cur.col] = edgeChar;
-  }
-}
-
-size_t absDiff(size_t a, size_t b) {
-  return a > b ? a - b : b - a;
-}
-
-Position pivotPoint(Position const& cur, Position const& to) {
-  auto diff = absDiff(cur.col, to.col);
-  if (diff == to.line - cur.line + 1) {
-    // The oblique line will reach the target directly
-    return to;
-  }
-  assert(diff < to.line - cur.line + 1);
-  return {cur.line + diff, to.col};
-}
-
-void drawEdge(Position const& cur, Position const& to, std::vector<std::string>& canvas) {
-  assert(cur.line < to.line);
-  assert(to.line < canvas.size());
-  assert(cur.col < canvas[cur.line].size() && to.col < canvas[to.line].size());
-  char obliqueChar = cur.col < to.col ? '\\' : '/';
-  int colShift = cur.col < to.col ? +1 : -1;
-  auto pivot = pivotPoint(cur, to);
-  drawStraightLine(cur, pivot.line, obliqueChar, colShift, canvas);
-  drawStraightLine(pivot, to.line, '|', 0, canvas);
-  // TODO: edge crossings
-}
-
-void placeEdges(
-  DAG const& dag,
-  std::vector<Position> const& coordinates,
-  std::vector<std::string>& canvas
-) {
-  for (size_t n = 0; n < dag.nodes.size(); ++n) {
-    for (auto e : dag.nodes[n].succs) {
-      Position curPos = coordinates[n];
-      // Node height is 1:
-      assert(dag.nodes[n].text.size() == 1);
-      ++curPos.line; // Start the edge from right under the node
-      Position targetPos = coordinates[e];
-      drawEdge(curPos, targetPos, canvas);
-    }
-  }
-}
-
 std::string rtrim(std::string s) {
   s.erase(s.find_last_not_of(' ') + 1);
   return s;
+}
+
+void placeEdges(
+  std::vector<Position> const& coordinates,
+  std::vector<Connectivity::Edge> const& edges,
+  std::vector<std::string>& canvas
+) {
+  for (auto const& e : edges) {
+    drawEdge(coordinates[e.from], e.exitAngle, coordinates[e.to], e.entryAngle, canvas);
+  }
 }
 
 std::vector<std::string> createCanvas(std::vector<Position> const& coordinates) {
@@ -668,15 +747,6 @@ std::vector<std::string> createCanvas(std::vector<Position> const& coordinates) 
   // line + 1 - to accomodate the node height
   // col + 1 - to accomodate the node width
   return std::vector<std::string>(max.line + 1, std::string(max.col + 1, ' '));
-}
-
-std::string renderCanvas(std::vector<std::string> const& canvas) {
-  std::string ret;
-  ret.reserve(canvas.size() * (canvas[0].size() + 1));
-  for (auto const& line : canvas) {
-    ret += rtrim(line) + "\n";
-  }
-  return ret;
 }
 
 std::optional<RenderError> checkDAGCompat(DAG const& dag) {
@@ -697,7 +767,9 @@ std::optional<RenderError> checkIfEdgesFitOnNodes(DAG const& dag) {
   for (size_t i = 0; i < N; ++i) {
     auto const& n = dag.nodes[i];
     if (3 < n.succs.size()) {
-      return {{RenderError::Code::Overcrowded, "Too many outgoing edges from a node, they don't fit.", i}};
+      return {
+        {RenderError::Code::Overcrowded, "Too many outgoing edges from a node, they don't fit.", i}
+      };
     }
     for (auto const& s : n.succs) {
       ++incomingEdgesPerNode[s];
@@ -705,13 +777,86 @@ std::optional<RenderError> checkIfEdgesFitOnNodes(DAG const& dag) {
   }
   for (size_t i = 0; i < N; ++i) {
     if (3 < incomingEdgesPerNode[i]) {
-      return {{RenderError::Code::Overcrowded, "Too many incoming edges to a node, they don't fit.", i}};
+      return {
+        {RenderError::Code::Overcrowded, "Too many incoming edges to a node, they don't fit.", i}
+      };
     }
   }
   return {};
 }
 
+size_t absDiff(size_t a, size_t b) {
+  return a > b ? a - b : b - a;
+}
+
 } // namespace
+
+std::string renderCanvas(std::vector<std::string> const& canvas) {
+  std::string ret;
+  ret.reserve(canvas.size() * (canvas[0].size() + 1));
+  for (auto const& line : canvas) {
+    ret += rtrim(line) + "\n";
+  }
+  return ret;
+}
+
+void drawEdge(
+  Position cur,
+  Direction startDir,
+  Position to,
+  Direction finishDir,
+  std::vector<std::string>& canvas
+) {
+  cur.line += 1;
+  cur.col += directionShift(startDir);
+  // TODO: enable this when lines are guaranteed to not intersect
+  // assert(canvas[cur.line][cur.col] == ' ');
+  canvas[cur.line][cur.col] = EdgesInFlight::edgeChar(startDir);
+
+  assert(cur.line < to.line);
+  assert(to.line < canvas.size());
+  assert(cur.col < canvas[cur.line].size() && to.col < canvas[to.line].size());
+
+  if (cur.line + 1 == to.line) {
+    assert(startDir == finishDir);
+    return;
+  }
+
+  if (cur.line + 2 == to.line) {
+    to.line -= 1;
+    to.col -= directionShift(finishDir);
+    // TODO: enable this when lines are guaranteed to not intersect
+    // assert(canvas[to.line][to.col] == ' ');
+    canvas[to.line][to.col] = EdgesInFlight::edgeChar(finishDir);
+    // TODO: assert that lines meet
+    return;
+  }
+
+  auto targetCol = to.col - directionShift(finishDir);
+  auto nextDir = [&]() {
+    if (cur.col == targetCol) {
+      return Direction::Straight;
+    }
+    if (startDir == Direction::Straight &&
+        absDiff(cur.col, targetCol - directionShift(finishDir)) < to.line - 3 - cur.line) {
+      return Direction::Straight;
+    }
+    if (cur.col < targetCol) {
+      return Direction::Right;
+    }
+    return Direction::Left;
+  }();
+  if (startDir != nextDir) {
+    // FIXME: this is ugly, should be refactored
+    // Next call will do a shift, the shift is justified
+    // only in the very beginning - when the edge starts off from a node
+    // and when the edge continues in the same direction.
+    // in the two other cases, it should not shift
+    // so compensate for it here.
+    cur.col -= directionShift(nextDir);
+  }
+  drawEdge(cur, nextDir, to, finishDir, canvas);
+}
 
 std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
   err.code = RenderError::Code::None;
@@ -730,10 +875,13 @@ std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
     err = *waypointErr;
     return {};
   }
+  // TODO: insert intermediate layers to layout the edge crossings
   auto coords = computeNodeCoordinates(dag, layers);
+  auto const connectivity = computeConnectivity(dag, coords);
+  adjustCoordsWithValencies(coords, connectivity.nodeValencies, layers);
   auto canvas = createCanvas(coords);
   placeNodes(dag, coords, canvas);
-  placeEdges(dag, coords, canvas);
+  placeEdges(coords, connectivity.edges, canvas);
   return renderCanvas(canvas);
 }
 
