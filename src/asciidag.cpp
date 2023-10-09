@@ -789,6 +789,26 @@ size_t absDiff(size_t a, size_t b) {
   return a > b ? a - b : b - a;
 }
 
+Direction chooseNextDirection(
+  Position const& cur,
+  Direction startDir,
+  Position const& to,
+  Direction finishDir
+) {
+  auto targetCol = to.col - directionShift(finishDir);
+  if (cur.col == targetCol) {
+    return Direction::Straight;
+  }
+  if (startDir == Direction::Straight &&
+        absDiff(cur.col, targetCol - directionShift(finishDir)) < to.line - 3 - cur.line) {
+    return Direction::Straight;
+  }
+  if (cur.col < targetCol) {
+    return Direction::Right;
+  }
+  return Direction::Left;
+}
+
 } // namespace
 
 std::string renderCanvas(std::vector<std::string> const& canvas) {
@@ -802,60 +822,47 @@ std::string renderCanvas(std::vector<std::string> const& canvas) {
 
 void drawEdge(
   Position cur,
-  Direction startDir,
+  Direction curDir,
   Position to,
   Direction finishDir,
   std::vector<std::string>& canvas
 ) {
   cur.line += 1;
-  cur.col += directionShift(startDir);
+  cur.col += directionShift(curDir);
   // TODO: enable this when lines are guaranteed to not intersect
   // assert(canvas[cur.line][cur.col] == ' ');
-  canvas[cur.line][cur.col] = EdgesInFlight::edgeChar(startDir);
+  canvas[cur.line][cur.col] = EdgesInFlight::edgeChar(curDir);
 
-  assert(cur.line < to.line);
-  assert(to.line < canvas.size());
+  assert(cur.line < to.line && to.line < canvas.size());
   assert(cur.col < canvas[cur.line].size() && to.col < canvas[to.line].size());
 
   if (cur.line + 1 == to.line) {
-    assert(startDir == finishDir);
+    assert(curDir == finishDir);
     return;
   }
 
-  if (cur.line + 2 == to.line) {
-    to.line -= 1;
-    to.col -= directionShift(finishDir);
+  while (cur.line + 2 < to.line) {
+    auto nextDir = chooseNextDirection(cur, curDir, to, finishDir);
+    if (curDir == nextDir) {
+      // Advance when continuing in the same direction such as:
+      //  \         /
+      //   \  and  /
+      cur.col += directionShift(curDir);
+    }
+    curDir = nextDir;
+    cur.line += 1;
     // TODO: enable this when lines are guaranteed to not intersect
-    // assert(canvas[to.line][to.col] == ' ');
-    canvas[to.line][to.col] = EdgesInFlight::edgeChar(finishDir);
-    // TODO: assert that lines meet
-    return;
+    // assert(canvas[cur.line][cur.col] == ' ');
+    canvas[cur.line][cur.col] = EdgesInFlight::edgeChar(curDir);
   }
 
-  auto targetCol = to.col - directionShift(finishDir);
-  auto nextDir = [&]() {
-    if (cur.col == targetCol) {
-      return Direction::Straight;
-    }
-    if (startDir == Direction::Straight &&
-        absDiff(cur.col, targetCol - directionShift(finishDir)) < to.line - 3 - cur.line) {
-      return Direction::Straight;
-    }
-    if (cur.col < targetCol) {
-      return Direction::Right;
-    }
-    return Direction::Left;
-  }();
-  if (startDir != nextDir) {
-    // FIXME: this is ugly, should be refactored
-    // Next call will do a shift, the shift is justified
-    // only in the very beginning - when the edge starts off from a node
-    // and when the edge continues in the same direction.
-    // in the two other cases, it should not shift
-    // so compensate for it here.
-    cur.col -= directionShift(nextDir);
-  }
-  drawEdge(cur, nextDir, to, finishDir, canvas);
+  assert(cur.line + 2 == to.line);
+  to.line -= 1;
+  to.col -= directionShift(finishDir);
+  // TODO: assert that lines meet
+  // TODO: enable this when lines are guaranteed to not intersect
+  // assert(canvas[to.line][to.col] == ' ');
+  canvas[to.line][to.col] = EdgesInFlight::edgeChar(finishDir);
 }
 
 std::optional<std::string> renderDAG(DAG dag, RenderError& err) {

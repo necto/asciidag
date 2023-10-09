@@ -11,7 +11,7 @@ enum class Direction : int { Left = 1, Straight = 2, Right = 3 };
 
 void drawEdge(
   Position cur,
-  Direction startDir,
+  Direction curDir,
   Position to,
   Direction finishDir,
   std::vector<std::string>& canvas
