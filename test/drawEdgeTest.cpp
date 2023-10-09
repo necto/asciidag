@@ -3,6 +3,8 @@
 #include <gtest/gtest.h>
 #include <sstream>
 
+namespace {
+
 using namespace asciidag;
 using std::string;
 using std::vector;
@@ -22,6 +24,42 @@ vector<string> derenderCanvas(string const& rendered) {
   return ret;
 }
 
+void eraseEdgeCharacters(vector<string>& canvas) {
+  for (auto& line : canvas) {
+    for (auto& c : line) {
+      if (c != '.') {
+        c = ' ';
+      }
+    }
+  }
+}
+
+Direction getEntryAngle(Position dotPos, vector<string> const& canvas) {
+  assert(0 < dotPos.line);
+  if (0 < dotPos.col && canvas[dotPos.line - 1][dotPos.col - 1] == '\\') {
+    return Direction::Right;
+  }
+  if (canvas[dotPos.line - 1][dotPos.col] == '|') {
+    return Direction::Straight;
+  }
+  assert(dotPos.col + 1 < canvas[dotPos.line - 1].size());
+  assert(canvas[dotPos.line - 1][dotPos.col + 1] == '/');
+  return Direction::Left;
+}
+
+Direction getExitAngle(Position dotPos, vector<string> const& canvas) {
+  assert(dotPos.line < canvas.size());
+  if (0 < dotPos.col && canvas[dotPos.line + 1][dotPos.col - 1] == '/') {
+    return Direction::Left;
+  }
+  if (canvas[dotPos.line + 1][dotPos.col] == '|') {
+    return Direction::Straight;
+  }
+  assert(dotPos.col + 1 < canvas[dotPos.line + 1].size());
+  assert(canvas[dotPos.line + 1][dotPos.col + 1] == '\\');
+  return Direction::Right;
+}
+
 string drawEdgeFromSpec(string const& spec) {
   Position from;
   Direction fromAngle;
@@ -37,39 +75,16 @@ string drawEdgeFromSpec(string const& spec) {
         if (fromFound) {
           to = {lineNum, col};
           toFound = true;
-          assert(0 < lineNum);
-          if (0 < col && canvas[lineNum - 1][col - 1] == '\\') {
-            toAngle = Direction::Right;
-          } else if (canvas[lineNum - 1][col] == '|') {
-            toAngle = Direction::Straight;
-          } else {
-            assert(col + 1 < canvas[lineNum - 1].size());
-            assert(canvas[lineNum - 1][col + 1] == '/');
-            toAngle = Direction::Left;
-          }
+          toAngle = getEntryAngle(to, canvas);
         } else {
           from = {lineNum, col};
           fromFound = true;
-          assert(lineNum < canvas.size());
-          if (0 < col && canvas[lineNum + 1][col - 1] == '/') {
-            fromAngle = Direction::Left;
-          } else if (canvas[lineNum + 1][col] == '|') {
-            fromAngle = Direction::Straight;
-          } else {
-            assert(col + 1 < canvas[lineNum + 1].size());
-            assert(canvas[lineNum + 1][col + 1] == '\\');
-            fromAngle = Direction::Right;
-          }
+          fromAngle = getExitAngle(from, canvas);
         }
       }
     }
   }
-  // Erase the edge characters
-  for (auto &line : canvas) {
-    for (auto & c : line) {
-      if (c != '.') c = ' ';
-    }
-  }
+  eraseEdgeCharacters(canvas);
   drawEdge(from, fromAngle, to, toAngle, canvas);
   return renderCanvas(canvas);
 }
@@ -158,7 +173,6 @@ TEST(drawEdge, straightLeftLen3) {
 )";
   EXPECT_EQ(spec, drawEdgeFromSpec(spec));
 }
-
 
 TEST(drawEdge, straightLeftLen4) {
   std::string spec = R"(
@@ -260,7 +274,6 @@ TEST(drawEdge, pivot1StepRightLongStraight) {
 )";
   EXPECT_EQ(spec, drawEdgeFromSpec(spec));
 }
-
 
 TEST(drawEdge, pivot2StepsRight) {
   std::string spec = R"(
@@ -521,5 +534,7 @@ TEST(drawEdge, straightTurnRightBy3Len6) {
 )";
   EXPECT_EQ(spec, drawEdgeFromSpec(spec));
 }
+
+} // namespace
 
 // TODO: all the test from above but mirrored
