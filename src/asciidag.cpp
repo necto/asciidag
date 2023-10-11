@@ -590,8 +590,71 @@ size_t minDistBetweenLayers(
   return ret;
 }
 
+void setEntryAngles(
+  Connectivity& conn,
+  std::vector<std::vector<size_t>> predEdges,
+  std::vector<Position> const& coords
+) {
+  for (size_t i = 0; i < predEdges.size(); ++i) {
+    (void)coords; // TODO: respect the order by coords
+    switch (predEdges[i].size()) {
+      case 0:
+        break;
+      case 1:
+        conn.edges[predEdges[i][0]].entryAngle = Direction::Straight;
+        break;
+      case 2:
+        conn.edges[predEdges[i][0]].entryAngle = Direction::Straight;
+        conn.edges[predEdges[i][1]].entryAngle = Direction::Left;
+        conn.nodeValencies[i].topRight = true;
+        break;
+      case 3:
+        conn.edges[predEdges[i][0]].entryAngle = Direction::Left;
+        conn.edges[predEdges[i][1]].entryAngle = Direction::Straight;
+        conn.edges[predEdges[i][2]].entryAngle = Direction::Right;
+        conn.nodeValencies[i].topLeft = true;
+        conn.nodeValencies[i].topRight = true;
+        break;
+      default:
+        assert(false && "Overcrowded node");
+        break;
+    }
+  }
+}
+
+void setExitAngles(
+  Connectivity& conn,
+  std::vector<std::vector<size_t>> succEdges,
+  std::vector<Position> const& coords
+) {
+  for (size_t i = 0; i < succEdges.size(); ++i) {
+    (void)coords;// TODO: respect the order by coords
+    switch (succEdges[i].size()) {
+      case 0:
+        break;
+      case 1:
+        conn.edges[succEdges[i][0]].exitAngle = Direction::Straight;
+        break;
+      case 2:
+        conn.edges[succEdges[i][0]].exitAngle = Direction::Straight;
+        conn.edges[succEdges[i][1]].exitAngle = Direction::Right;
+        conn.nodeValencies[i].bottomRight = true;
+        break;
+      case 3:
+        conn.edges[succEdges[i][0]].exitAngle = Direction::Left;
+        conn.edges[succEdges[i][1]].exitAngle = Direction::Straight;
+        conn.edges[succEdges[i][2]].exitAngle = Direction::Right;
+        conn.nodeValencies[i].bottomLeft = true;
+        conn.nodeValencies[i].bottomRight = true;
+        break;
+      default:
+        assert(false && "Overcrowded node");
+        break;
+    }
+  }
+}
+
 Connectivity computeConnectivity(DAG const& dag, std::vector<Position> const& coords) {
-  (void)coords;
   size_t const N = dag.nodes.size();
   std::vector<std::vector<size_t>> preds(N);
   std::vector<std::vector<size_t>> predEdges(N);
@@ -614,53 +677,8 @@ Connectivity computeConnectivity(DAG const& dag, std::vector<Position> const& co
     assert(1 <= dag.nodes[edge.from].succs.size() && "Fanthom edge");
     assert(1 <= preds[edge.to].size() && "Fanthom edge");
   }
-  for (size_t i = 0; i < N; ++i) {
-    // TODO: respect the order by coords
-    switch (predEdges[i].size()) {
-      case 0:
-        break;
-      case 1:
-        ret.edges[predEdges[i][0]].entryAngle = Direction::Straight;
-        break;
-      case 2:
-        ret.edges[predEdges[i][0]].entryAngle = Direction::Straight;
-        ret.edges[predEdges[i][1]].entryAngle = Direction::Left;
-        ret.nodeValencies[i].topRight = true;
-        break;
-      case 3:
-        ret.edges[predEdges[i][0]].entryAngle = Direction::Left;
-        ret.edges[predEdges[i][1]].entryAngle = Direction::Straight;
-        ret.edges[predEdges[i][2]].entryAngle = Direction::Right;
-        ret.nodeValencies[i].topLeft = true;
-        ret.nodeValencies[i].topRight = true;
-        break;
-      default:
-        assert(false && "Overcrowded node");
-        break;
-    }
-    switch (succEdges[i].size()) {
-      case 0:
-        break;
-      case 1:
-        ret.edges[succEdges[i][0]].exitAngle = Direction::Straight;
-        break;
-      case 2:
-        ret.edges[succEdges[i][0]].exitAngle = Direction::Straight;
-        ret.edges[succEdges[i][1]].exitAngle = Direction::Right;
-        ret.nodeValencies[i].bottomRight = true;
-        break;
-      case 3:
-        ret.edges[succEdges[i][0]].exitAngle = Direction::Left;
-        ret.edges[succEdges[i][1]].exitAngle = Direction::Straight;
-        ret.edges[succEdges[i][2]].exitAngle = Direction::Right;
-        ret.nodeValencies[i].bottomLeft = true;
-        ret.nodeValencies[i].bottomRight = true;
-        break;
-      default:
-        assert(false && "Overcrowded node");
-        break;
-    }
-  }
+  setEntryAngles(ret, predEdges, coords);
+  setExitAngles(ret, succEdges, coords);
   return ret;
 }
 
