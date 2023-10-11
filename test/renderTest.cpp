@@ -196,6 +196,36 @@ TEST(render, nonStraightRightEdge) {
 )");
 }
 
+TEST(render, tripleEdgePair) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{1, 1, 1}, "0"});
+  test.nodes.push_back(DAG::Node{{}, "1"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+ 0
+/|\
+|||
+\|/
+ 1
+)");
+}
+
+TEST(render, twoTripleEdgePairs) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{1, 1, 1}, "0"});
+  test.nodes.push_back(DAG::Node{{}, "1"});
+  test.nodes.push_back(DAG::Node{{3, 3, 3}, "2"});
+  test.nodes.push_back(DAG::Node{{}, "3"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+ 0   2
+/|\ /|\
+||| |||
+\|/ \|/
+ 1   3
+)");
+}
+
 TEST(render, nonStraightLeftEdge) {
   DAG test;
   test.nodes.push_back(DAG::Node{{2}, "0"});

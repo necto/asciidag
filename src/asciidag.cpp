@@ -834,8 +834,8 @@ std::vector<std::string> createCanvas(std::vector<Position> const& coordinates) 
     }
   }
   // line + 1 - to accomodate the node height
-  // col + 1 - to accomodate the node width
-  return std::vector<std::string>(max.line + 1, std::string(max.col + 1, ' '));
+  // col + 2 - to accomodate the node width + potential top/bottom-right edge
+  return std::vector<std::string>(max.line + 1, std::string(max.col + 2, ' '));
 }
 
 std::optional<RenderError> checkDAGCompat(DAG const& dag) {
