@@ -49,6 +49,7 @@ TEST(render, twoSimpleEdgesDiverge) {
 |\
 | \
 | |
+| |
 1 2
 )");
 }
@@ -61,6 +62,7 @@ TEST(render, twoSimpleEdgesConverge) {
   EXPECT_EQ(renderSuccessfully(test),
             R"(
 0 1
+| |
 | |
 | /
 |/
@@ -97,9 +99,11 @@ TEST(render, threeSimpleEdgesConverge) {
             R"(
 0 1 2
 | | |
-\ | /
- \//
+| | /
+\ |/
+ \/
  //
+//|
 \|/
  3
 )");
@@ -164,7 +168,6 @@ TEST(render, nonStraightLeftEdge) {
 
 
 TEST(render, twoParallelRightEdges) {
-  // FIXME: space between the layers is not sufficient
   DAG test;
   test.nodes.push_back(DAG::Node{{1, 2}, "0"});
   test.nodes.push_back(DAG::Node{{}, "1"});
@@ -176,13 +179,13 @@ TEST(render, twoParallelRightEdges) {
 0  3
 |\ |
 | \\
+| | \
 | | |
 1 2 4
 )");
 }
 
 TEST(render, twoParallelLeftEdges) {
-  // FIXME: space between the layers is not sufficient
   DAG test;
   test.nodes.push_back(DAG::Node{{}, "0"});
   test.nodes.push_back(DAG::Node{{2}, "1"});
@@ -194,6 +197,8 @@ TEST(render, twoParallelLeftEdges) {
 0 1 3
   | |
   / /
+ / /
+/ /
 | |
 2 4
 )");
@@ -211,7 +216,9 @@ TEST(render, hammock) {
 |\
 | \
 | |
+| |
 1 2
+| |
 | |
 | /
 |/
@@ -230,7 +237,9 @@ TEST(render, multiLayerEdge) {
 |\
 | \
 | |
+| |
 1 .
+| |
 | |
 | /
 |/
@@ -239,6 +248,7 @@ TEST(render, multiLayerEdge) {
 }
 
 TEST(render, twoMultiLayerEdgesBroken) {
+  // TODO: handle intersection, or shift the nodes in the layers
   DAG test;
   test.nodes.push_back(DAG::Node{{1, 2, 3}, "0"});
   test.nodes.push_back(DAG::Node{{2, 3}, "1"});
@@ -248,13 +258,16 @@ TEST(render, twoMultiLayerEdgesBroken) {
             R"(
  0
 /|\
-|\ \
-| \ \
-|  \ \
+|| \
+|\  \
+| \  \
+|  \ |
 |  | |
 1  . .
 |\ | |
-| \/ /
+| \| |
+|  / |
+| /| /
 |/ |/
 2  3
 )");
@@ -272,11 +285,13 @@ TEST(render, twoLayerEdge) {
 |\
 | \
 | |
+| |
 1 .
 | |
 | |
 | |
 2 .
+| |
 | |
 | /
 |/
@@ -285,7 +300,6 @@ TEST(render, twoLayerEdge) {
 }
 
 TEST(render, fourLayers) {
-  // FIXME: Spacing on the last layer is not sufficient
   DAG test;
   test.nodes.push_back(DAG::Node{{1, 2, 3}, "#"});
   test.nodes.push_back(DAG::Node{{4}, "1"});
@@ -303,11 +317,14 @@ TEST(render, fourLayers) {
 | | |
 1 2 3
 | | |
-| / /
+| | /
+| //
 |/ |
 4  .
 |  |
+|  |
 |  /
+| /
 |/
 B
 )");

@@ -531,46 +531,6 @@ std::optional<size_t> NodeCollector::findNodeAbove(size_t col) {
   return {};
 }
 
-size_t minDistBetweenLayers(
-  DAG const& dag,
-  std::vector<size_t> const& upper,
-  std::vector<Position> const& positions
-) {
-  // FIXME: readjust accounting for new system of drawing edges (valency etc.)
-  size_t ret = 1; // At least 1 '|' must separate any two connected nodes
-  for (auto n : upper) {
-    size_t ncol = positions[n].col;
-    for (auto e : dag.nodes[n].succs) {
-      size_t ecol = positions[e].col;
-      size_t shift = ncol < ecol ? ecol - ncol : ncol - ecol;
-      if (ret < shift) {
-        ret = shift;
-      }
-    }
-  }
-  if (ret > 1) {
-    // series of N oblique chars ('/' or '\\') shift by N+1 positions
-    --ret;
-  }
-  // TODO: It is not necessary to have whole lines for the exit/entry
-  // pieces of edges
-  ret += 2; // 1 for entry, 1 for exit edge pieces (these are placed separately)
-  return ret;
-}
-
-int directionShift(Direction dir) {
-  switch (dir) {
-    case Direction::Left:
-      return -1;
-    case Direction::Straight:
-      return 0;
-    case Direction::Right:
-      return +1;
-  }
-  assert(false && "Unexpected Direction");
-  return 0;
-}
-
 struct Connectivity {
   struct Edge {
     size_t from;
@@ -589,6 +549,46 @@ struct Connectivity {
   std::vector<Edge> edges;
   std::vector<Valency> nodeValencies;
 };
+
+size_t absDiff(size_t a, size_t b) {
+  return a > b ? a - b : b - a;
+}
+
+int directionShift(Direction dir) {
+  switch (dir) {
+    case Direction::Left:
+      return -1;
+    case Direction::Straight:
+      return 0;
+    case Direction::Right:
+      return +1;
+  }
+  assert(false && "Unexpected Direction");
+  return 0;
+}
+
+size_t minEdgeHeight(Connectivity::Edge const& edge, std::vector<Position> const& positions) {
+  return absDiff(
+           positions[edge.from].col + directionShift(edge.entryAngle),
+           positions[edge.to].col - directionShift(edge.exitAngle)
+         )
+       + 3;
+}
+
+size_t minDistBetweenLayers(
+  Connectivity const& conn,
+  std::vector<size_t> const& edges,
+  std::vector<Position> const& positions
+) {
+  size_t ret = 1; // At least 1 '|' must separate any two connected nodes
+  for (auto eId : edges) {
+    size_t hight = minEdgeHeight(conn.edges[eId], positions);
+    if (ret < hight) {
+      ret = hight;
+    }
+  }
+  return ret;
+}
 
 Connectivity computeConnectivity(DAG const& dag, std::vector<Position> const& coords) {
   (void)coords;
@@ -667,43 +667,64 @@ Connectivity computeConnectivity(DAG const& dag, std::vector<Position> const& co
 std::vector<Position>
 computeNodeCoordinates(DAG const& dag, std::vector<std::vector<size_t>> const& layers) {
   std::vector<Position> ret(dag.nodes.size(), Position{0, 0});
+  size_t line = 0;
   for (auto const& layer : layers) {
     size_t col = 0;
     for (size_t n : layer) {
       assert(dag.nodes[n].text.size() == 1);
       ret[n].col = col;
+      ret[n].line = line;
       // 1 for space + 1 for the node text (single-character)
       col += 2;
     }
+    ++line;
   }
-  size_t line = 0;
+  return ret;
+}
+
+std::vector<std::vector<size_t>>
+groupEdgesByLayer(Connectivity const& conn, std::vector<std::vector<size_t>> const& layers) {
+  size_t const N = conn.nodeValencies.size();
+  std::vector<std::vector<size_t>> ret(layers.size());
+  std::vector<size_t> nodeLayer(N);
   for (size_t i = 0; i < layers.size(); ++i) {
     for (auto n : layers[i]) {
-      ret[n].line = line;
+      nodeLayer[n] = i;
     }
-    // 1 for the node height
-    line += 1 + minDistBetweenLayers(dag, layers[i], ret);
+  }
+  for (size_t i = 0; i < conn.edges.size(); ++i) {
+    ret[nodeLayer[conn.edges[i].from]].push_back(i);
   }
   return ret;
 }
 
 void adjustCoordsWithValencies(
   std::vector<Position>& coords,
-  std::vector<Connectivity::Valency> const& valencies,
+  Connectivity const& conn,
   std::vector<std::vector<size_t>> const& layers
 ) {
   for (auto layer : layers) {
     size_t lastCol = 0;
     for (auto node : layer) {
-      if (valencies[node].bottomLeft || valencies[node].topLeft) {
+      if (conn.nodeValencies[node].bottomLeft || conn.nodeValencies[node].topLeft) {
         lastCol += 1; // Accomodate left edge (incoming or outgoing)
       }
       coords[node].col = lastCol;
       lastCol += 2; // Accomodate node width and mandatory space
-      if (valencies[node].bottomRight || valencies[node].topRight) {
+      if (conn.nodeValencies[node].bottomRight || conn.nodeValencies[node].topRight) {
         lastCol += 1; // Accomodate right edge (incoming or outgoing)
       }
     }
+  }
+  auto interLayerEdges = groupEdgesByLayer(conn, layers);
+  assert(interLayerEdges.size() == layers.size());
+  size_t line = 0;
+  for (size_t i = 0; i < layers.size(); ++i) {
+    for (auto n : layers[i]) {
+      coords[n].line = line;
+    }
+    // 1 for the node height
+    line += 1 + minDistBetweenLayers(conn, interLayerEdges[i], coords);
   }
 }
 
@@ -783,10 +804,6 @@ std::optional<RenderError> checkIfEdgesFitOnNodes(DAG const& dag) {
     }
   }
   return {};
-}
-
-size_t absDiff(size_t a, size_t b) {
-  return a > b ? a - b : b - a;
 }
 
 Direction chooseNextDirection(
@@ -885,7 +902,7 @@ std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
   // TODO: insert intermediate layers to layout the edge crossings
   auto coords = computeNodeCoordinates(dag, layers);
   auto const connectivity = computeConnectivity(dag, coords);
-  adjustCoordsWithValencies(coords, connectivity.nodeValencies, layers);
+  adjustCoordsWithValencies(coords, connectivity, layers);
   auto canvas = createCanvas(coords);
   placeNodes(dag, coords, canvas);
   placeEdges(coords, connectivity.edges, canvas);
