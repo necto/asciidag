@@ -596,22 +596,23 @@ void setEntryAngles(
   std::vector<Position> const& coords
 ) {
   for (size_t i = 0; i < predEdges.size(); ++i) {
+    auto const& edgeIds = predEdges[i];
     (void)coords; // TODO: respect the order by coords
-    switch (predEdges[i].size()) {
+    switch (edgeIds.size()) {
       case 0:
         break;
       case 1:
-        conn.edges[predEdges[i][0]].entryAngle = Direction::Straight;
+        conn.edges[edgeIds[0]].entryAngle = Direction::Straight;
         break;
       case 2:
-        conn.edges[predEdges[i][0]].entryAngle = Direction::Straight;
-        conn.edges[predEdges[i][1]].entryAngle = Direction::Left;
+        conn.edges[edgeIds[0]].entryAngle = Direction::Straight;
+        conn.edges[edgeIds[1]].entryAngle = Direction::Left;
         conn.nodeValencies[i].topRight = true;
         break;
       case 3:
-        conn.edges[predEdges[i][0]].entryAngle = Direction::Left;
-        conn.edges[predEdges[i][1]].entryAngle = Direction::Straight;
-        conn.edges[predEdges[i][2]].entryAngle = Direction::Right;
+        conn.edges[edgeIds[0]].entryAngle = Direction::Left;
+        conn.edges[edgeIds[1]].entryAngle = Direction::Straight;
+        conn.edges[edgeIds[2]].entryAngle = Direction::Right;
         conn.nodeValencies[i].topLeft = true;
         conn.nodeValencies[i].topRight = true;
         break;
@@ -628,22 +629,23 @@ void setExitAngles(
   std::vector<Position> const& coords
 ) {
   for (size_t i = 0; i < succEdges.size(); ++i) {
+    auto const& edgeIds = succEdges[i];
     (void)coords;// TODO: respect the order by coords
-    switch (succEdges[i].size()) {
+    switch (edgeIds.size()) {
       case 0:
         break;
       case 1:
-        conn.edges[succEdges[i][0]].exitAngle = Direction::Straight;
+        conn.edges[edgeIds[0]].exitAngle = Direction::Straight;
         break;
       case 2:
-        conn.edges[succEdges[i][0]].exitAngle = Direction::Straight;
-        conn.edges[succEdges[i][1]].exitAngle = Direction::Right;
+        conn.edges[edgeIds[0]].exitAngle = Direction::Straight;
+        conn.edges[edgeIds[1]].exitAngle = Direction::Right;
         conn.nodeValencies[i].bottomRight = true;
         break;
       case 3:
-        conn.edges[succEdges[i][0]].exitAngle = Direction::Left;
-        conn.edges[succEdges[i][1]].exitAngle = Direction::Straight;
-        conn.edges[succEdges[i][2]].exitAngle = Direction::Right;
+        conn.edges[edgeIds[0]].exitAngle = Direction::Left;
+        conn.edges[edgeIds[1]].exitAngle = Direction::Straight;
+        conn.edges[edgeIds[2]].exitAngle = Direction::Right;
         conn.nodeValencies[i].bottomLeft = true;
         conn.nodeValencies[i].bottomRight = true;
         break;
