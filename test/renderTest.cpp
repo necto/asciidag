@@ -175,7 +175,8 @@ TEST(render, twoParallelSimpleEdges) {
 }
 
 TEST(render, nonStraightRightEdge) {
-  // FIXME: edges touch ambiguously
+  // Edges come close and touch slightly ambiguously, but
+  // the parser can figureout proper handling for it
   DAG test;
   test.nodes.push_back(DAG::Node{{1, 2}, "0"});
   test.nodes.push_back(DAG::Node{{}, "1"});

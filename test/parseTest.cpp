@@ -868,8 +868,8 @@ TEST(parseError, mergingEdgeLeft) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  ASSERT_EQ(err.code, ParseError::Code::MergingEdge);
-  EXPECT_EQ(err.pos, (Position{4U, 5U}));
+  ASSERT_EQ(err.code, ParseError::Code::DanglingEdge);
+  EXPECT_EQ(err.pos, (Position{3U, 5U}));
 }
 
 TEST(parseError, mergingEdgeRightSkewed) {
@@ -883,8 +883,8 @@ TEST(parseError, mergingEdgeRightSkewed) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  ASSERT_EQ(err.code, ParseError::Code::MergingEdge);
-  EXPECT_EQ(err.pos, (Position{4U, 5U}));
+  ASSERT_EQ(err.code, ParseError::Code::DanglingEdge);
+  EXPECT_EQ(err.pos, (Position{3U, 6U}));
 }
 
 TEST(parseError, mergingEdgeLeftStraight) {
@@ -898,8 +898,8 @@ TEST(parseError, mergingEdgeLeftStraight) {
   ParseError err;
   auto result = parseDAG(str, err);
   EXPECT_FALSE(result.has_value());
-  ASSERT_EQ(err.code, ParseError::Code::MergingEdge);
-  EXPECT_EQ(err.pos, (Position{4U, 6U}));
+  ASSERT_EQ(err.code, ParseError::Code::DanglingEdge);
+  EXPECT_EQ(err.pos, (Position{3U, 6U}));
 }
 
 TEST(parseError, nodeShiftedLeft) {
@@ -1325,6 +1325,76 @@ TEST(parse, selfLoop) {
   std::string node = "##\n##\n##\n##\n##\n##\n##";
   ASSERT_EQ(dag.allNodes(), nodes(node));
   ASSERT_EQ(dag.node(node).succs(), nodes(node, node));
+}
+
+TEST(parse, touchRight) {
+  std::string str = R"(
+   A B
+    \|
+    |\
+    C D
+)";
+  auto dag = parseSuccessfully(str);
+  EXPECT_EQ(dag.node("A").succs(), nodes("C"));
+  EXPECT_EQ(dag.node("B").succs(), nodes("D"));
+  EXPECT_EQ(dag.node("C").succs(), nodes());
+  EXPECT_EQ(dag.node("D").succs(), nodes());
+}
+
+TEST(parse, touchLeftStraght) {
+  std::string str = R"(
+   A B
+   |/
+   /|
+  C D
+)";
+  auto dag = parseSuccessfully(str);
+  EXPECT_EQ(dag.node("A").succs(), nodes("C"));
+  EXPECT_EQ(dag.node("B").succs(), nodes("D"));
+  EXPECT_EQ(dag.node("C").succs(), nodes());
+  EXPECT_EQ(dag.node("D").succs(), nodes());
+}
+
+TEST(parse, touchLeftRight) {
+  std::string str = R"(
+  A  B
+   \/
+   /|
+  C D
+)";
+  auto dag = parseSuccessfully(str);
+  EXPECT_EQ(dag.node("A").succs(), nodes("C"));
+  EXPECT_EQ(dag.node("B").succs(), nodes("D"));
+  EXPECT_EQ(dag.node("C").succs(), nodes());
+  EXPECT_EQ(dag.node("D").succs(), nodes());
+}
+
+TEST(parse, touchRightLeft) {
+  std::string str = R"(
+  A  B
+   \/
+   |\
+   C D
+)";
+  auto dag = parseSuccessfully(str);
+  EXPECT_EQ(dag.node("A").succs(), nodes("C"));
+  EXPECT_EQ(dag.node("B").succs(), nodes("D"));
+  EXPECT_EQ(dag.node("C").succs(), nodes());
+  EXPECT_EQ(dag.node("D").succs(), nodes());
+}
+
+TEST(parse, touchCross) {
+  std::string str = R"(
+  A  B
+   \/
+   /\
+  C  D
+)";
+  auto dag = parseSuccessfully(str);
+  EXPECT_EQ(dag.node("A").succs(), nodes("C"));
+  EXPECT_EQ(dag.node("B").succs(), nodes("D"));
+  EXPECT_EQ(dag.node("C").succs(), nodes());
+  EXPECT_EQ(dag.node("D").succs(), nodes());
 }
 
 TEST(parse, simpleEdgeCross) {

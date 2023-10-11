@@ -8,7 +8,6 @@
 #include <iostream>
 #include <optional>
 #include <set>
-#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -167,12 +166,12 @@ public:
   static char edgeChar(Direction dir);
 
   std::vector<size_t> findNRemoveEdgesToNode(size_t col);
-  std::vector<size_t> findNRemoveEdgesToEdge(Direction dir, EdgeMap const& prevNodes, size_t col);
+  std::optional<size_t> findNRemoveEdgeToEdge(Direction dir, EdgeMap const& prevNodes, size_t col);
   std::optional<ParseError> findDanglingEdge(size_t line) const;
   friend std::ostream& operator<<(std::ostream& os, EdgesInFlight const& edges);
 
   std::optional<ParseError>
-  updateOrError(std::vector<size_t> const& fromNodes, Direction dir, Position const& pos);
+  updateOrError(std::optional<size_t> fromNode, Direction dir, Position const& pos);
 
 private:
 
@@ -211,13 +210,10 @@ int toInt(Direction dir) {
 }
 
 std::optional<ParseError> EdgesInFlight::
-  updateOrError(std::vector<size_t> const& fromNodes, Direction dir, Position const& pos) {
-  if (fromNodes.size() == 1) {
-    edges[toInt(dir)][pos.col] = fromNodes.front();
+  updateOrError(std::optional<size_t> fromNodes, Direction dir, Position const& pos) {
+  if (fromNodes) {
+    edges[toInt(dir)][pos.col] = *fromNodes;
     return {};
-  }
-  if (fromNodes.size() != 0) {
-    return ParseError{ParseError::Code::MergingEdge, "Edges merged into one edge", pos};
   }
   return ParseError{
     ParseError::Code::SuspendedEdge,
@@ -244,23 +240,22 @@ std::vector<size_t> EdgesInFlight::findNRemoveEdgesToNode(size_t col) {
   return ret;
 }
 
-std::vector<size_t>
-EdgesInFlight::findNRemoveEdgesToEdge(Direction dirBelow, EdgeMap const& prevNodes, size_t col) {
-  std::vector<size_t> ret;
+std::optional<size_t>
+EdgesInFlight::findNRemoveEdgeToEdge(Direction dirBelow, EdgeMap const& prevNodes, size_t col) {
+  // Important to order them in order they can appear on the previous line,
+  // from left to right, i.e., \(Right), |(Straight), /(Left)
   for (auto dirAbove :
-       {toInt(Direction::Left), toInt(Direction::Straight), toInt(Direction::Right)}) {
+       {toInt(Direction::Right), toInt(Direction::Straight), toInt(Direction::Left)}) {
     if (auto from = findAndEraseIf(edges[dirAbove], col + columnShift[dirAbove][toInt(dirBelow)])) {
-      ret.push_back(*from);
+      return *from;
     }
   }
-  // Avoid connecting an edge to a node if it is already connected to an edge
-  // so only register the connection if there is no connection to an edge
-  if (ret.empty()) {
-    if (auto to = getIf(prevNodes, col + columnShift[0][toInt(dirBelow)])) {
-      ret.push_back(*to);
-    }
+  // The early return above guarantees that an edge is not connected to a node
+  // if it is already connected to an edge
+  if (auto to = getIf(prevNodes, col + columnShift[0][toInt(dirBelow)])) {
+    return *to;
   }
-  return ret;
+  return std::nullopt;
 }
 
 [[maybe_unused]]
@@ -1009,8 +1004,8 @@ std::optional<DAG> parseDAG(std::string str, ParseError& err) {
       collector.addNodeChar(c);
     } else if (auto dir = EdgesInFlight::edgeChar(c)) {
       // Continue the edge, if possible, before attaching one to a node
-      auto fromNodes = prevEdges.findNRemoveEdgesToEdge(*dir, collector.getPrevNodes(), pos.col);
-      if (auto e = currEdges.updateOrError(fromNodes, *dir, pos)) {
+      auto fromNode = prevEdges.findNRemoveEdgeToEdge(*dir, collector.getPrevNodes(), pos.col);
+      if (auto e = currEdges.updateOrError(fromNode, *dir, pos)) {
         err = *e;
         return std::nullopt;
       }
@@ -1047,8 +1042,6 @@ std::string parseErrorCodeToStr(ParseError::Code code) {
   switch (code) {
     case Code::DanglingEdge:
       return "DanglingEdge";
-    case Code::MergingEdge:
-      return "MergingEdge";
     case Code::SuspendedEdge:
       return "SuspendedEdge";
     case Code::NonRectangularNode:

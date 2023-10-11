@@ -29,7 +29,7 @@ inline bool operator==(Position const& p1, Position const& p2) {
 }
 
 struct ParseError {
-  enum class Code { None, DanglingEdge, SuspendedEdge, MergingEdge, NonRectangularNode };
+  enum class Code { None, DanglingEdge, SuspendedEdge, NonRectangularNode };
 
   Code code;
   std::string message;
