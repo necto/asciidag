@@ -54,6 +54,22 @@ TEST(render, twoSimpleEdgesDiverge) {
 )");
 }
 
+TEST(render, twoSimpleEdgesDivergeDiffOrder) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{2, 1}, "0"});
+  test.nodes.push_back(DAG::Node{{}, "1"});
+  test.nodes.push_back(DAG::Node{{}, "2"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+0
+|\
+| \
+| |
+| |
+1 2
+)");
+}
+
 TEST(render, twoSimpleEdgesConverge) {
   DAG test;
   test.nodes.push_back(DAG::Node{{2}, "0"});
@@ -88,8 +104,43 @@ TEST(render, threeSimpleEdgesDiverge) {
 )");
 }
 
+TEST(render, threeSimpleEdgesDivergeOrder321) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{3, 2, 1}, "0"});
+  test.nodes.push_back(DAG::Node{{}, "1"});
+  test.nodes.push_back(DAG::Node{{}, "2"});
+  test.nodes.push_back(DAG::Node{{}, "3"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+ 0
+/|\
+|| \
+|\  \
+| \ |
+| | |
+1 2 3
+)");
+}
+
+TEST(render, threeSimpleEdgesDivergeOrder312) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{3, 1, 2}, "0"});
+  test.nodes.push_back(DAG::Node{{}, "1"});
+  test.nodes.push_back(DAG::Node{{}, "2"});
+  test.nodes.push_back(DAG::Node{{}, "3"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+ 0
+/|\
+|| \
+|\  \
+| \ |
+| | |
+1 2 3
+)");
+}
+
 TEST(render, threeSimpleEdgesConverge) {
-  // FIXME: incorrect predecessor assignment to the fan-in of the bottom node
   DAG test;
   test.nodes.push_back(DAG::Node{{3}, "0"});
   test.nodes.push_back(DAG::Node{{3}, "1"});
@@ -99,11 +150,9 @@ TEST(render, threeSimpleEdgesConverge) {
             R"(
 0 1 2
 | | |
-| | /
-\ |/
- \/
- //
-//|
+| | |
+| / /
+|/ /
 \|/
  3
 )");

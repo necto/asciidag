@@ -590,6 +590,37 @@ size_t minDistBetweenLayers(
   return ret;
 }
 
+std::pair<size_t, size_t> choseStraightAndRight(size_t zero, size_t one) {
+  if (zero <= one) {
+    return {0, 1};
+  }
+  return {1, 0};
+}
+
+bool inOrder(size_t a, size_t b, size_t c) {
+  return a <= b && b <= c;
+}
+
+std::tuple<size_t, size_t, size_t> choseLeftStraightRight(size_t zero, size_t one, size_t two) {
+  if (inOrder(zero, one, two)) {
+    return {0, 1, 2};
+  }
+  if (inOrder(zero, two, one)) {
+    return {0, 2, 1};
+  }
+  if (inOrder(one, zero, two)) {
+    return {1, 0, 2};
+  }
+  if (inOrder(one, two, zero)) {
+    return {1, 2, 0};
+  }
+  if (inOrder(two, zero, one)) {
+    return {1, 2, 0};
+  }
+  assert(inOrder(two, one, zero));
+  return {2, 1, 0};
+}
+
 void setEntryAngles(
   Connectivity& conn,
   std::vector<std::vector<size_t>> predEdges,
@@ -597,25 +628,36 @@ void setEntryAngles(
 ) {
   for (size_t i = 0; i < predEdges.size(); ++i) {
     auto const& edgeIds = predEdges[i];
-    (void)coords; // TODO: respect the order by coords
     switch (edgeIds.size()) {
       case 0:
         break;
-      case 1:
+      case 1: {
         conn.edges[edgeIds[0]].entryAngle = Direction::Straight;
         break;
-      case 2:
-        conn.edges[edgeIds[0]].entryAngle = Direction::Straight;
-        conn.edges[edgeIds[1]].entryAngle = Direction::Left;
+      }
+      case 2: {
+        auto [straight, right] = choseStraightAndRight(
+          coords[conn.edges[edgeIds[0]].from].col,
+          coords[conn.edges[edgeIds[1]].from].col
+        );
+        conn.edges[edgeIds[straight]].entryAngle = Direction::Straight;
+        conn.edges[edgeIds[right]].entryAngle = Direction::Left;
         conn.nodeValencies[i].topRight = true;
         break;
-      case 3:
-        conn.edges[edgeIds[0]].entryAngle = Direction::Left;
-        conn.edges[edgeIds[1]].entryAngle = Direction::Straight;
-        conn.edges[edgeIds[2]].entryAngle = Direction::Right;
+      }
+      case 3: {
+        auto [left, straight, right] = choseLeftStraightRight(
+          coords[conn.edges[edgeIds[0]].from].col,
+          coords[conn.edges[edgeIds[1]].from].col,
+          coords[conn.edges[edgeIds[2]].from].col
+        );
+        conn.edges[edgeIds[left]].entryAngle = Direction::Right;
+        conn.edges[edgeIds[straight]].entryAngle = Direction::Straight;
+        conn.edges[edgeIds[right]].entryAngle = Direction::Left;
         conn.nodeValencies[i].topLeft = true;
         conn.nodeValencies[i].topRight = true;
         break;
+      }
       default:
         assert(false && "Overcrowded node");
         break;
@@ -630,25 +672,36 @@ void setExitAngles(
 ) {
   for (size_t i = 0; i < succEdges.size(); ++i) {
     auto const& edgeIds = succEdges[i];
-    (void)coords;// TODO: respect the order by coords
     switch (edgeIds.size()) {
       case 0:
         break;
-      case 1:
+      case 1: {
         conn.edges[edgeIds[0]].exitAngle = Direction::Straight;
         break;
-      case 2:
-        conn.edges[edgeIds[0]].exitAngle = Direction::Straight;
-        conn.edges[edgeIds[1]].exitAngle = Direction::Right;
+      }
+      case 2: {
+        auto [straight, right] = choseStraightAndRight(
+          coords[conn.edges[edgeIds[0]].to].col,
+          coords[conn.edges[edgeIds[1]].to].col
+        );
+        conn.edges[edgeIds[straight]].exitAngle = Direction::Straight;
+        conn.edges[edgeIds[right]].exitAngle = Direction::Right;
         conn.nodeValencies[i].bottomRight = true;
         break;
-      case 3:
-        conn.edges[edgeIds[0]].exitAngle = Direction::Left;
-        conn.edges[edgeIds[1]].exitAngle = Direction::Straight;
-        conn.edges[edgeIds[2]].exitAngle = Direction::Right;
+      }
+      case 3: {
+        auto [left, straight, right] = choseLeftStraightRight(
+          coords[conn.edges[edgeIds[0]].to].col,
+          coords[conn.edges[edgeIds[1]].to].col,
+          coords[conn.edges[edgeIds[2]].to].col
+        );
+        conn.edges[edgeIds[left]].exitAngle = Direction::Left;
+        conn.edges[edgeIds[straight]].exitAngle = Direction::Straight;
+        conn.edges[edgeIds[right]].exitAngle = Direction::Right;
         conn.nodeValencies[i].bottomLeft = true;
         conn.nodeValencies[i].bottomRight = true;
         break;
+      }
       default:
         assert(false && "Overcrowded node");
         break;
