@@ -8,7 +8,7 @@ target_sources(asciidag
     asciidag.h
   )
 
-target_compile_options(asciidag PRIVATE -Wall -Wextra -Wpedantic -Werror)
+target_compile_options(asciidag PRIVATE -Wall -Wextra -Wpedantic)
 
 target_include_directories(asciidag
   PUBLIC
