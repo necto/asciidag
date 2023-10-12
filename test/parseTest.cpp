@@ -67,7 +67,7 @@ private:
 class DAGWithFunctions : public DAG {
 public:
   bool hasNode(std::string const& text) const {
-    auto iter = std::find_if(nodes.begin(), nodes.end(), [text](DAG::Node const& n) {
+    auto iter = std::find_if(nodes.begin(), nodes.end(), [&text](DAG::Node const& n) {
       return n.text == text;
     });
     return iter != nodes.end();
@@ -84,8 +84,8 @@ public:
   }
 
   NodeInfo node(std::string const& text) const {
-    auto findFrom = [text, this](auto fromIter) {
-      return std::find_if(fromIter, nodes.end(), [text](DAG::Node const& n) {
+    auto findFrom = [&text, this](auto fromIter) {
+      return std::find_if(fromIter, nodes.end(), [&text](DAG::Node const& n) {
         return n.text == text;
       });
     };
@@ -107,7 +107,7 @@ std::vector<std::string> nodes(Arg ...args) {
   return ret;
 }
 
-DAGWithFunctions parseSuccessfully(std::string str) {
+DAGWithFunctions parseSuccessfully(std::string_view str) {
   ParseError err;
   auto dag = parseDAG(str, err);
   EXPECT_EQ(err.code, ParseError::Code::None);

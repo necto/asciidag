@@ -84,6 +84,7 @@ string drawEdgeFromSpec(string const& spec) {
       }
     }
   }
+  assert(fromFound && toFound);
   eraseEdgeCharacters(canvas);
   drawEdge(from, fromAngle, to, toAngle, canvas);
   return renderCanvas(canvas);

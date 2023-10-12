@@ -3,6 +3,7 @@
 #include "asciidagImpl.h"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstddef>
 #include <iostream>
@@ -177,7 +178,7 @@ private:
 
   /// edges[0] stores an empty map (just for padding)
   /// The edges[1]..edges[3] corresponds to the Direction options
-  EdgeMap edges[4];
+  std::array<EdgeMap, 4> edges;
 };
 
 std::optional<Direction> EdgesInFlight::edgeChar(char c) {
@@ -188,8 +189,9 @@ std::optional<Direction> EdgesInFlight::edgeChar(char c) {
       return Direction::Right;
     case '/':
       return Direction::Left;
+    default:
+      return {};
   }
-  return {};
 }
 
 char EdgesInFlight::edgeChar(Direction dir) {
@@ -209,8 +211,8 @@ int toInt(Direction dir) {
   return static_cast<int>(dir);
 }
 
-std::optional<ParseError> EdgesInFlight::
-  updateOrError(std::optional<size_t> fromNodes, Direction dir, Position const& pos) {
+std::optional<ParseError>
+EdgesInFlight::updateOrError(std::optional<size_t> fromNodes, Direction dir, Position const& pos) {
   if (fromNodes) {
     edges[toInt(dir)][pos.col] = *fromNodes;
     return {};
@@ -223,12 +225,12 @@ std::optional<ParseError> EdgesInFlight::
 }
 
 /// [Node, Left, Straight, Right]
-static int columnShift[/* line above */ 4][/* line below */ 4] = {
-  {0, +1, 0, -1},
-  {+1, +1, 0, 0},
-  {0, 0, 0, 0},
-  {-1, 0, 0, -1},
-};
+static std::array<std::array<int, /* line above */ 4>, /* line below */ 4> const columnShift = {{
+  {0, +1, 0, -1}, // no format
+  {+1, +1, 0, 0}, // no format
+  {0, 0, 0, 0}, // no format
+  {-1, 0, 0, -1} // no format
+}};
 
 std::vector<size_t> EdgesInFlight::findNRemoveEdgesToNode(size_t col) {
   std::vector<size_t> ret;
@@ -374,7 +376,7 @@ std::optional<ParseError> validateEdgeCrossings(
   return {};
 }
 
-std::vector<DAG::Node> resolveCrossEdges(std::vector<DAG::Node>&& nodes) {
+std::vector<DAG::Node> resolveCrossEdges(std::vector<DAG::Node> nodes) {
   size_t nSkipped = 0;
   std::unordered_map<size_t, std::vector<size_t>> fromEdges;
   std::vector<size_t> idMap(nodes.size());
@@ -466,7 +468,7 @@ void NodeCollector::startNewNode(EdgesInFlight& prevEdges, Position const& pos) 
     }
     currNodes[p] = id;
   }
-  nodes.push_back({});
+  nodes.emplace_back();
   nodes[id].text = partialNode;
   partialNode.clear();
   nodePositions.push_back(pos);
@@ -771,7 +773,7 @@ void adjustCoordsWithValencies(
   Connectivity const& conn,
   std::vector<std::vector<size_t>> const& layers
 ) {
-  for (auto layer : layers) {
+  for (auto const& layer : layers) {
     size_t lastCol = 0;
     for (auto node : layer) {
       if (conn.nodeValencies[node].bottomLeft || conn.nodeValencies[node].topLeft) {
@@ -977,7 +979,7 @@ std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
   return renderCanvas(canvas);
 }
 
-std::optional<DAG> parseDAG(std::string str, ParseError& err) {
+std::optional<DAG> parseDAG(std::string_view str, ParseError& err) {
   NodeCollector collector;
   EdgesInFlight prevEdges;
   EdgesInFlight currEdges;

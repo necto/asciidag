@@ -53,6 +53,6 @@ struct RenderError {
 
 std::optional<std::string> renderDAG(DAG dag, RenderError& err);
 
-std::optional<DAG> parseDAG(std::string str, ParseError& err);
+std::optional<DAG> parseDAG(std::string_view str, ParseError& err);
 
 } // namespace asciidag
