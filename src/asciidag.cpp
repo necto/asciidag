@@ -342,35 +342,37 @@ std::optional<ParseError> validateEdgeCrossings(
   std::vector<Position> const& nodePositions
 ) {
   assert(nodes.size() == nodePositions.size());
-  std::unordered_map<size_t, std::vector<size_t>> fromEdges;
-  for (size_t i = 0; i < nodes.size(); ++i) {
-    if (nodes[i].text == "X") {
-      auto fromIter = fromEdges.find(i);
-      if (fromIter == fromEdges.end()) {
+  std::unordered_map<size_t, std::vector<size_t>> preds; // TODO: change to vector of vectors
+  for (size_t nodeId = 0; nodeId < nodes.size(); ++nodeId) {
+    if (nodes[nodeId].text == "X") {
+      auto fromIter = preds.find(nodeId);
+      if (fromIter == preds.end()) {
         return {
           {ParseError::Code::SuspendedEdge,
            "Edge crossing misses both incoming edges.",
-           nodePositions[i]}
+           nodePositions[nodeId]}
         };
       }
       auto& from = fromIter->second;
-      if (from.size() != 2) {
+      if (from.size() == 1 || from.size() < nodes[nodeId].succs.size()) {
         return {
           {ParseError::Code::SuspendedEdge,
            "Edge crossing misses an incoming edge.",
-           nodePositions[i]}
+           nodePositions[nodeId]}
         };
       }
-      if (nodes[i].succs.size() != 2) {
+      if (nodes[nodeId].succs.size() == 1 || nodes[nodeId].succs.size() < from.size()) {
         return {
           {ParseError::Code::DanglingEdge,
            "Edge crossing misses an outgoing edge.",
-           nodePositions[i]}
+           nodePositions[nodeId]}
         };
       }
+      assert(from.size() == 2 || from.size() == 3);
+      assert(nodes[nodeId].succs.size() == 2 || nodes[nodeId].succs.size() == 3);
     }
-    for (auto const& e : nodes[i].succs) {
-      fromEdges[e].push_back(i);
+    for (auto const& e : nodes[nodeId].succs) {
+      preds[e].push_back(nodeId);
     }
   }
   return {};
@@ -378,22 +380,29 @@ std::optional<ParseError> validateEdgeCrossings(
 
 std::vector<DAG::Node> resolveCrossEdges(std::vector<DAG::Node> nodes) {
   size_t nSkipped = 0;
-  std::unordered_map<size_t, std::vector<size_t>> fromEdges;
+  std::unordered_map<size_t, std::vector<size_t>> preds; // TODO: change to vector of vectors
   std::vector<size_t> idMap(nodes.size());
   for (size_t i = 0; i < nodes.size(); ++i) {
     if (nodes[i].text == "X") {
       // Assertions are ensured by "validateEdgeCrossings"
-      assert(fromEdges.count(i) != 0);
-      auto& from = fromEdges[i];
-      assert(from.size() == 2);
-      assert(nodes[i].succs.size() == 2);
+      assert(preds.count(i) != 0);
+      auto& from = preds[i];
+      if (from.size() == 2) {
+        assert(nodes[i].succs.size() == 2);
+        replace(nodes[from[0]].succs, i, nodes[i].succs[1]);
+        replace(nodes[from[1]].succs, i, nodes[i].succs[0]);
+      } else {
+        assert(from.size() == 3);
+        assert(nodes[i].succs.size() == 3);
 
-      replace(nodes[from[0]].succs, i, nodes[i].succs[1]);
-      replace(nodes[from[1]].succs, i, nodes[i].succs[0]);
+        replace(nodes[from[0]].succs, i, nodes[i].succs[2]);
+        replace(nodes[from[1]].succs, i, nodes[i].succs[1]);
+        replace(nodes[from[2]].succs, i, nodes[i].succs[0]);
+      }
       ++nSkipped;
     }
     for (auto const& e : nodes[i].succs) {
-      fromEdges[e].push_back(i);
+      preds[e].push_back(i);
     }
     idMap[i] = i - nSkipped;
   }

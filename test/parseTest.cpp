@@ -1599,6 +1599,8 @@ TEST(parse, skewedCrossLeft) {
   ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D"));
   ASSERT_EQ(dag.node("A").succs(), nodes("D"));
   ASSERT_EQ(dag.node("B").succs(), nodes("C"));
+  ASSERT_EQ(dag.node("C").succs(), nodes());
+  ASSERT_EQ(dag.node("D").succs(), nodes());
 }
 
 TEST(parse, skewedCrossRight) {
@@ -1613,12 +1615,65 @@ TEST(parse, skewedCrossRight) {
   ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D"));
   ASSERT_EQ(dag.node("A").succs(), nodes("D"));
   ASSERT_EQ(dag.node("B").succs(), nodes("C"));
+  ASSERT_EQ(dag.node("C").succs(), nodes());
+  ASSERT_EQ(dag.node("D").succs(), nodes());
 }
+
+TEST(parse, tripleCross) {
+  std::string str = R"(
+    A B C
+     \|/
+      X
+     /|\
+    D E F
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "E", "F"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("F"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("E"));
+  ASSERT_EQ(dag.node("C").succs(), nodes("D"));
+  ASSERT_EQ(dag.node("D").succs(), nodes());
+  ASSERT_EQ(dag.node("E").succs(), nodes());
+  ASSERT_EQ(dag.node("F").succs(), nodes());
+}
+
+TEST(parseError, tripleCrossMissingLowerEdge) {
+  std::string str = R"(
+    A B C
+     \|/
+      X
+     /|
+    D E
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  EXPECT_EQ(err.code, ParseError::Code::DanglingEdge);
+  EXPECT_EQ(err.pos, (Position{3U, 8U}));
+}
+
+TEST(parseError, tripleCrossMissingUpperEdge) {
+  std::string str = R"(
+    A B
+     \|
+      X
+     /|\
+    D E F
+)";
+  ParseError err;
+  auto result = parseDAG(str, err);
+  EXPECT_FALSE(result.has_value());
+  EXPECT_EQ(err.code, ParseError::Code::SuspendedEdge);
+  EXPECT_EQ(err.pos, (Position{3U, 8U}));
+}
+
 //TODO:
-//  test for triple cross:
-//  \|/
-//   X
-//  /|\
+//  test for 2 consequitive crossings:
+//  \ /  |
+//   X   /
+//  / \ /
+//  |  X
+//  | / \
 
 // TODO: hemed in
 // 1
@@ -1626,4 +1681,4 @@ TEST(parse, skewedCrossRight) {
 //  4\
 //    3
 
-// TODO: ergonomic way to specify the position
+// TODO: ergonomic way to specify the Position
