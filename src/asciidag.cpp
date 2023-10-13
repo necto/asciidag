@@ -952,9 +952,44 @@ void drawEdge(
   canvas[to.line][to.col] = EdgesInFlight::edgeChar(finishDir);
 }
 
+size_t findIndex(std::vector<size_t> const list, size_t val) {
+  // This linear search might better be replaced with a lookup table
+  for (size_t pos = 0; pos < list.size(); ++pos) {
+    if (list[pos] == val) {
+      return pos;
+    }
+  }
+  assert(false && "The node must be in this list");
+  return 0;
+}
+
+void minimizeCrossings(std::vector<std::vector<size_t>> &layers, DAG const& dag) {
+  std::vector<std::vector<size_t>> preds(dag.nodes.size());
+  for (size_t i = 0; i < dag.nodes.size(); ++i) {
+    for (auto succ : dag.nodes[i].succs) {
+      preds[succ].push_back(i);
+    }
+  }
+  std::vector<size_t> targetPos(dag.nodes.size());
+  for (size_t i = 1; i < layers.size(); ++i) {
+    for (size_t nId : layers[i]) {
+      size_t nPreds = preds[nId].size();
+      // We've skipped the layer 0 - the only layer with "roots" - nodes with no predecessors
+      assert(0 < nPreds && "After insertion of waypoints, all edges span a single layer");
+      targetPos[nId] = 0; // Reset potential previous pass
+      for (auto pred : preds[nId]) {
+        targetPos[nId] += findIndex(layers[i - 1], pred);
+      }
+      targetPos[nId] /= nPreds;
+    }
+    std::stable_sort(layers[i].begin(), layers[i].end(), [&targetPos](size_t n1id, size_t n2id) {
+      return targetPos[n1id] < targetPos[n2id];
+    });
+  }
+}
+
 std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
   err.code = RenderError::Code::None;
-  // TODO: find proper order of nodes
   // TODO: find best horisontal position of nodes
   if (auto compatErr = checkDAGCompat(dag)) {
     err = *compatErr;
@@ -969,6 +1004,7 @@ std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
     err = *waypointErr;
     return {};
   }
+  minimizeCrossings(layers, dag);
   // TODO: insert intermediate layers to layout the edge crossings
   auto coords = computeNodeCoordinates(dag, layers);
   auto const connectivity = computeConnectivity(dag, coords);
