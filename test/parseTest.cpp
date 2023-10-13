@@ -1587,16 +1587,33 @@ TEST(parse, doubleXIsNotCrossing) {
   ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "XX", "######"));
 }
 
-// TODO:
-// test for skewed cross:
-//   |/
-//   X
-//  /|
-//
-//  \|
-//   X
-//   |\
-//
+TEST(parse, skewedCrossLeft) {
+  std::string str = R"(
+      A B
+      |/
+      X
+     /|
+    C D
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("D"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("C"));
+}
+
+TEST(parse, skewedCrossRight) {
+  std::string str = R"(
+    A B
+     \|
+      X
+      |\
+      C D
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("D"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("C"));
+}
 //TODO:
 //  test for triple cross:
 //  \|/
