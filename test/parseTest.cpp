@@ -1443,22 +1443,41 @@ TEST(parse, crossLeftBottomBelow) {
   ASSERT_EQ(dag.node("B").succs(), nodes("C"));
 }
 
-// TODO:
-// TEST(parse, crossRightTopAbove) {
-//   // Here C is added after D, hence X might get its succs in inverse order
-//   std::string str = R"(
-//          B
-//     A   /
-//      \ /
-//       X
-//      / \
-//     C   D
-// )";
-//   auto dag = parseSuccessfully(str);
-//   ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D"));
-//   ASSERT_EQ(dag.node("A").succs(), nodes("D"));
-//   ASSERT_EQ(dag.node("B").succs(), nodes("C"));
-// }
+TEST(parse, crossRightTopAbove) {
+  // Here C is added after D, hence X might get its succs in inverse order
+  std::string str = R"(
+         B
+    A   /
+     \ /
+      X
+     / \
+    C   D
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("D"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("C"));
+}
+
+TEST(parse, crossRightTopAboveSwapExitDirs) {
+  // Here C is added after D, hence X might get its succs in inverse order
+  std::string str = R"(
+      B
+       \
+        \
+       A \
+      /  /
+     /  /
+     \ /
+      X
+     / \
+    C   D
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("D"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("C"));
+}
 
 TEST(parseError, crossMissingLeftBottomEdge) {
   std::string str = R"(
@@ -1744,8 +1763,65 @@ TEST(parse, tripleCrossLeftBottomLowerMiddleBottomLower) {
   ASSERT_EQ(dag.node("F").succs(), nodes());
 }
 
-// TODO: tripleCrossMiddleTopAbove
-// TODO: tripleCrossRightTopAbove
+TEST(parse, tripleCrossMiddleTopAbove) {
+  std::string str = R"(
+      B
+    A | C
+     \|/
+      X
+     /|\
+    D E F
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "E", "F"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("F"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("E"));
+  ASSERT_EQ(dag.node("C").succs(), nodes("D"));
+  ASSERT_EQ(dag.node("D").succs(), nodes());
+  ASSERT_EQ(dag.node("E").succs(), nodes());
+  ASSERT_EQ(dag.node("F").succs(), nodes());
+}
+
+TEST(parse, tripleCrossRightTopAbove) {
+  std::string str = R"(
+         C
+    A B /
+     \|/
+      X
+     /|\
+    D E F
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "E", "F"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("F"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("E"));
+  ASSERT_EQ(dag.node("C").succs(), nodes("D"));
+  ASSERT_EQ(dag.node("D").succs(), nodes());
+  ASSERT_EQ(dag.node("E").succs(), nodes());
+  ASSERT_EQ(dag.node("F").succs(), nodes());
+}
+
+TEST(parse, tripleCrossMiddleTopAboveRightTopAbove) {
+  std::string str = R"(
+     C
+      \
+       \
+      B \
+    A | /
+     \|/
+      X
+     /|\
+    D E F
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "E", "F"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("F"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("E"));
+  ASSERT_EQ(dag.node("C").succs(), nodes("D"));
+  ASSERT_EQ(dag.node("D").succs(), nodes());
+  ASSERT_EQ(dag.node("E").succs(), nodes());
+  ASSERT_EQ(dag.node("F").succs(), nodes());
+}
 
 TEST(parseError, tripleCrossMissingLowerEdge) {
   std::string str = R"(
