@@ -19,6 +19,17 @@ namespace {
 
 using namespace std::string_literals;
 
+size_t findIndex(std::vector<size_t> const list, size_t val) {
+  // This linear search might better be replaced with a lookup table
+  for (size_t pos = 0; pos < list.size(); ++pos) {
+    if (list[pos] == val) {
+      return pos;
+    }
+  }
+  assert(false && "The node must be in this list");
+  return 0;
+}
+
 std::vector<std::vector<size_t>> dagLayers(DAG const& dag) {
   // TODO: optimize using a queue (linear in edges)
   // instead of a fix-point (quadratic in edges)
@@ -80,6 +91,56 @@ std::optional<RenderError> insertEdgeWaypoints(DAG& dag, std::vector<std::vector
     }
   }
   return {};
+}
+
+struct CrossingPair {
+  size_t fromLeft;
+  size_t fromRight;
+  size_t toLeft;
+  size_t toRight;
+};
+
+std::vector<CrossingPair> findCrossings(
+  DAG const& dag,
+  std::vector<size_t> const& lAbove,
+  std::vector<size_t> const& lBelow
+) {
+  std::vector<CrossingPair> ret;
+  // TODO: These 5 nested loops can definitely be optmized
+  for (size_t leftTopPos = 0; leftTopPos < lAbove.size(); ++leftTopPos) {
+    for (size_t rightTopPos = leftTopPos + 1; rightTopPos < lAbove.size(); ++rightTopPos) {
+      for (size_t rightBottom : dag.nodes[lAbove[leftTopPos]].succs) {
+        for (size_t leftBottom : dag.nodes[lAbove[rightTopPos]].succs) {
+          if (findIndex(lBelow, leftBottom) < findIndex(lBelow, rightBottom)) {
+            ret.push_back({lAbove[leftTopPos], lAbove[rightTopPos], leftBottom, rightBottom});
+          }
+        }
+      }
+    }
+  }
+  return ret;
+}
+
+void insertCrossNode(DAG& dag, CrossingPair const& crossing) {
+  size_t fromLeftIdx = findIndex(dag.nodes[crossing.fromLeft].succs, crossing.toRight);
+  size_t fromRightIdx = findIndex(dag.nodes[crossing.fromRight].succs, crossing.toLeft);
+  size_t xid = dag.nodes.size();
+  dag.nodes.emplace_back();
+  dag.nodes[xid].text = "X";
+  dag.nodes[xid].succs.push_back(crossing.toLeft);
+  dag.nodes[xid].succs.push_back(crossing.toRight);
+  dag.nodes[crossing.fromLeft].succs[fromLeftIdx] = xid;
+  dag.nodes[crossing.fromRight].succs[fromRightIdx] = xid;
+}
+
+void insertCrossNodes(DAG& dag, std::vector<std::vector<size_t>> const& layers) {
+  // TODO: this might not widthstand multiple crossings between edge packs
+  for (size_t layerI = 1; layerI < layers.size(); ++layerI) {
+    for (auto const& crossing: findCrossings(dag, layers[layerI - 1], layers[layerI])) {
+      std::cout <<"Inserting cross\n";
+      insertCrossNode(dag, crossing);
+    }
+  }
 }
 
 template <typename A>
@@ -1032,17 +1093,6 @@ Direction chooseNextDirection(
   return Direction::Left;
 }
 
-size_t findIndex(std::vector<size_t> const list, size_t val) {
-  // This linear search might better be replaced with a lookup table
-  for (size_t pos = 0; pos < list.size(); ++pos) {
-    if (list[pos] == val) {
-      return pos;
-    }
-  }
-  assert(false && "The node must be in this list");
-  return 0;
-}
-
 size_t findTargetPos(std::vector<size_t> linkedNodes, std::vector<size_t> layer) {
   size_t const count = linkedNodes.size();
   assert(0 < count && "Leaf or root node on a non-first layer");
@@ -1166,7 +1216,18 @@ std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
     return {};
   }
   minimizeCrossings(layers, dag);
-  // TODO: insert intermediate layers to layout the edge crossings
+  insertCrossNodes(dag, layers); // Invalidates layers
+  layers = dagLayers(dag);
+  auto waypointErr = insertEdgeWaypoints(dag, layers);
+  assert(!waypointErr.has_value());
+  // TODO: will this preserve the edge direction over the crossings?
+  // i.e. in a   b
+  //          \ /
+  //           X
+  //          / \
+  //         c   d
+  // one cannot simply swap c & d
+  minimizeCrossings(layers, dag);
   auto coords = computeNodeCoordinates(dag, layers);
   auto const connectivity = computeConnectivity(dag, coords);
   adjustCoordsWithValencies(coords, connectivity, layers);

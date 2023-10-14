@@ -15,6 +15,7 @@ add_executable(
     renderTest.cpp
     drawEdgeTest.cpp
     crossingMinimizationTest.cpp
+    crossingEdgesTest.cpp
     testUtils.cpp
     )
 

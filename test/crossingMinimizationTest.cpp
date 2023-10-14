@@ -324,3 +324,37 @@ R"(
 6 7
 )");
 }
+
+// TODO:
+// TEST(crossingMinimizationTest, untangleCentripetalSymmetricalCrossing) {
+//   EXPECT_EQ(parseAndRender(R"(
+//  0   1   2
+//   \ / \ /
+//    X   X
+//   / \ / \
+//  3   4   5
+// )"),
+// R"(
+// )");
+// }
+
+// TODO:
+// TEST(crossingMinimizationTest, untangleStrayLongerEdgeFail) {
+//   EXPECT_EQ(parseAndRender(R"(
+// 0     1
+// |\   /|
+// | \ / |
+// |  X  |
+// | / \ |
+// |/  | |
+// 2   3 4
+// |\  | |
+// | \ / |
+// |  X  |
+// | / \ |
+// |/   \|
+// 5     6
+// )"),
+// R"(
+// )");
+// }
