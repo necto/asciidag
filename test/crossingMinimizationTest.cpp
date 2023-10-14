@@ -190,3 +190,141 @@ R"(
 3
 )");
 }
+
+TEST(crossingMinimizationTest, untangleCrossByTwo) {
+  EXPECT_EQ(parseAndRender(R"(
+  0 1 2
+   \| |
+    X |
+    |\|
+    | X
+    | |\
+    3 4 5
+)"),
+R"(
+0 1 2
+| | |
+| | |
+| | |
+5 3 4
+)");
+}
+
+TEST(crossingMinimizationTest, untangleCrossTwoByTwo) {
+  EXPECT_EQ(parseAndRender(R"(
+  0 1 2 3
+   \ \| |
+    \ X |
+     \|\|
+      X X
+      |\|\
+      | X \
+      | |\ \
+      4 5 6 7
+)"),
+R"(
+0 1 2 3
+| | | |
+| | | |
+| | | |
+6 7 4 5
+)");
+}
+
+TEST(crossingMinimizationTest, untangleDiffDirections) {
+  EXPECT_EQ(parseAndRender(R"(
+  0 1 2
+   \|/
+    X
+   /|\
+  3 4 5
+)"),
+R"(
+0 1 2
+| | |
+| | |
+| | |
+5 4 3
+)");
+}
+
+TEST(crossingMinimizationTest, untangleTwoPredsCrossedOneFail) {
+  // This untangling requries moving the nodes in the upper layer
+  EXPECT_EQ(parseAndRender(R"(
+    0 1 2
+    |/ /
+    X /
+   /|/
+  3 4
+)"),
+R"(
+0 1 2
+| | |
+\ / |
+ /  |
+/ \ /
+| |/
+3 4
+)");
+}
+
+TEST(crossingMinimizationTest, untangleTwoPredsCrossedTwo) {
+  // This untangling requries moving the nodes in the upper layer
+  EXPECT_EQ(parseAndRender(R"(
+    0 1 2
+    |/ /
+    X /
+   /|/
+  / X
+  |/|
+  3 4
+)"),
+R"(
+0 1 2
+| | |
+| | |
+| | /
+| |/
+4 3
+)");
+}
+
+TEST(crossingMinimizationTest, untangleTwoSuccsCrossedOne) {
+  // This untangling requries moving the nodes in the upper layer
+  EXPECT_EQ(parseAndRender(R"(
+    0 1
+    |/|
+    X |
+   /| |
+  3 4 5
+)"),
+R"(
+0 1
+| |\
+| | \
+| | |
+| | |
+4 3 5
+)");
+}
+
+TEST(crossingMinimizationTest, untangleTwoSuccsCrossedTwo) {
+  // This untangling requries moving the nodes in the upper layer
+  EXPECT_EQ(parseAndRender(R"(
+    0 1
+    |/|
+    X /
+   /|/
+  / X
+ / /|
+3 4 5
+)"),
+R"(
+0 1
+| |\
+| | \
+| | |
+| | |
+5 3 4
+)");
+}
