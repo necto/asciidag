@@ -169,7 +169,7 @@ struct ConnToNode {
 };
 
 std::ostream& operator<<(std::ostream& os, ConnToNode const& conn) {
-  return os <<edgeChar(conn.exitAngle) <<edgeChar(conn.entryAngle) <<conn.nId;
+  return os << edgeChar(conn.exitAngle) << edgeChar(conn.entryAngle) << conn.nId;
 }
 
 using EdgeMap = std::unordered_map<size_t, ConnToNode>;
@@ -182,7 +182,8 @@ class EdgesInFlight {
 public:
 
   std::vector<ConnToNode> findNRemoveEdgesToNode(size_t col);
-  std::optional<ConnToNode> findNRemoveEdgeToEdge(Direction dir, NodeMap const& prevNodes, size_t col);
+  std::optional<ConnToNode>
+  findNRemoveEdgeToEdge(Direction dir, NodeMap const& prevNodes, size_t col);
   std::optional<ParseError> findDanglingEdge(size_t line) const;
   friend std::ostream& operator<<(std::ostream& os, EdgesInFlight const& edges);
 
@@ -226,8 +227,8 @@ int toInt(Direction dir) {
   return static_cast<int>(dir);
 }
 
-std::optional<ParseError>
-EdgesInFlight::updateOrError(std::optional<ConnToNode> fromNodes, Direction dir, Position const& pos) {
+std::optional<ParseError> EdgesInFlight::
+  updateOrError(std::optional<ConnToNode> fromNodes, Direction dir, Position const& pos) {
   if (fromNodes) {
     edges[toInt(dir)][pos.col] = *fromNodes;
     return {};
@@ -359,10 +360,10 @@ private:
 DAG NodeCollector::buildDAG() && {
   DAG ret;
   ret.nodes.reserve(nodes.size());
-  for (auto && node : nodes) {
+  for (auto&& node : nodes) {
     ret.nodes.emplace_back();
     ret.nodes.back().text = std::move(node.text);
-    auto &succs = ret.nodes.back().succs;
+    auto& succs = ret.nodes.back().succs;
     for (auto const& edgeId : node.succEdges) {
       succs.push_back(edges[edgeId].toNode);
     }
@@ -415,12 +416,13 @@ std::pair<size_t, size_t> chooseLeftRightDirs(Direction dir0, Direction dir1) {
   return {1, 0};
 }
 
-template<typename T>
+template <typename T>
 bool inOrder(T a, T b, T c) {
   return a <= b && b <= c;
 }
 
-std::tuple<size_t, size_t, size_t> chooseLeftMiddleRightDirs(Direction dir0, Direction dir1, Direction dir2) {
+std::tuple<size_t, size_t, size_t>
+chooseLeftMiddleRightDirs(Direction dir0, Direction dir1, Direction dir2) {
   assert(dir0 != dir1);
   assert(dir0 != dir2);
   assert(dir1 != dir2);
@@ -1030,6 +1032,67 @@ Direction chooseNextDirection(
   return Direction::Left;
 }
 
+size_t findIndex(std::vector<size_t> const list, size_t val) {
+  // This linear search might better be replaced with a lookup table
+  for (size_t pos = 0; pos < list.size(); ++pos) {
+    if (list[pos] == val) {
+      return pos;
+    }
+  }
+  assert(false && "The node must be in this list");
+  return 0;
+}
+
+size_t findTargetPos(std::vector<size_t> linkedNodes, std::vector<size_t> layer) {
+  size_t const count = linkedNodes.size();
+  assert(0 < count && "Leaf or root node on a non-first layer");
+  size_t sum = 0;
+  for (auto pred : linkedNodes) {
+    sum += findIndex(layer, pred);
+  }
+  return sum / count;
+}
+
+void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag) {
+  std::vector<std::vector<size_t>> preds(dag.nodes.size());
+  for (size_t i = 0; i < dag.nodes.size(); ++i) {
+    for (auto succ : dag.nodes[i].succs) {
+      preds[succ].push_back(i);
+    }
+  }
+  // Forward pass
+  std::vector<size_t> targetPos(dag.nodes.size());
+  size_t const nLayers = layers.size();
+  for (size_t i = 1; i < nLayers; ++i) {
+    for (size_t nId : layers[i]) {
+      assert(0 < preds[nId].size() && "Root node can only be on the 0-th layer.");
+      targetPos[nId] = findTargetPos(preds[nId], layers[i - 1]);
+    }
+    std::stable_sort(layers[i].begin(), layers[i].end(), [&targetPos](size_t n1id, size_t n2id) {
+      return targetPos[n1id] < targetPos[n2id];
+    });
+  }
+  // Backward pass
+  for (size_t i = 1; i < nLayers; ++i) {
+    auto const& curLayer = layers[nLayers - i - 1];
+    for (size_t position = 0; position < curLayer.size(); ++position) {
+      size_t nId = curLayer[position];
+      auto const& succs = dag.nodes[nId].succs;
+      if (succs.empty()) {
+        // No successors, stay where you are
+        targetPos[nId] = position;
+      } else {
+        targetPos[nId] = findTargetPos(succs, layers[nLayers - i]);
+      }
+    }
+    std::stable_sort(
+      layers[nLayers - i - 1].begin(),
+      layers[nLayers - i - 1].end(),
+      [&targetPos](size_t n1id, size_t n2id) { return targetPos[n1id] < targetPos[n2id]; }
+    );
+  }
+}
+
 } // namespace
 
 std::string renderCanvas(std::vector<std::string> const& canvas) {
@@ -1084,65 +1147,6 @@ void drawEdge(
   // TODO: enable this when lines are guaranteed to not intersect
   // assert(canvas[to.line][to.col] == ' ');
   canvas[to.line][to.col] = edgeChar(finishDir);
-}
-
-size_t findIndex(std::vector<size_t> const list, size_t val) {
-  // This linear search might better be replaced with a lookup table
-  for (size_t pos = 0; pos < list.size(); ++pos) {
-    if (list[pos] == val) {
-      return pos;
-    }
-  }
-  assert(false && "The node must be in this list");
-  return 0;
-}
-
-size_t findTargetPos(std::vector<size_t> linkedNodes, std::vector<size_t> layer) {
-  size_t const count = linkedNodes.size();
-  assert(0 < count && "Leaf or root node on a non-first layer");
-  size_t sum = 0;
-  for (auto pred : linkedNodes) {
-    sum += findIndex(layer, pred);
-  }
-  return sum / count;
-}
-
-void minimizeCrossings(std::vector<std::vector<size_t>> &layers, DAG const& dag) {
-  std::vector<std::vector<size_t>> preds(dag.nodes.size());
-  for (size_t i = 0; i < dag.nodes.size(); ++i) {
-    for (auto succ : dag.nodes[i].succs) {
-      preds[succ].push_back(i);
-    }
-  }
-  // Forward pass
-  std::vector<size_t> targetPos(dag.nodes.size());
-  size_t const nLayers = layers.size();
-  for (size_t i = 1; i < nLayers; ++i) {
-    for (size_t nId : layers[i]) {
-      assert(0 < preds[nId].size() && "Root node can only be on the 0-th layer.");
-      targetPos[nId] = findTargetPos(preds[nId], layers[i - 1]);
-    }
-    std::stable_sort(layers[i].begin(), layers[i].end(), [&targetPos](size_t n1id, size_t n2id) {
-      return targetPos[n1id] < targetPos[n2id];
-    });
-  }
-  // Backward pass
-  for (size_t i = 1; i < nLayers; ++i) {
-    auto const& curLayer = layers[nLayers - i - 1];
-    for (size_t position = 0; position < curLayer.size(); ++position) {
-      size_t nId = curLayer[position];
-      auto const& succs = dag.nodes[nId].succs;
-      if (succs.empty()) {
-        // No successors, stay where you are
-        targetPos[nId] = position;
-      } else {
-        targetPos[nId] = findTargetPos(succs, layers[nLayers - i]);
-      }
-    }
-    std::stable_sort(layers[nLayers - i - 1].begin(), layers[nLayers - i - 1].end(), [&targetPos](size_t n1id, size_t n2id) {
-      return targetPos[n1id] < targetPos[n2id];
-    });
-  }
 }
 
 std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
@@ -1253,7 +1257,7 @@ std::ostream& operator<<(std::ostream& os, Position const& pos) {
 }
 
 std::ostream& operator<<(std::ostream& os, DAG::Node const& node) {
-  return os <<"'" <<node.text <<"'->" <<node.succs;
+  return os << "'" << node.text << "'->" << node.succs;
 }
 
 std::ostream& operator<<(std::ostream& os, ParseError const& err) {
