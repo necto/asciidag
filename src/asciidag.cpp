@@ -234,7 +234,6 @@ std::ostream& operator<<(std::ostream& os, ConnToNode const& conn) {
 using EdgeMap = std::unordered_map<size_t, ConnToNode>;
 
 // Map from position to a node id, if any
-// TODO: use a vector here?
 using NodeMap = std::vector<std::optional<size_t>>;
 
 class EdgesInFlight {
@@ -470,17 +469,40 @@ std::optional<ParseError> validateEdgeCrossings(std::vector<NodeCollector::Node>
   return {};
 }
 
-std::pair<size_t, size_t> chooseLeftRightDirs(Direction dir0, Direction dir1) {
-  assert(dir0 != dir1);
-  if (toInt(dir0) < toInt(dir1)) {
+bool inOrder(size_t a, size_t b, size_t c) {
+  return a <= b && b <= c;
+}
+
+std::pair<size_t, size_t> increasingOrder(size_t zero, size_t one) {
+  if (zero <= one) {
     return {0, 1};
   }
   return {1, 0};
 }
 
-template <typename T>
-bool inOrder(T a, T b, T c) {
-  return a <= b && b <= c;
+std::tuple<size_t, size_t, size_t> increasingOrder(size_t zero, size_t one, size_t two) {
+  if (inOrder(zero, one, two)) {
+    return {0, 1, 2};
+  }
+  if (inOrder(zero, two, one)) {
+    return {0, 2, 1};
+  }
+  if (inOrder(one, zero, two)) {
+    return {1, 0, 2};
+  }
+  if (inOrder(one, two, zero)) {
+    return {1, 2, 0};
+  }
+  if (inOrder(two, zero, one)) {
+    return {2, 0, 1};
+  }
+  assert(inOrder(two, one, zero));
+  return {2, 1, 0};
+}
+
+std::pair<size_t, size_t> chooseLeftRightDirs(Direction dir0, Direction dir1) {
+  assert(dir0 != dir1);
+  return increasingOrder(toInt(dir0), toInt(dir1));
 }
 
 std::tuple<size_t, size_t, size_t>
@@ -488,26 +510,7 @@ chooseLeftMiddleRightDirs(Direction dir0, Direction dir1, Direction dir2) {
   assert(dir0 != dir1);
   assert(dir0 != dir2);
   assert(dir1 != dir2);
-  auto dir0Int = toInt(dir0);
-  auto dir1Int = toInt(dir1);
-  auto dir2Int = toInt(dir2);
-  if (inOrder(dir0Int, dir1Int, dir2Int)) {
-    return {0, 1, 2};
-  }
-  if (inOrder(dir0Int, dir2Int, dir1Int)) {
-    return {0, 2, 1};
-  }
-  if (inOrder(dir1Int, dir0Int, dir2Int)) {
-    return {1, 0, 2};
-  }
-  if (inOrder(dir1Int, dir2Int, dir0Int)) {
-    return {1, 2, 0};
-  }
-  if (inOrder(dir2Int, dir0Int, dir1Int)) {
-    return {2, 0, 1};
-  }
-  assert(inOrder(dir2Int, dir1Int, dir0Int));
-  return {2, 1, 0};
+  return increasingOrder(toInt(dir0), toInt(dir1), toInt(dir2));
 }
 
 void joinEdges(
@@ -783,34 +786,6 @@ size_t minDistBetweenLayers(
   return ret;
 }
 
-// TODO: deduplicate these two with chooseLeftMiddleRightDirs and chooseLeftRightDirs
-std::pair<size_t, size_t> chooseStraightAndRight(size_t zero, size_t one) {
-  if (zero <= one) {
-    return {0, 1};
-  }
-  return {1, 0};
-}
-
-std::tuple<size_t, size_t, size_t> chooseLeftStraightRight(size_t zero, size_t one, size_t two) {
-  if (inOrder(zero, one, two)) {
-    return {0, 1, 2};
-  }
-  if (inOrder(zero, two, one)) {
-    return {0, 2, 1};
-  }
-  if (inOrder(one, zero, two)) {
-    return {1, 0, 2};
-  }
-  if (inOrder(one, two, zero)) {
-    return {1, 2, 0};
-  }
-  if (inOrder(two, zero, one)) {
-    return {1, 2, 0};
-  }
-  assert(inOrder(two, one, zero));
-  return {2, 1, 0};
-}
-
 void setEntryAngles(
   Connectivity& conn,
   std::vector<std::vector<size_t>> predEdges,
@@ -826,7 +801,7 @@ void setEntryAngles(
         break;
       }
       case 2: {
-        auto [straight, right] = chooseStraightAndRight(
+        auto [straight, right] = increasingOrder(
           coords[conn.edges[edgeIds[0]].from].col,
           coords[conn.edges[edgeIds[1]].from].col
         );
@@ -836,7 +811,7 @@ void setEntryAngles(
         break;
       }
       case 3: {
-        auto [left, straight, right] = chooseLeftStraightRight(
+        auto [left, straight, right] = increasingOrder(
           coords[conn.edges[edgeIds[0]].from].col,
           coords[conn.edges[edgeIds[1]].from].col,
           coords[conn.edges[edgeIds[2]].from].col
@@ -870,7 +845,7 @@ void setExitAngles(
         break;
       }
       case 2: {
-        auto [straight, right] = chooseStraightAndRight(
+        auto [straight, right] = increasingOrder(
           coords[conn.edges[edgeIds[0]].to].col,
           coords[conn.edges[edgeIds[1]].to].col
         );
@@ -880,7 +855,7 @@ void setExitAngles(
         break;
       }
       case 3: {
-        auto [left, straight, right] = chooseLeftStraightRight(
+        auto [left, straight, right] = increasingOrder(
           coords[conn.edges[edgeIds[0]].to].col,
           coords[conn.edges[edgeIds[1]].to].col,
           coords[conn.edges[edgeIds[2]].to].col
