@@ -1270,6 +1270,36 @@ TEST(parse, edgeUndercuttingNodeLeft) {
   EXPECT_TRUE(dag.node("3").succs().empty());
 }
 
+TEST(parse, edgeHemedBetweenLeft) {
+  std::string str = R"(
+       1
+     2/
+     /4
+    3
+)";
+  auto dag = parseSuccessfully(str);
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2", "3", "4"));
+  EXPECT_EQ(dag.node("1").succs(), nodes("3"));
+  EXPECT_TRUE(dag.node("2").succs().empty());
+  EXPECT_TRUE(dag.node("3").succs().empty());
+  EXPECT_TRUE(dag.node("4").succs().empty());
+}
+
+TEST(parse, edgeHemedBetweenRight) {
+  std::string str = R"(
+   1
+    \2
+    4\
+      3
+)";
+  auto dag = parseSuccessfully(str);
+  EXPECT_EQ(dag.allNodes(), nodes("1", "2", "3", "4"));
+  EXPECT_EQ(dag.node("1").succs(), nodes("3"));
+  EXPECT_TRUE(dag.node("2").succs().empty());
+  EXPECT_TRUE(dag.node("3").succs().empty());
+  EXPECT_TRUE(dag.node("4").succs().empty());
+}
+
 TEST(parse, sideEdgeSquiglyPipe) {
   std::string str = R"(
      ###
@@ -2131,10 +2161,24 @@ TEST(parse, sixCrossings) {
   ASSERT_EQ(dag.node("J").succs(), nodes());
 }
 
-// TODO: hemed in
-// 1
-//  \2
-//  4\
-//    3
-
-// TODO: ergonomic way to specify the Position
+TEST(parse, fiveCrosses) {
+  std::string str = R"(
+    A   B   C
+     \ / \ /
+      X   X
+     / \ / \
+     |  X  |
+     \ / \ /
+      X   X
+     / \ / \
+    D   E   F
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "E", "F"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("F"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("E", "E"));
+  ASSERT_EQ(dag.node("C").succs(), nodes("D"));
+  ASSERT_EQ(dag.node("D").succs(), nodes());
+  ASSERT_EQ(dag.node("E").succs(), nodes());
+  ASSERT_EQ(dag.node("F").succs(), nodes());
+}
