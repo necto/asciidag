@@ -1,4 +1,5 @@
 #include "asciidag.h"
+#include "testUtils.h"
 
 #include <gtest/gtest.h>
 #include <iostream>
@@ -26,6 +27,9 @@ DAG canonicalDAG(DAG const& orig) {
     for (size_t &succ : node.succs) {
       succ = idMap[succ];
     }
+    std::sort(node.succs.begin(), node.succs.end(), [&](size_t a, size_t b) {
+      return ret.nodes[a].text < ret.nodes[b].text;
+    });
   }
   return ret;
 }
@@ -65,23 +69,23 @@ void assertEqual(DAG const& a, DAG const& b) {
 void assertRenderAndParseIdentity(DAG const& dag) {
   RenderError renderErr;
   auto pic = renderDAG(dag, renderErr);
-  ASSERT_EQ(renderErr.code, RenderError::Code::None);
+  EXPECT_EQ(renderErr.code, RenderError::Code::None);
   if (renderErr.code != RenderError::Code::None) {
     // Print error message by violating an assertion
-    ASSERT_EQ(renderErr.message, "");
+    EXPECT_EQ(renderErr.message, "");
     // Print error location by violating an assertion
-    ASSERT_EQ(renderErr.nodeId, 0U);
+    EXPECT_EQ(renderErr.nodeId, 0U);
   }
   ASSERT_TRUE(pic.has_value());
   if (pic) {
     ParseError parseErr;
     auto dagClone = parseDAG(*pic, parseErr);
-    ASSERT_EQ(parseErr.code, ParseError::Code::None);
+    EXPECT_EQ(parseErr.code, ParseError::Code::None);
     if (parseErr.code != ParseError::Code::None) {
       // Print error message by violating an assertion
-      ASSERT_EQ(parseErr.message, "");
+      EXPECT_EQ(parseErr.message, "");
       // Print error location by violating an assertion
-      ASSERT_EQ(parseErr.pos, (Position{0, 0}));
+      EXPECT_EQ(parseErr.pos, (Position{0, 0}));
     }
     ASSERT_TRUE(dagClone.has_value());
     ASSERT_NO_FATAL_FAILURE(assertEqual(dag, *dagClone));
@@ -113,6 +117,10 @@ void configureDAGFromSeed(DAG &dag, size_t seed) {
   size_t shift = 0;
   for (int node = 0; node < dag.nodes.size(); ++node) {
     for (int succ = node + 1; succ < dag.nodes.size(); ++succ) {
+      if (3 <= dag.nodes[node].succs.size()) {
+        // single-character nodes do not support more than 3 successors
+        break;
+      }
       size_t mask = 1 << shift;
       if (seed & mask) {
         dag.nodes[node].succs.push_back(succ);
@@ -122,27 +130,45 @@ void configureDAGFromSeed(DAG &dag, size_t seed) {
   }
 }
 
+size_t numberOfEdgeConfigurations(size_t nodeCount) {
+  size_t const maxEdgesCount = nodeCount * (nodeCount - 1) / 2;
+  return 1 << maxEdgesCount;
+}
+
 TEST(parseRender, generated3) {
   DAG dag;
   dag.nodes.push_back({{}, "0"});
   dag.nodes.push_back({{}, "1"});
   dag.nodes.push_back({{}, "2"});
-  size_t const nPermutations = 1 << dag.nodes.size();
+  size_t const nPermutations = numberOfEdgeConfigurations(dag.nodes.size());
   for (size_t seed = 0; seed < nPermutations; ++seed) {
     configureDAGFromSeed(dag, seed);
     ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
   }
 }
 
+TEST(parseRender, generated4) {
+  DAG dag;
+  dag.nodes.push_back({{}, "0"});
+  dag.nodes.push_back({{}, "1"});
+  dag.nodes.push_back({{}, "2"});
+  dag.nodes.push_back({{}, "3"});
+  size_t const nPermutations = numberOfEdgeConfigurations(dag.nodes.size());
+  for (size_t seed = 0; seed < nPermutations; ++seed) {
+    configureDAGFromSeed(dag, seed);
+    ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
+  }
+}
 
 // TODO:
-// TEST(parseRender, generated4) {
+// TEST(parseRender, generated5) {
 //   DAG dag;
 //   dag.nodes.push_back({{}, "0"});
 //   dag.nodes.push_back({{}, "1"});
 //   dag.nodes.push_back({{}, "2"});
 //   dag.nodes.push_back({{}, "3"});
-//   size_t const nPermutations = 1 << dag.nodes.size();
+//   dag.nodes.push_back({{}, "4"});
+//   size_t const nPermutations = numberOfEdgeConfigurations(dag.nodes.size());
 //   for (size_t seed = 0; seed < nPermutations; ++seed) {
 //     configureDAGFromSeed(dag, seed);
 //     ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));

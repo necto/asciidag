@@ -456,3 +456,14 @@ TEST(renderError, tooManyIncomingEdges) {
   EXPECT_EQ(err.code, RenderError::Code::Overcrowded);
   EXPECT_EQ(err.nodeId, 4U);
 }
+
+// // TODO:
+// TEST(render, twoEdgeCrossingFromSamePredecessor) {
+//   DAG test;
+//   test.nodes.push_back(DAG::Node{{2, 3, 4}, "0"});
+//   test.nodes.push_back(DAG::Node{{2, 3}, "1"});
+//   test.nodes.push_back(DAG::Node{{}, "2"});
+//   test.nodes.push_back(DAG::Node{{}, "3"});
+//   test.nodes.push_back(DAG::Node{{}, "4"});
+//   renderSuccessfully(test);
+// }

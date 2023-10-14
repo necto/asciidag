@@ -1345,8 +1345,25 @@ std::ostream& operator<<(std::ostream& os, ParseError const& err) {
 }
 
 std::ostream& operator<<(std::ostream& os, DAG const& dag) {
-  os <<"DAG";
-  return os <<dag.nodes;
+  os <<"DAG{";
+  bool first = true;
+  for (auto const& node : dag.nodes) {
+    if (!first) {
+      os <<", ";
+    }
+    os <<node.text <<"->[";
+    bool firstInner = true;
+    for (size_t succ : node.succs) {
+      if (!firstInner) {
+        os <<", ";
+      }
+      os <<dag.nodes[succ].text;
+      firstInner = false;
+    }
+    os <<"]";
+    first = false;
+  }
+  return os <<"}";
 }
 
 
