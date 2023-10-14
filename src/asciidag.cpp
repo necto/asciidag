@@ -1190,8 +1190,7 @@ void drawEdge(
 ) {
   cur.line += 1;
   cur.col += directionShift(curDir);
-  // TODO: enable this when lines are guaranteed to not intersect
-  // assert(canvas[cur.line][cur.col] == ' ');
+  assert(canvas[cur.line][cur.col] == ' ');
   canvas[cur.line][cur.col] = edgeChar(curDir);
 
   assert(cur.line < to.line && to.line < canvas.size());
@@ -1212,8 +1211,7 @@ void drawEdge(
     }
     curDir = nextDir;
     cur.line += 1;
-    // TODO: enable this when lines are guaranteed to not intersect
-    // assert(canvas[cur.line][cur.col] == ' ');
+    assert(canvas[cur.line][cur.col] == ' ');
     canvas[cur.line][cur.col] = edgeChar(curDir);
   }
 
@@ -1221,8 +1219,7 @@ void drawEdge(
   to.line -= 1;
   to.col -= directionShift(finishDir);
   // TODO: assert that lines meet
-  // TODO: enable this when lines are guaranteed to not intersect
-  // assert(canvas[to.line][to.col] == ' ');
+  assert(canvas[to.line][to.col] == ' ');
   canvas[to.line][to.col] = edgeChar(finishDir);
 }
 
