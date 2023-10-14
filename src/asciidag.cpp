@@ -137,7 +137,6 @@ void insertCrossNodes(DAG& dag, std::vector<std::vector<size_t>> const& layers) 
   // TODO: this might not widthstand multiple crossings between edge packs
   for (size_t layerI = 1; layerI < layers.size(); ++layerI) {
     for (auto const& crossing: findCrossings(dag, layers[layerI - 1], layers[layerI])) {
-      std::cout <<"Inserting cross\n";
       insertCrossNode(dag, crossing);
     }
   }
@@ -1103,6 +1102,30 @@ size_t findTargetPos(std::vector<size_t> linkedNodes, std::vector<size_t> layer)
   return sum / count;
 }
 
+template<typename Callable>
+void swapEquipotentialNeighbors(
+  std::vector<size_t> const& targetPos,
+  std::vector<size_t>& curLayer,
+  Callable const& penalty
+) {
+  size_t nCrossings = penalty(curLayer);
+  if (0 < nCrossings) {
+    for (size_t nodePos = 1; nodePos < curLayer.size(); ++nodePos) {
+      if (targetPos[curLayer[nodePos - 1]] == targetPos[curLayer[nodePos]]) {
+        // If the two nodes compete for the same position, try to swapt them
+        std::swap(curLayer[nodePos - 1], curLayer[nodePos]);
+        size_t newNCrossings = penalty(curLayer);
+        if (newNCrossings < nCrossings) {
+          nCrossings = newNCrossings;
+        } else {
+          // Not useful, put the nodes back
+          std::swap(curLayer[nodePos - 1], curLayer[nodePos]);
+        }
+      }
+    }
+  }
+}
+
 void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag) {
   std::vector<std::vector<size_t>> preds(dag.nodes.size());
   for (size_t i = 0; i < dag.nodes.size(); ++i) {
@@ -1113,18 +1136,24 @@ void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag)
   // Forward pass
   std::vector<size_t> targetPos(dag.nodes.size());
   size_t const nLayers = layers.size();
-  for (size_t i = 1; i < nLayers; ++i) {
-    for (size_t nId : layers[i]) {
+  for (size_t layerI = 1; layerI < nLayers; ++layerI) {
+    auto const& prevLayer = layers[layerI - 1];
+    auto & curLayer = layers[layerI];
+    for (size_t nId : curLayer) {
       assert(0 < preds[nId].size() && "Root node can only be on the 0-th layer.");
-      targetPos[nId] = findTargetPos(preds[nId], layers[i - 1]);
+      targetPos[nId] = findTargetPos(preds[nId], prevLayer);
     }
-    std::stable_sort(layers[i].begin(), layers[i].end(), [&targetPos](size_t n1id, size_t n2id) {
+    std::stable_sort(curLayer.begin(), curLayer.end(), [&targetPos](size_t n1id, size_t n2id) {
       return targetPos[n1id] < targetPos[n2id];
+    });
+    swapEquipotentialNeighbors(targetPos, curLayer, [&dag, &prevLayer](auto const& curLayer) {
+      return findCrossings(dag, prevLayer, curLayer).size();
     });
   }
   // Backward pass
   for (size_t i = 1; i < nLayers; ++i) {
-    auto const& curLayer = layers[nLayers - i - 1];
+    auto& curLayer = layers[nLayers - i - 1];
+    auto const& nextLayer = layers[nLayers - i];
     for (size_t position = 0; position < curLayer.size(); ++position) {
       size_t nId = curLayer[position];
       auto const& succs = dag.nodes[nId].succs;
@@ -1132,14 +1161,17 @@ void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag)
         // No successors, stay where you are
         targetPos[nId] = position;
       } else {
-        targetPos[nId] = findTargetPos(succs, layers[nLayers - i]);
+        targetPos[nId] = findTargetPos(succs, nextLayer);
       }
     }
     std::stable_sort(
-      layers[nLayers - i - 1].begin(),
-      layers[nLayers - i - 1].end(),
+      curLayer.begin(),
+      curLayer.end(),
       [&targetPos](size_t n1id, size_t n2id) { return targetPos[n1id] < targetPos[n2id]; }
     );
+    swapEquipotentialNeighbors(targetPos, curLayer, [&dag, &nextLayer](auto const& curLayer) {
+      return findCrossings(dag, curLayer, nextLayer).size();
+    });
   }
 }
 

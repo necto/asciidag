@@ -5,15 +5,25 @@
 using namespace asciidag;
 using namespace asciidag::tests;
 
-// TODO:
-// TEST(crossingEdgesTest, simpleIrreducibleCrossing) {
-//   EXPECT_EQ(parseAndRender(R"(
-// 0   1
-// |\ /|
-// | X |
-// |/ \|
-// 2   3
-// )"),
-// R"(
-// )");
-// }
+TEST(crossingEdgesTest, simpleIrreducibleCrossing) {
+  EXPECT_EQ(parseAndRender(R"(
+0   1
+|\ /|
+| X |
+|/ \|
+2   3
+)"),
+R"(
+0  1
+|\ |\
+| \| \
+| || |
+| |/ |
+. X  .
+| |\ |
+| || |
+| /| /
+|/ |/
+2  3
+)");
+}

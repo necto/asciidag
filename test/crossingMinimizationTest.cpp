@@ -325,6 +325,77 @@ R"(
 )");
 }
 
+TEST(crossingMinimizationTest, untangleEquipotentialStrayNodeUpperLayer) {
+  EXPECT_EQ(parseAndRender(R"(
+2   3 4
+|\  | |
+| \ / |
+|  X  |
+| / \ |
+|/   \|
+5     6
+)"),
+R"(
+3 2  4
+| |\ |
+| || |
+| /| /
+|/ |/
+5  6
+)");
+}
+
+TEST(crossingMinimizationTest, untangleEquipotentialStrayNodeLowerLayer) {
+  EXPECT_EQ(parseAndRender(R"(
+0     1
+|\   /|
+| \ / |
+|  X  |
+| / \ |
+|/  | |
+2   3 4
+)"),
+R"(
+0  1
+|\ |\
+| \| \
+| || |
+| |/ |
+3 2  4
+)");
+}
+
+TEST(crossingMinimizationTest, untangleEquipotentialStrayNodeMiddleLayer) {
+  EXPECT_EQ(parseAndRender(R"(
+0     1
+|\   /|
+| \ / |
+|  X  |
+| / \ |
+|/  | |
+2   3 4
+|\  | |
+| \ / |
+|  X  |
+| / \ |
+|/   \|
+5     6
+)"),
+R"(
+0  1
+|\ |\
+| \| \
+| || |
+| |/ |
+3 2  4
+| |\ |
+| || |
+| /| /
+|/ |/
+5  6
+)");
+}
+
 // TODO:
 // TEST(crossingMinimizationTest, untangleCentripetalSymmetricalCrossing) {
 //   EXPECT_EQ(parseAndRender(R"(
@@ -333,27 +404,6 @@ R"(
 //    X   X
 //   / \ / \
 //  3   4   5
-// )"),
-// R"(
-// )");
-// }
-
-// TODO:
-// TEST(crossingMinimizationTest, untangleStrayLongerEdgeFail) {
-//   EXPECT_EQ(parseAndRender(R"(
-// 0     1
-// |\   /|
-// | \ / |
-// |  X  |
-// | / \ |
-// |/  | |
-// 2   3 4
-// |\  | |
-// | \ / |
-// |  X  |
-// | / \ |
-// |/   \|
-// 5     6
 // )"),
 // R"(
 // )");

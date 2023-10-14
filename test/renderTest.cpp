@@ -327,8 +327,7 @@ TEST(render, multiLayerEdge) {
 )");
 }
 
-TEST(render, twoMultiLayerEdgesBroken) {
-  // TODO: handle intersection, or shift the nodes in the layers
+TEST(render, twoMultiLayerEdges) {
   DAG test;
   test.nodes.push_back(DAG::Node{{1, 2, 3}, "0"});
   test.nodes.push_back(DAG::Node{{2, 3}, "1"});
@@ -339,14 +338,13 @@ TEST(render, twoMultiLayerEdgesBroken) {
  0
 /|\
 || \
-|\  \
-| \  \
-|  \ |
-|  | |
-1  . .
-|\ | |
-| \| |
-|  / |
+||  \
+|\   \
+| \  |
+| |  |
+. 1  .
+| |\ |
+| || |
 | /| /
 |/ |/
 2  3
