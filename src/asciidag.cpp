@@ -458,48 +458,58 @@ void joinEdges(
   replace(nodes[edges[primary].toNode].predEdges, secondary, primary);
 }
 
-void NodeCollector::resolveCrossEdges() {
+void untangleTwoEdgeCrossing(
+  std::vector<size_t> const& preds,
+  std::vector<size_t> const& succs,
+  std::vector<NodeCollector::Node>& nodes,
+  std::vector<NodeCollector::Edge>& edges
+) {
+  assert(preds.size() == 2);
+  assert(succs.size() == 2);
+  auto [succLeft, succRight] =
+    chooseLeftRightDirs(edges[succs[0]].exitDir, edges[succs[1]].exitDir);
+  auto [predRight, predLeft] =
+    chooseLeftRightDirs(edges[preds[0]].entryDir, edges[preds[1]].entryDir);
+  joinEdges(edges, nodes, preds[predLeft], succs[succRight]);
+  joinEdges(edges, nodes, preds[predRight], succs[succLeft]);
+}
+
+void untangleThreeEdgeCrossing(
+  std::vector<size_t> const& preds,
+  std::vector<size_t> const& succs,
+  std::vector<NodeCollector::Node>& nodes,
+  std::vector<NodeCollector::Edge>& edges
+) {
+  assert(preds.size() == 3);
+  assert(succs.size() == 3);
+  auto [succLeft, succMid, succRight] = chooseLeftMiddleRightDirs(
+    edges[succs[0]].exitDir,
+    edges[succs[1]].exitDir,
+    edges[succs[2]].exitDir
+  );
+  auto [predRight, predMid, predLeft] = chooseLeftMiddleRightDirs(
+    edges[preds[0]].entryDir,
+    edges[preds[1]].entryDir,
+    edges[preds[2]].entryDir
+  );
+  joinEdges(edges, nodes, preds[predLeft], succs[succRight]);
+  joinEdges(edges, nodes, preds[predMid], succs[succMid]);
+  joinEdges(edges, nodes, preds[predRight], succs[succLeft]);
+}
+
+void removeXnodes(
+  std::vector<NodeCollector::Node>& nodes,
+  std::vector<NodeCollector::Edge>& edges
+) {
   size_t nSkipped = 0;
   std::vector<size_t> nodeIdMap(nodes.size());
   for (size_t i = 0; i < nodes.size(); ++i) {
-    auto &node = nodes[i];
-    if (node.text == "X") {
-      // Assertions are ensured by "validateEdgeCrossings"
-      auto &preds = node.predEdges;
-      auto &succs = node.succEdges;
-      size_t nPreds = preds.size();
-      assert(2 <= nPreds);
-      if (nPreds == 2) {
-        assert(succs.size() == 2);
-        auto [succLeft, succRight] =
-          chooseLeftRightDirs(edges[succs[0]].exitDir, edges[succs[1]].exitDir);
-        auto [predRight, predLeft] =
-          chooseLeftRightDirs(edges[preds[0]].entryDir, edges[preds[1]].entryDir);
-        joinEdges(edges, nodes, preds[predLeft], succs[succRight]);
-        joinEdges(edges, nodes, preds[predRight], succs[succLeft]);
-      } else {
-        assert(nPreds == 3);
-        assert(succs.size() == 3);
-
-        auto [succLeft, succMid, succRight] = chooseLeftMiddleRightDirs(
-          edges[succs[0]].exitDir,
-          edges[succs[1]].exitDir,
-          edges[succs[2]].exitDir
-        );
-        auto [predRight, predMid, predLeft] = chooseLeftMiddleRightDirs(
-          edges[preds[0]].entryDir,
-          edges[preds[1]].entryDir,
-          edges[preds[2]].entryDir
-        );
-        joinEdges(edges, nodes, preds[predLeft], succs[succRight]);
-        joinEdges(edges, nodes, preds[predMid], succs[succMid]);
-        joinEdges(edges, nodes, preds[predRight], succs[succLeft]);
-      }
+    if (nodes[i].text == "X") {
       ++nSkipped;
     }
     nodeIdMap[i] = i - nSkipped;
   }
-  for (auto &edge : edges) {
+  for (auto& edge : edges) {
     edge.fromNode = nodeIdMap[edge.fromNode];
     edge.toNode = nodeIdMap[edge.toNode];
   }
@@ -507,6 +517,22 @@ void NodeCollector::resolveCrossEdges() {
     std::remove_if(nodes.begin(), nodes.end(), [](auto const& n) { return n.text == "X"; }),
     nodes.end()
   );
+}
+
+void NodeCollector::resolveCrossEdges() {
+  for (auto const& node : nodes) {
+    if (node.text == "X") {
+      // Assertions are ensured by "validateEdgeCrossings"
+      size_t nPreds = node.predEdges.size();
+      assert(2 <= nPreds);
+      if (nPreds == 2) {
+        untangleTwoEdgeCrossing(node.predEdges, node.succEdges, nodes, edges);
+      } else {
+        untangleThreeEdgeCrossing(node.predEdges, node.succEdges, nodes, edges);
+      }
+    }
+  }
+  removeXnodes(nodes, edges);
   // Note here some edges that were connected the "X" nodes
   // are preserved and are inconsistent with the new array of nodes,
   // but they are "dead" - not referenced from this array of nodes
