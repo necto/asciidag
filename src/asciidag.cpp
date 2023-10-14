@@ -159,20 +159,34 @@ V const* getIf(std::unordered_map<K, V> const& map, K const& k) {
   return nullptr;
 }
 
-using EdgeMap = std::unordered_map<size_t, size_t>;
+std::optional<Direction> edgeChar(char c);
+char edgeChar(Direction dir);
+
+struct ConnToNode {
+  size_t nId;
+  Direction exitAngle;
+};
+
+std::ostream& operator<<(std::ostream& os, ConnToNode const& conn) {
+  return os <<edgeChar(conn.exitAngle) <<conn.nId;
+}
+
+using EdgeMap = std::unordered_map<size_t, ConnToNode>;
+
+// Map from position to a node id, if any
+// TODO: use a vector here?
+using NodeMap = std::unordered_map<size_t, size_t>;
 
 class EdgesInFlight {
 public:
-  static std::optional<Direction> edgeChar(char c);
-  static char edgeChar(Direction dir);
 
-  std::vector<size_t> findNRemoveEdgesToNode(size_t col);
-  std::optional<size_t> findNRemoveEdgeToEdge(Direction dir, EdgeMap const& prevNodes, size_t col);
+  std::vector<ConnToNode> findNRemoveEdgesToNode(size_t col);
+  std::optional<ConnToNode> findNRemoveEdgeToEdge(Direction dir, NodeMap const& prevNodes, size_t col);
   std::optional<ParseError> findDanglingEdge(size_t line) const;
   friend std::ostream& operator<<(std::ostream& os, EdgesInFlight const& edges);
 
   std::optional<ParseError>
-  updateOrError(std::optional<size_t> fromNode, Direction dir, Position const& pos);
+  updateOrError(std::optional<ConnToNode> fromNode, Direction dir, Position const& pos);
 
 private:
 
@@ -181,7 +195,7 @@ private:
   std::array<EdgeMap, 4> edges;
 };
 
-std::optional<Direction> EdgesInFlight::edgeChar(char c) {
+std::optional<Direction> edgeChar(char c) {
   switch (c) {
     case '|':
       return Direction::Straight;
@@ -194,7 +208,7 @@ std::optional<Direction> EdgesInFlight::edgeChar(char c) {
   }
 }
 
-char EdgesInFlight::edgeChar(Direction dir) {
+char edgeChar(Direction dir) {
   switch (dir) {
     case Direction::Left:
       return '/';
@@ -212,7 +226,7 @@ int toInt(Direction dir) {
 }
 
 std::optional<ParseError>
-EdgesInFlight::updateOrError(std::optional<size_t> fromNodes, Direction dir, Position const& pos) {
+EdgesInFlight::updateOrError(std::optional<ConnToNode> fromNodes, Direction dir, Position const& pos) {
   if (fromNodes) {
     edges[toInt(dir)][pos.col] = *fromNodes;
     return {};
@@ -232,19 +246,19 @@ static std::array<std::array<int, /* line above */ 4>, /* line below */ 4> const
   {-1, 0, 0, -1} // no format
 }};
 
-std::vector<size_t> EdgesInFlight::findNRemoveEdgesToNode(size_t col) {
-  std::vector<size_t> ret;
+std::vector<ConnToNode> EdgesInFlight::findNRemoveEdgesToNode(size_t col) {
+  std::vector<ConnToNode> ret;
   for (auto dir : {toInt(Direction::Left), toInt(Direction::Straight), toInt(Direction::Right)}) {
     if (auto to = findAndEraseIf(edges[dir], col + columnShift[dir][0])) {
-      ret.push_back(*to);
+      ret.emplace_back(*to);
     }
   }
   return ret;
 }
 
-std::optional<size_t>
-EdgesInFlight::findNRemoveEdgeToEdge(Direction dirBelow, EdgeMap const& prevNodes, size_t col) {
-  // Important to order them in order they can appear on the previous line,
+std::optional<ConnToNode>
+EdgesInFlight::findNRemoveEdgeToEdge(Direction dirBelow, NodeMap const& prevNodes, size_t col) {
+  // Important to order them in the order they can appear on the previous line,
   // from left to right, i.e., \(Right), |(Straight), /(Left)
   for (auto dirAbove :
        {toInt(Direction::Right), toInt(Direction::Straight), toInt(Direction::Left)}) {
@@ -255,7 +269,7 @@ EdgesInFlight::findNRemoveEdgeToEdge(Direction dirBelow, EdgeMap const& prevNode
   // The early return above guarantees that an edge is not connected to a node
   // if it is already connected to an edge
   if (auto to = getIf(prevNodes, col + columnShift[0][toInt(dirBelow)])) {
-    return *to;
+    return {{*to, dirBelow}};
   }
   return std::nullopt;
 }
@@ -265,7 +279,7 @@ std::ostream&
 operator<<(std::ostream& os, EdgesInFlight const& edges) {
   bool first = true;
   for (auto dir : {Direction::Left, Direction::Straight, Direction::Right}) {
-    os << EdgesInFlight::edgeChar(dir) << ' ' << edges.edges[toInt(dir)];
+    os << edgeChar(dir) << ' ' << edges.edges[toInt(dir)];
     if (!first) {
       os << ' ';
     }
@@ -282,7 +296,7 @@ std::optional<ParseError> EdgesInFlight::findDanglingEdge(size_t line) const {
       if (!ret || col < ret->pos.col) {
         ret = ParseError{
           ParseError::Code::DanglingEdge,
-          "Dangling edge "s + edgeChar(dir) + " from " + std::to_string(src),
+          "Dangling edge "s + edgeChar(dir) + " from " + std::to_string(src.nId),
           {line, col}
         };
       }
@@ -293,6 +307,8 @@ std::optional<ParseError> EdgesInFlight::findDanglingEdge(size_t line) const {
 
 class NodeCollector {
 public:
+  using ExitAngles = std::vector<Direction>;
+
   std::optional<ParseError> tryAddNode(EdgesInFlight& prevEdges, Position const& pos);
 
   void addNodeChar(char c) { partialNode.push_back(c); }
@@ -304,7 +320,7 @@ public:
     return {std::move(nodes)};
   }
 
-  EdgeMap const& getPrevNodes() const { return prevNodes; }
+  NodeMap const& getPrevNodes() const { return prevNodes; }
 
   void newLine();
 
@@ -318,10 +334,11 @@ private:
   std::optional<size_t> findNodeAbove(size_t col);
 
   std::vector<DAG::Node> nodes = {};
+  std::vector<ExitAngles> exitAngles;
   std::vector<Position> nodePositions = {};
   std::string partialNode = "";
-  EdgeMap prevNodes;
-  EdgeMap currNodes;
+  NodeMap prevNodes;
+  NodeMap currNodes;
   bool finalized = false;
 };
 
@@ -378,33 +395,81 @@ std::optional<ParseError> validateEdgeCrossings(
   return {};
 }
 
-std::vector<DAG::Node> resolveCrossEdges(std::vector<DAG::Node> nodes) {
+std::pair<size_t, size_t> chooseLeftRightSuccs(Direction exitDir0, Direction exitDir1) {
+  if (toInt(exitDir0) < toInt(exitDir1)) {
+    return {0, 1};
+  }
+  return {1, 0};
+}
+
+template<typename T>
+bool inOrder(T a, T b, T c) {
+  return a <= b && b <= c;
+}
+
+std::tuple<size_t, size_t, size_t> chooseLeftMiddleRightSuccs(Direction exitDir0, Direction exitDir1, Direction exitDir2) {
+  auto dir0 = toInt(exitDir0);
+  auto dir1 = toInt(exitDir1);
+  auto dir2 = toInt(exitDir2);
+  if (inOrder(dir0, dir1, dir2)) {
+    return {0, 1, 2};
+  }
+  if (inOrder(dir0, dir2, dir1)) {
+    return {0, 2, 1};
+  }
+  if (inOrder(dir1, dir0, dir2)) {
+    return {1, 0, 2};
+  }
+  if (inOrder(dir1, dir2, dir0)) {
+    return {1, 2, 0};
+  }
+  if (inOrder(dir2, dir0, dir1)) {
+    return {2, 0, 1};
+  }
+  assert(inOrder(dir2, dir1, dir0));
+  return {2, 1, 0};
+}
+
+std::vector<DAG::Node> resolveCrossEdges(
+  std::vector<DAG::Node> nodes,
+  std::vector<NodeCollector::ExitAngles> const& exitAngles
+) {
   size_t nSkipped = 0;
   std::unordered_map<size_t, std::vector<size_t>> preds; // TODO: change to vector of vectors
   std::vector<size_t> idMap(nodes.size());
   for (size_t i = 0; i < nodes.size(); ++i) {
+    for (auto const& e : nodes[i].succs) {
+      preds[e].push_back(i);
+    }
     if (nodes[i].text == "X") {
       // Assertions are ensured by "validateEdgeCrossings"
       assert(preds.count(i) != 0);
       auto& from = preds[i];
       if (from.size() == 2) {
         assert(nodes[i].succs.size() == 2);
-        replace(nodes[from[0]].succs, i, nodes[i].succs[1]);
-        replace(nodes[from[1]].succs, i, nodes[i].succs[0]);
+        assert(exitAngles[i].size() == 2);
+        auto [succLeft, succRight] = chooseLeftRightSuccs(exitAngles[i][0], exitAngles[i][1]);
+        replace(nodes[from[0]].succs, i, nodes[i].succs[succRight]);
+        replace(preds[nodes[i].succs[succRight]], i, from[0]);
+        replace(nodes[from[1]].succs, i, nodes[i].succs[succLeft]);
+        replace(preds[nodes[i].succs[succLeft]], i, from[1]);
       } else {
         assert(from.size() == 3);
         assert(nodes[i].succs.size() == 3);
 
-        replace(nodes[from[0]].succs, i, nodes[i].succs[2]);
-        replace(nodes[from[1]].succs, i, nodes[i].succs[1]);
-        replace(nodes[from[2]].succs, i, nodes[i].succs[0]);
+        auto [succLeft, succMiddle, succRight] =
+          chooseLeftMiddleRightSuccs(exitAngles[i][0], exitAngles[i][1], exitAngles[i][2]);
+        replace(nodes[from[0]].succs, i, nodes[i].succs[succRight]);
+        replace(nodes[from[1]].succs, i, nodes[i].succs[succMiddle]);
+        replace(nodes[from[2]].succs, i, nodes[i].succs[succLeft]);
+        // FIXME: update preds!
       }
       ++nSkipped;
     }
-    for (auto const& e : nodes[i].succs) {
-      preds[e].push_back(i);
-    }
     idMap[i] = i - nSkipped;
+    std::cout <<"\nAfter processing " <<i <<"(" <<nodes[i] <<")\n";
+    std::cout <<"nodes: " <<nodes <<"\n";
+    std::cout <<"preds: " <<preds <<"\n";
   }
   nodes.erase(
     std::remove_if(nodes.begin(), nodes.end(), [](DAG::Node const& n) { return n.text == "X"; }),
@@ -423,7 +488,7 @@ std::optional<ParseError> NodeCollector::finalize() {
     if (auto err = validateEdgeCrossings(nodes, nodePositions)) {
       return err;
     }
-    nodes = resolveCrossEdges(std::move(nodes));
+    nodes = resolveCrossEdges(std::move(nodes), exitAngles);
   }
   finalized = true;
   return {};
@@ -473,11 +538,13 @@ void NodeCollector::startNewNode(EdgesInFlight& prevEdges, Position const& pos) 
   size_t id = nodes.size();
   for (size_t p = pos.col - partialNode.size(); p < pos.col; ++p) {
     for (auto from : prevEdges.findNRemoveEdgesToNode(p)) {
-      nodes[from].succs.push_back({id});
+      nodes[from.nId].succs.push_back({id});
+      exitAngles[from.nId].push_back(from.exitAngle);
     }
     currNodes[p] = id;
   }
   nodes.emplace_back();
+  exitAngles.emplace_back();
   nodes[id].text = partialNode;
   partialNode.clear();
   nodePositions.push_back(pos);
@@ -521,10 +588,12 @@ void NodeCollector::addNodeLine(size_t nodeAbove, EdgesInFlight& prevEdges, Posi
     currNodes[p] = nodeAbove;
   }
   for (auto edge : prevEdges.findNRemoveEdgesToNode(pos.col - partialNode.size())) {
-    nodes[edge].succs.push_back({nodeAbove});
+    nodes[edge.nId].succs.push_back({nodeAbove});
+    exitAngles[edge.nId].push_back(edge.exitAngle);
   }
   for (auto edge : prevEdges.findNRemoveEdgesToNode(pos.col - 1)) {
-    nodes[edge].succs.push_back({nodeAbove});
+    nodes[edge.nId].succs.push_back({nodeAbove});
+    exitAngles[edge.nId].push_back(edge.exitAngle);
   }
   nodes[nodeAbove].text += "\n" + partialNode;
   partialNode.clear();
@@ -596,18 +665,14 @@ size_t minDistBetweenLayers(
   return ret;
 }
 
-std::pair<size_t, size_t> choseStraightAndRight(size_t zero, size_t one) {
+std::pair<size_t, size_t> chooseStraightAndRight(size_t zero, size_t one) {
   if (zero <= one) {
     return {0, 1};
   }
   return {1, 0};
 }
 
-bool inOrder(size_t a, size_t b, size_t c) {
-  return a <= b && b <= c;
-}
-
-std::tuple<size_t, size_t, size_t> choseLeftStraightRight(size_t zero, size_t one, size_t two) {
+std::tuple<size_t, size_t, size_t> chooseLeftStraightRight(size_t zero, size_t one, size_t two) {
   if (inOrder(zero, one, two)) {
     return {0, 1, 2};
   }
@@ -642,7 +707,7 @@ void setEntryAngles(
         break;
       }
       case 2: {
-        auto [straight, right] = choseStraightAndRight(
+        auto [straight, right] = chooseStraightAndRight(
           coords[conn.edges[edgeIds[0]].from].col,
           coords[conn.edges[edgeIds[1]].from].col
         );
@@ -652,7 +717,7 @@ void setEntryAngles(
         break;
       }
       case 3: {
-        auto [left, straight, right] = choseLeftStraightRight(
+        auto [left, straight, right] = chooseLeftStraightRight(
           coords[conn.edges[edgeIds[0]].from].col,
           coords[conn.edges[edgeIds[1]].from].col,
           coords[conn.edges[edgeIds[2]].from].col
@@ -686,7 +751,7 @@ void setExitAngles(
         break;
       }
       case 2: {
-        auto [straight, right] = choseStraightAndRight(
+        auto [straight, right] = chooseStraightAndRight(
           coords[conn.edges[edgeIds[0]].to].col,
           coords[conn.edges[edgeIds[1]].to].col
         );
@@ -696,7 +761,7 @@ void setExitAngles(
         break;
       }
       case 3: {
-        auto [left, straight, right] = choseLeftStraightRight(
+        auto [left, straight, right] = chooseLeftStraightRight(
           coords[conn.edges[edgeIds[0]].to].col,
           coords[conn.edges[edgeIds[1]].to].col,
           coords[conn.edges[edgeIds[2]].to].col
@@ -927,7 +992,7 @@ void drawEdge(
   cur.col += directionShift(curDir);
   // TODO: enable this when lines are guaranteed to not intersect
   // assert(canvas[cur.line][cur.col] == ' ');
-  canvas[cur.line][cur.col] = EdgesInFlight::edgeChar(curDir);
+  canvas[cur.line][cur.col] = edgeChar(curDir);
 
   assert(cur.line < to.line && to.line < canvas.size());
   assert(cur.col < canvas[cur.line].size() && to.col < canvas[to.line].size());
@@ -949,7 +1014,7 @@ void drawEdge(
     cur.line += 1;
     // TODO: enable this when lines are guaranteed to not intersect
     // assert(canvas[cur.line][cur.col] == ' ');
-    canvas[cur.line][cur.col] = EdgesInFlight::edgeChar(curDir);
+    canvas[cur.line][cur.col] = edgeChar(curDir);
   }
 
   assert(cur.line + 2 == to.line);
@@ -958,7 +1023,7 @@ void drawEdge(
   // TODO: assert that lines meet
   // TODO: enable this when lines are guaranteed to not intersect
   // assert(canvas[to.line][to.col] == ' ');
-  canvas[to.line][to.col] = EdgesInFlight::edgeChar(finishDir);
+  canvas[to.line][to.col] = edgeChar(finishDir);
 }
 
 size_t findIndex(std::vector<size_t> const list, size_t val) {
@@ -1049,7 +1114,7 @@ std::optional<DAG> parseDAG(std::string_view str, ParseError& err) {
     } else if (collector.isPartOfANode(pos.col)) {
       // Keep accumulating at least for as long as the node-line above
       collector.addNodeChar(c);
-    } else if (auto dir = EdgesInFlight::edgeChar(c)) {
+    } else if (auto dir = edgeChar(c)) {
       // Continue the edge, if possible, before attaching one to a node
       auto fromNode = prevEdges.findNRemoveEdgeToEdge(*dir, collector.getPrevNodes(), pos.col);
       if (auto e = currEdges.updateOrError(fromNode, *dir, pos)) {
@@ -1102,6 +1167,10 @@ std::string parseErrorCodeToStr(ParseError::Code code) {
 
 std::ostream& operator<<(std::ostream& os, Position const& pos) {
   return os << pos.line << ":" << pos.col;
+}
+
+std::ostream& operator<<(std::ostream& os, DAG::Node const& node) {
+  return os <<"'" <<node.text <<"'->" <<node.succs;
 }
 
 std::ostream& operator<<(std::ostream& os, ParseError const& err) {

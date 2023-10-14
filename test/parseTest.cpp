@@ -40,7 +40,8 @@ void checkValidEdges(DAG const& dag) {
   for (size_t id = 0; id <= maxId; ++id) {
     for (auto const& e : dag.nodes[id].succs) {
       EXPECT_LE(e, maxId);
-      EXPECT_LT(id, e);
+      // id is not necessarily smaller than e because the successor e might be a
+      // long node that started before the predecessor id
     }
   }
 }
@@ -1327,6 +1328,21 @@ TEST(parse, selfLoop) {
   ASSERT_EQ(dag.node(node).succs(), nodes(node, node));
 }
 
+TEST(parse, predStartsAfterSucc) {
+  std::string str = R"(
+     A
+     A B
+     A/
+     A
+
+)";
+  auto dag = parseSuccessfully(str);
+  std::string aNode = "A\nA\nA\nA";
+  EXPECT_EQ(dag.allNodes(), nodes(aNode, "B"));
+  EXPECT_EQ(dag.node("B").succs(), nodes(aNode));
+  EXPECT_EQ(dag.node(aNode).succs(), nodes());
+}
+
 TEST(parse, touchRight) {
   std::string str = R"(
    A B
@@ -1410,6 +1426,39 @@ TEST(parse, simpleEdgeCross) {
   ASSERT_EQ(dag.node("A").succs(), nodes("D"));
   ASSERT_EQ(dag.node("B").succs(), nodes("C"));
 }
+
+TEST(parse, crossLeftBottomBelow) {
+  // Here C is added after D, hence X might get its succs in inverse order
+  std::string str = R"(
+    A   B
+     \ /
+      X
+     / \
+    /   D
+   C
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("D"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("C"));
+}
+
+// TODO:
+// TEST(parse, crossRightTopAbove) {
+//   // Here C is added after D, hence X might get its succs in inverse order
+//   std::string str = R"(
+//          B
+//     A   /
+//      \ /
+//       X
+//      / \
+//     C   D
+// )";
+//   auto dag = parseSuccessfully(str);
+//   ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D"));
+//   ASSERT_EQ(dag.node("A").succs(), nodes("D"));
+//   ASSERT_EQ(dag.node("B").succs(), nodes("C"));
+// }
 
 TEST(parseError, crossMissingLeftBottomEdge) {
   std::string str = R"(
@@ -1637,6 +1686,67 @@ TEST(parse, tripleCross) {
   ASSERT_EQ(dag.node("F").succs(), nodes());
 }
 
+TEST(parse, tripleCrossLeftBottomLower) {
+  std::string str = R"(
+    A B C
+     \|/
+      X
+     /|\
+    / E F
+   D
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "E", "F"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("F"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("E"));
+  ASSERT_EQ(dag.node("C").succs(), nodes("D"));
+  ASSERT_EQ(dag.node("D").succs(), nodes());
+  ASSERT_EQ(dag.node("E").succs(), nodes());
+  ASSERT_EQ(dag.node("F").succs(), nodes());
+}
+
+TEST(parse, tripleCrossMiddleBottomLower) {
+  std::string str = R"(
+    A B C
+     \|/
+      X
+     /|\
+    D | F
+      E
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "E", "F"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("F"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("E"));
+  ASSERT_EQ(dag.node("C").succs(), nodes("D"));
+  ASSERT_EQ(dag.node("D").succs(), nodes());
+  ASSERT_EQ(dag.node("E").succs(), nodes());
+  ASSERT_EQ(dag.node("F").succs(), nodes());
+}
+
+TEST(parse, tripleCrossLeftBottomLowerMiddleBottomLower) {
+  std::string str = R"(
+    A B C
+     \|/
+      X
+     /|\
+    / | F
+    | E
+    D
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "E", "F"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("F"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("E"));
+  ASSERT_EQ(dag.node("C").succs(), nodes("D"));
+  ASSERT_EQ(dag.node("D").succs(), nodes());
+  ASSERT_EQ(dag.node("E").succs(), nodes());
+  ASSERT_EQ(dag.node("F").succs(), nodes());
+}
+
+// TODO: tripleCrossMiddleTopAbove
+// TODO: tripleCrossRightTopAbove
+
 TEST(parseError, tripleCrossMissingLowerEdge) {
   std::string str = R"(
     A B C
@@ -1667,13 +1777,103 @@ TEST(parseError, tripleCrossMissingUpperEdge) {
   EXPECT_EQ(err.pos, (Position{3U, 8U}));
 }
 
-//TODO:
-//  test for 2 consequitive crossings:
-//  \ /  |
-//   X   /
-//  / \ /
-//  |  X
-//  | / \
+TEST(parse, twoIndependentCrossings) {
+  std::string str = R"(
+    A   B C   D
+     \ /   \ /
+      X     X
+     / \   / \
+    E   F G   H
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "E", "F", "G", "H"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("F"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("E"));
+  ASSERT_EQ(dag.node("C").succs(), nodes("H"));
+  ASSERT_EQ(dag.node("D").succs(), nodes("G"));
+  ASSERT_EQ(dag.node("E").succs(), nodes());
+  ASSERT_EQ(dag.node("F").succs(), nodes());
+  ASSERT_EQ(dag.node("G").succs(), nodes());
+  ASSERT_EQ(dag.node("H").succs(), nodes());
+}
+
+TEST(parse, twoConsequitiveCrossings) {
+  std::string str = R"(
+    A   B
+     \ /
+      X   C
+     / \ /
+    D   X
+       / \
+      E   F
+
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "E", "F"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("F"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("D"));
+  ASSERT_EQ(dag.node("C").succs(), nodes("E"));
+  ASSERT_EQ(dag.node("D").succs(), nodes());
+  ASSERT_EQ(dag.node("E").succs(), nodes());
+  ASSERT_EQ(dag.node("F").succs(), nodes());
+}
+
+TEST(parse, twoCrossingsShareNodeOnRowBelow) {
+  std::string str = R"(
+    A B     C D
+     \|     |/
+      X     X
+      |\   /|
+      E \ / G
+         F
+
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "E", "F", "G"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("F"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("E"));
+  ASSERT_EQ(dag.node("C").succs(), nodes("G"));
+  ASSERT_EQ(dag.node("D").succs(), nodes("F"));
+  ASSERT_EQ(dag.node("E").succs(), nodes());
+  ASSERT_EQ(dag.node("F").succs(), nodes());
+  ASSERT_EQ(dag.node("G").succs(), nodes());
+}
+
+TEST(parse, threeCrossings) {
+  std::string str = R"(
+    A B     C D
+     \|     |/
+      X     X
+      |\   /|
+      E \ / H
+         X
+        / \
+       F   G
+
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "E", "F", "G", "H"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("G"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("E"));
+  ASSERT_EQ(dag.node("C").succs(), nodes("H"));
+  ASSERT_EQ(dag.node("D").succs(), nodes("F"));
+  ASSERT_EQ(dag.node("E").succs(), nodes());
+  ASSERT_EQ(dag.node("F").succs(), nodes());
+  ASSERT_EQ(dag.node("G").succs(), nodes());
+  ASSERT_EQ(dag.node("H").succs(), nodes());
+}
+
+// TODO:
+// test for crossing and joining
+// A   B
+//  \ /
+//   X
+//  / \
+//  \ /
+//   C
+
+// TODO:
+// test triple crosses combined
 
 // TODO: hemed in
 // 1

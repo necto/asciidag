@@ -24,6 +24,9 @@ struct Position {
 
 std::ostream& operator<<(std::ostream& os, Position const& pos);
 
+std::ostream& operator<<(std::ostream& os, DAG::Node const& node);
+
+
 inline bool operator==(Position const& p1, Position const& p2) {
   return std::tie(p1.line, p1.col) == std::tie(p2.line, p2.col);
 }
