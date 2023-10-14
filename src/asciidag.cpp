@@ -1097,6 +1097,16 @@ size_t findIndex(std::vector<size_t> const list, size_t val) {
   return 0;
 }
 
+size_t findTargetPos(std::vector<size_t> linkedNodes, std::vector<size_t> layer) {
+  size_t const count = linkedNodes.size();
+  assert(0 < count && "Leaf or root node on a non-first layer");
+  size_t sum = 0;
+  for (auto pred : linkedNodes) {
+    sum += findIndex(layer, pred);
+  }
+  return sum / count;
+}
+
 void minimizeCrossings(std::vector<std::vector<size_t>> &layers, DAG const& dag) {
   std::vector<std::vector<size_t>> preds(dag.nodes.size());
   for (size_t i = 0; i < dag.nodes.size(); ++i) {
@@ -1104,19 +1114,32 @@ void minimizeCrossings(std::vector<std::vector<size_t>> &layers, DAG const& dag)
       preds[succ].push_back(i);
     }
   }
+  // Forward pass
   std::vector<size_t> targetPos(dag.nodes.size());
-  for (size_t i = 1; i < layers.size(); ++i) {
+  size_t const nLayers = layers.size();
+  for (size_t i = 1; i < nLayers; ++i) {
     for (size_t nId : layers[i]) {
-      size_t nPreds = preds[nId].size();
-      // We've skipped the layer 0 - the only layer with "roots" - nodes with no predecessors
-      assert(0 < nPreds && "After insertion of waypoints, all edges span a single layer");
-      targetPos[nId] = 0; // Reset potential previous pass
-      for (auto pred : preds[nId]) {
-        targetPos[nId] += findIndex(layers[i - 1], pred);
-      }
-      targetPos[nId] /= nPreds;
+      assert(0 < preds[nId].size() && "Root node can only be on the 0-th layer.");
+      targetPos[nId] = findTargetPos(preds[nId], layers[i - 1]);
     }
     std::stable_sort(layers[i].begin(), layers[i].end(), [&targetPos](size_t n1id, size_t n2id) {
+      return targetPos[n1id] < targetPos[n2id];
+    });
+  }
+  // Backward pass
+  for (size_t i = 1; i < nLayers; ++i) {
+    auto const& curLayer = layers[nLayers - i - 1];
+    for (size_t position = 0; position < curLayer.size(); ++position) {
+      size_t nId = curLayer[position];
+      auto const& succs = dag.nodes[nId].succs;
+      if (succs.empty()) {
+        // No successors, stay where you are
+        targetPos[nId] = position;
+      } else {
+        targetPos[nId] = findTargetPos(succs, layers[nLayers - i]);
+      }
+    }
+    std::stable_sort(layers[nLayers - i - 1].begin(), layers[nLayers - i - 1].end(), [&targetPos](size_t n1id, size_t n2id) {
       return targetPos[n1id] < targetPos[n2id];
     });
   }

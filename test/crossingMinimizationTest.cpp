@@ -248,7 +248,7 @@ R"(
 )");
 }
 
-TEST(crossingMinimizationTest, untangleTwoPredsCrossedOneFail) {
+TEST(crossingMinimizationTest, untangleTwoPredsCrossedOne) {
   // This untangling requries moving the nodes in the upper layer
   EXPECT_EQ(parseAndRender(R"(
     0 1 2
@@ -258,11 +258,10 @@ TEST(crossingMinimizationTest, untangleTwoPredsCrossedOneFail) {
   3 4
 )"),
 R"(
-0 1 2
+1 0 2
 | | |
-\ / |
- /  |
-/ \ /
+| | |
+| | /
 | |/
 3 4
 )");
@@ -290,7 +289,6 @@ R"(
 }
 
 TEST(crossingMinimizationTest, untangleTwoSuccsCrossedOne) {
-  // This untangling requries moving the nodes in the upper layer
   EXPECT_EQ(parseAndRender(R"(
     0 1
     |/|
@@ -309,7 +307,6 @@ R"(
 }
 
 TEST(crossingMinimizationTest, untangleTwoSuccsCrossedTwo) {
-  // This untangling requries moving the nodes in the upper layer
   EXPECT_EQ(parseAndRender(R"(
     0 1
     |/|
@@ -326,5 +323,32 @@ R"(
 | | |
 | | |
 5 3 4
+)");
+}
+
+TEST(crossingMinimizationTest, untangleHammockWithIntruder) {
+  EXPECT_EQ(parseAndRender(R"(
+1   2
+ \ / \
+  X   \
+ / \   \
+3   4   5
+ \ /   /
+  X   /
+ / \ /
+6   7
+)"),
+R"(
+1 2
+| |\
+| | \
+| | |
+| | |
+4 3 5
+| | |
+| | |
+| | /
+| |/
+6 7
 )");
 }
