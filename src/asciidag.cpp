@@ -72,10 +72,9 @@ std::optional<RenderError> insertEdgeWaypoints(DAG& dag, std::vector<std::vector
       }
       for (size_t& e : dag.nodes[n].succs) {
         assert(layerI < rank[e]);
-        // TODO: optimization:
-        // if (layerI + 1 == rank[e]) {
-        //   continue;
-        // }
+        if (layerI + 1 == rank[e]) {
+          continue;
+        }
         size_t finalSucc = e;
         size_t* lastEdge = &e;
         for (auto l = layerI + 1; l < rank[finalSucc]; ++l) {
