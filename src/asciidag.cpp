@@ -1193,7 +1193,10 @@ void drawEdge(
   assert(cur.line + 2 == to.line);
   to.line -= 1;
   to.col -= directionShift(finishDir);
-  // TODO: assert that lines meet
+  assert(
+    cur.col - columnShift[toInt(curDir)][toInt(finishDir)] == to.col
+    && "Not enough height for the edge"
+  );
   assert(canvas[to.line][to.col] == ' ');
   canvas[to.line][to.col] = edgeChar(finishDir);
 }
