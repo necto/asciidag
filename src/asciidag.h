@@ -25,6 +25,7 @@ struct Position {
 std::ostream& operator<<(std::ostream& os, Position const& pos);
 
 std::ostream& operator<<(std::ostream& os, DAG::Node const& node);
+std::ostream& operator<<(std::ostream& os, DAG const& dag);
 
 
 inline bool operator==(Position const& p1, Position const& p2) {

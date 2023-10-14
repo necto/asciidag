@@ -80,7 +80,7 @@ std::optional<RenderError> insertEdgeWaypoints(DAG& dag, std::vector<std::vector
         for (auto l = layerI + 1; l < rank[finalSucc]; ++l) {
           size_t nodeId = dag.nodes.size();
           *lastEdge = nodeId;
-          dag.nodes.push_back({{0}, "."});
+          dag.nodes.push_back({{0}, "|"});
           layers[l].push_back(nodeId);
           lastEdge = &dag.nodes.back().succs.back();
           // No need to add it to rank
@@ -1203,6 +1203,9 @@ void drawEdge(
 
 std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
   err.code = RenderError::Code::None;
+  if (dag.nodes.empty()) {
+    return "";
+  }
   // TODO: find best horisontal position of nodes
   if (auto compatErr = checkDAGCompat(dag)) {
     err = *compatErr;
@@ -1340,5 +1343,11 @@ std::ostream& operator<<(std::ostream& os, ParseError const& err) {
   return os
       << "ERROR: " << parseErrorCodeToStr(err.code) << " at " << err.pos << ":" << err.message;
 }
+
+std::ostream& operator<<(std::ostream& os, DAG const& dag) {
+  os <<"DAG";
+  return os <<dag.nodes;
+}
+
 
 } // namespace asciidag

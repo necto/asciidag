@@ -318,7 +318,7 @@ TEST(render, multiLayerEdge) {
 | \
 | |
 | |
-1 .
+1 |
 | |
 | |
 | /
@@ -342,7 +342,7 @@ TEST(render, twoMultiLayerEdges) {
 |\   \
 | \  |
 | |  |
-. 1  .
+| 1  |
 | |\ |
 | || |
 | /| /
@@ -364,11 +364,11 @@ TEST(render, twoLayerEdge) {
 | \
 | |
 | |
-1 .
+1 |
 | |
 | |
 | |
-2 .
+2 |
 | |
 | |
 | /
@@ -398,7 +398,7 @@ TEST(render, fourLayers) {
 | | /
 | //
 |/ |
-4  .
+4  |
 |  |
 |  |
 |  /
