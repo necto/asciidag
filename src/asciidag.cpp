@@ -135,7 +135,7 @@ void insertCrossNode(DAG& dag, CrossingPair const& crossing) {
 void insertCrossNodes(DAG& dag, std::vector<std::vector<size_t>> const& layers) {
   // TODO: this might not widthstand multiple crossings between edge packs
   for (size_t layerI = 1; layerI < layers.size(); ++layerI) {
-    for (auto const& crossing: findCrossings(dag, layers[layerI - 1], layers[layerI])) {
+    for (auto const& crossing : findCrossings(dag, layers[layerI - 1], layers[layerI])) {
       insertCrossNode(dag, crossing);
     }
   }
@@ -235,7 +235,7 @@ using EdgeMap = std::unordered_map<size_t, ConnToNode>;
 
 // Map from position to a node id, if any
 // TODO: use a vector here?
-using NodeMap = std::unordered_map<size_t, size_t>;
+using NodeMap = std::vector<std::optional<size_t>>;
 
 class EdgesInFlight {
 public:
@@ -330,7 +330,7 @@ EdgesInFlight::findNRemoveEdgeToEdge(Direction dirBelow, NodeMap const& prevNode
   }
   // The early return above guarantees that an edge is not connected to a node
   // if it is already connected to an edge
-  if (auto to = getIf(prevNodes, col + columnShift[0][toInt(dirBelow)])) {
+  if (auto to = prevNodes[col + columnShift[0][toInt(dirBelow)]]) {
     return {{*to, dirBelow, dirBelow}};
   }
   return std::nullopt;
@@ -369,6 +369,10 @@ std::optional<ParseError> EdgesInFlight::findDanglingEdge(size_t line) const {
 
 class NodeCollector {
 public:
+  NodeCollector(size_t maxWidth) : prevNodes(maxWidth + 1), currNodes(maxWidth + 1) {
+    // Allocate 1 extra because columns are counted from 1
+  }
+
   struct Edge {
     size_t fromNode;
     Direction exitDir;
@@ -402,7 +406,6 @@ private:
   void startNewNode(EdgesInFlight& prevEdges, Position const& pos);
   std::optional<ParseError> checkRectangularNodeLine(size_t nodeAbove, Position const& pos);
   void addNodeLine(size_t nodeAbove, EdgesInFlight& prevEdges, Position const& pos);
-  std::optional<size_t> findNodeAbove(size_t col);
 
   void resolveCrossEdges();
 
@@ -614,7 +617,7 @@ std::optional<ParseError> NodeCollector::tryAddNode(EdgesInFlight& prevEdges, Po
   if (partialNode.empty()) {
     return {};
   }
-  if (auto nodeAbove = findNodeAbove(pos.col)) {
+  if (auto nodeAbove = prevNodes[pos.col - partialNode.size()]) {
     if (auto err = checkRectangularNodeLine(*nodeAbove, pos)) {
       return err;
     }
@@ -629,17 +632,17 @@ std::optional<ParseError> NodeCollector::tryAddNode(EdgesInFlight& prevEdges, Po
 }
 
 bool NodeCollector::isPartOfANode(size_t col) const {
-  return !partialNode.empty() && prevNodes.count(col - 1) != 0 && prevNodes.count(col) != 0;
+  return !partialNode.empty() && prevNodes[col - 1].has_value() && prevNodes[col].has_value() != 0;
 }
 
 void NodeCollector::newLine() {
   prevNodes = std::move(currNodes);
-  currNodes = {};
+  currNodes = NodeMap(prevNodes.size());
 }
 
 std::optional<ParseError> NodeCollector::checkRectangularNewNode(Position const& pos) {
   for (size_t p = pos.col - partialNode.size() + 1; p < pos.col; ++p) {
-    if (auto iter = prevNodes.find(p); iter != prevNodes.end()) {
+    if (prevNodes[p].has_value()) {
       return {ParseError{
         ParseError::Code::NonRectangularNode,
         "Node-line above started midway node-line below.",
@@ -673,12 +676,13 @@ void NodeCollector::startNewNode(EdgesInFlight& prevEdges, Position const& pos) 
 
 std::optional<ParseError>
 NodeCollector::checkRectangularNodeLine(size_t nodeAbove, Position const& pos) {
+  assert(partialNode.size() < pos.col);
   for (size_t p = pos.col - partialNode.size(); p < pos.col; ++p) {
-    if (auto iter = prevNodes.find(p); iter != prevNodes.end()) {
+    if (auto prevNode = prevNodes[p]) {
       // Node above can change only after a gap,
       // Two nodes "AA" and "BB" cannot follow each other immediately.
       // "AABB" would have been treated as a single node.
-      assert(nodeAbove == iter->second);
+      assert(nodeAbove == *prevNode);
     } else {
       return {ParseError{
         ParseError::Code::NonRectangularNode,
@@ -687,14 +691,14 @@ NodeCollector::checkRectangularNodeLine(size_t nodeAbove, Position const& pos) {
       }};
     }
   }
-  if (prevNodes.count(pos.col - 1 - partialNode.size()) != 0) {
+  if (prevNodes[pos.col - 1 - partialNode.size()].has_value()) {
     return ParseError{
       ParseError::Code::NonRectangularNode,
       "Previous node-line was longer on the left side.",
       {pos.line, pos.col - 1 - partialNode.size()}
     };
   }
-  if (prevNodes.count(pos.col) != 0) {
+  if (prevNodes[pos.col].has_value()) {
     return {ParseError{
       ParseError::Code::NonRectangularNode,
       "Previous node-line was longer on the right side.",
@@ -718,13 +722,6 @@ void NodeCollector::addNodeLine(size_t nodeAbove, EdgesInFlight& prevEdges, Posi
   }
   nodes[nodeAbove].text += "\n" + partialNode;
   partialNode.clear();
-}
-
-std::optional<size_t> NodeCollector::findNodeAbove(size_t col) {
-  if (auto iter = prevNodes.find(col - partialNode.size()); iter != prevNodes.end()) {
-    return iter->second;
-  }
-  return {};
 }
 
 struct Connectivity {
@@ -1102,7 +1099,7 @@ size_t findTargetPos(std::vector<size_t> linkedNodes, std::vector<size_t> layer)
   return sum / count;
 }
 
-template<typename Callable>
+template <typename Callable>
 void swapEquipotentialNeighbors(
   std::vector<size_t> const& targetPos,
   std::vector<size_t>& curLayer,
@@ -1138,7 +1135,7 @@ void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag)
   size_t const nLayers = layers.size();
   for (size_t layerI = 1; layerI < nLayers; ++layerI) {
     auto const& prevLayer = layers[layerI - 1];
-    auto & curLayer = layers[layerI];
+    auto& curLayer = layers[layerI];
     for (size_t nId : curLayer) {
       assert(0 < preds[nId].size() && "Root node can only be on the 0-th layer.");
       targetPos[nId] = findTargetPos(preds[nId], prevLayer);
@@ -1164,11 +1161,9 @@ void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag)
         targetPos[nId] = findTargetPos(succs, nextLayer);
       }
     }
-    std::stable_sort(
-      curLayer.begin(),
-      curLayer.end(),
-      [&targetPos](size_t n1id, size_t n2id) { return targetPos[n1id] < targetPos[n2id]; }
-    );
+    std::stable_sort(curLayer.begin(), curLayer.end(), [&targetPos](size_t n1id, size_t n2id) {
+      return targetPos[n1id] < targetPos[n2id];
+    });
     swapEquipotentialNeighbors(targetPos, curLayer, [&dag, &nextLayer](auto const& curLayer) {
       return findCrossings(dag, curLayer, nextLayer).size();
     });
@@ -1269,8 +1264,21 @@ std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
   return renderCanvas(canvas);
 }
 
+size_t maxLineWidth(std::string_view str) {
+  size_t ret = 0;
+  size_t curLine = 0;
+  for (char c : str) {
+    ++curLine;
+    if (c == '\n') {
+      ret = std::max(ret, curLine);
+      curLine = 0;
+    }
+  }
+  return std::max(ret, curLine);
+}
+
 std::optional<DAG> parseDAG(std::string_view str, ParseError& err) {
-  NodeCollector collector;
+  NodeCollector collector(maxLineWidth(str));
   EdgesInFlight prevEdges;
   EdgesInFlight currEdges;
   err.code = ParseError::Code::None;
