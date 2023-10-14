@@ -1993,52 +1993,143 @@ TEST(parse, threeCrossings) {
   ASSERT_EQ(dag.node("H").succs(), nodes());
 }
 
-// TODO:
-// TEST(parse, sixCrossings) {
-//   std::string str = R"(
-//        A B
-//         \|
-//      C D X
-//      |/  |\
-//      X   E/
-//     /|   /
-//     \F  /
-//      \ /   G
-//       X   /
-//      / \ /
-//      |  X
-//      \ /|
-//       X |
-//      / \|
-//     H   X
-//        / \
-//       I   J
-// )";
-//   auto dag = parseSuccessfully(str);
-//   ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "E", "F", "G", "H", "I", "J"));
-//   ASSERT_EQ(dag.node("A").succs(), nodes("J"));
-//   ASSERT_EQ(dag.node("B").succs(), nodes("E"));
-//   ASSERT_EQ(dag.node("C").succs(), nodes("F"));
-//   ASSERT_EQ(dag.node("D").succs(), nodes("I"));
-//   ASSERT_EQ(dag.node("G").succs(), nodes("H"));
-//   ASSERT_EQ(dag.node("E").succs(), nodes());
-//   ASSERT_EQ(dag.node("F").succs(), nodes());
-//   ASSERT_EQ(dag.node("H").succs(), nodes());
-//   ASSERT_EQ(dag.node("I").succs(), nodes());
-//   ASSERT_EQ(dag.node("J").succs(), nodes());
-// }
+TEST(parse, doubleCrossSameEdges) {
+  std::string str = R"(
+    A   B
+     \ /
+      X
+     / \
+     \ /
+      X
+     / \
+    C   D
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("C"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("D"));
+  ASSERT_EQ(dag.node("C").succs(), nodes());
+  ASSERT_EQ(dag.node("D").succs(), nodes());
+}
 
-// TODO:
-// test for crossing and joining
-// A   B
-//  \ /
-//   X
-//  / \
-//  \ /
-//   C
+TEST(parse, crossJoiningBottom) {
+  std::string str = R"(
+    A   B
+     \ /
+      X
+     / \
+     \ /
+      C
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("C"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("C"));
+  ASSERT_EQ(dag.node("C").succs(), nodes());
+}
 
-// TODO:
-// test triple crosses combined
+TEST(parse, crossJoiningTop) {
+  std::string str = R"(
+      A
+     / \
+     \ /
+      X
+     / \
+    B   C
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("B", "C"));
+  ASSERT_EQ(dag.node("B").succs(), nodes());
+  ASSERT_EQ(dag.node("C").succs(), nodes());
+}
+
+TEST(parse, crossJoiningBoth) {
+  std::string str = R"(
+      A
+     / \
+     \ /
+      X
+     / \
+     \ /
+      B
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("B", "B"));
+  ASSERT_EQ(dag.node("B").succs(), nodes());
+}
+
+TEST(parse, tripleCrossJoiningBoth) {
+  std::string str = R"(
+      A
+     /|\
+     \|/
+      X
+     /|\
+     \|/
+      B
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("B", "B", "B"));
+  ASSERT_EQ(dag.node("B").succs(), nodes());
+}
+
+TEST(parse, tripleCrossSameEdges) {
+  std::string str = R"(
+    A B C
+     \|/
+      X
+     /|\
+     \|/
+      X
+     /|\
+    D E F
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "E", "F"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("D"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("E"));
+  ASSERT_EQ(dag.node("C").succs(), nodes("F"));
+  ASSERT_EQ(dag.node("D").succs(), nodes());
+  ASSERT_EQ(dag.node("E").succs(), nodes());
+  ASSERT_EQ(dag.node("F").succs(), nodes());
+}
+
+TEST(parse, sixCrossings) {
+  std::string str = R"(
+       A B
+        \|
+     C D X
+     |/  |\
+     X   E/
+    /|   /
+    \F  /
+     \ /   G
+      X   /
+     / \ /
+     |  X
+     \ /|
+      X |
+     / \|
+    H   X
+       / \
+      I   J
+)";
+  auto dag = parseSuccessfully(str);
+  ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "E", "F", "G", "H", "I", "J"));
+  ASSERT_EQ(dag.node("A").succs(), nodes("J"));
+  ASSERT_EQ(dag.node("B").succs(), nodes("E"));
+  ASSERT_EQ(dag.node("C").succs(), nodes("F"));
+  ASSERT_EQ(dag.node("D").succs(), nodes("I"));
+  ASSERT_EQ(dag.node("G").succs(), nodes("H"));
+  ASSERT_EQ(dag.node("E").succs(), nodes());
+  ASSERT_EQ(dag.node("F").succs(), nodes());
+  ASSERT_EQ(dag.node("H").succs(), nodes());
+  ASSERT_EQ(dag.node("I").succs(), nodes());
+  ASSERT_EQ(dag.node("J").succs(), nodes());
+}
 
 // TODO: hemed in
 // 1

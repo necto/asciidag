@@ -309,7 +309,19 @@ std::optional<ParseError> EdgesInFlight::findDanglingEdge(size_t line) const {
 
 class NodeCollector {
 public:
-  using Directions = std::vector<Direction>;
+  struct Edge {
+    size_t fromNode;
+    Direction exitDir;
+    size_t toNode;
+    Direction entryDir;
+  };
+
+  struct Node {
+    std::string text;
+    Position pos;
+    std::vector<size_t> succEdges;
+    std::vector<size_t> predEdges;
+  };
 
   std::optional<ParseError> tryAddNode(EdgesInFlight& prevEdges, Position const& pos);
 
@@ -317,10 +329,7 @@ public:
 
   bool isPartOfANode(size_t col) const;
 
-  DAG buildDAG() && {
-    assert(finalized);
-    return {std::move(nodes)};
-  }
+  DAG buildDAG() &&;
 
   NodeMap const& getPrevNodes() const { return prevNodes; }
 
@@ -335,64 +344,64 @@ private:
   void addNodeLine(size_t nodeAbove, EdgesInFlight& prevEdges, Position const& pos);
   std::optional<size_t> findNodeAbove(size_t col);
 
-  std::vector<DAG::Node> nodes = {};
-  std::vector<Directions> exitAngles;
-  std::vector<Directions> entryAngles;
-  std::vector<Position> nodePositions = {};
+  void resolveCrossEdges();
+
+  void addEdge(Edge&& e);
+
+  std::vector<Node> nodes = {};
+  std::vector<Edge> edges = {};
   std::string partialNode = "";
   NodeMap prevNodes;
   NodeMap currNodes;
   bool finalized = false;
 };
 
-bool hasCrossEdges(std::vector<DAG::Node> const& nodes) {
-  return std::any_of(nodes.begin(), nodes.end(), [](DAG::Node const& n) { return n.text == "X"; });
+DAG NodeCollector::buildDAG() && {
+  DAG ret;
+  ret.nodes.reserve(nodes.size());
+  for (auto && node : nodes) {
+    ret.nodes.emplace_back();
+    ret.nodes.back().text = std::move(node.text);
+    auto &succs = ret.nodes.back().succs;
+    for (auto const& edgeId : node.succEdges) {
+      succs.push_back(edges[edgeId].toNode);
+    }
+  }
+  return ret;
 }
 
-void replace(std::vector<size_t>& edges, size_t dated, size_t updated) {
-  for (auto& e : edges) {
-    if (e == dated) {
-      e = updated;
+bool hasCrossEdges(std::vector<NodeCollector::Node> const& nodes) {
+  return std::any_of(nodes.begin(), nodes.end(), [](auto const& n) { return n.text == "X"; });
+}
+
+void replace(std::vector<size_t>& values, size_t dated, size_t updated) {
+  for (auto& v : values) {
+    if (v == dated) {
+      v = updated;
     }
   }
 }
 
-std::optional<ParseError> validateEdgeCrossings(
-  std::vector<DAG::Node> const& nodes,
-  std::vector<Position> const& nodePositions
-) {
-  assert(nodes.size() == nodePositions.size());
-  std::unordered_map<size_t, std::vector<size_t>> preds; // TODO: change to vector of vectors
-  for (size_t nodeId = 0; nodeId < nodes.size(); ++nodeId) {
-    if (nodes[nodeId].text == "X") {
-      auto fromIter = preds.find(nodeId);
-      if (fromIter == preds.end()) {
+std::optional<ParseError> validateEdgeCrossings(std::vector<NodeCollector::Node> const& nodes) {
+  for (auto const& node : nodes) {
+    if (node.text == "X") {
+      auto nPreds = node.predEdges.size();
+      auto nSuccs = node.succEdges.size();
+      if (nPreds < 2 || nPreds < nSuccs) {
         return {
           {ParseError::Code::SuspendedEdge,
-           "Edge crossing misses both incoming edges.",
-           nodePositions[nodeId]}
+           "Edge crossing misses one or two incoming edges.",
+           node.pos}
         };
       }
-      auto& from = fromIter->second;
-      if (from.size() == 1 || from.size() < nodes[nodeId].succs.size()) {
-        return {
-          {ParseError::Code::SuspendedEdge,
-           "Edge crossing misses an incoming edge.",
-           nodePositions[nodeId]}
-        };
-      }
-      if (nodes[nodeId].succs.size() == 1 || nodes[nodeId].succs.size() < from.size()) {
+      assert(nPreds < 4); // Single node has only 3 possible edge entries
+      if (nSuccs < 2 || nSuccs < nPreds) {
         return {
           {ParseError::Code::DanglingEdge,
-           "Edge crossing misses an outgoing edge.",
-           nodePositions[nodeId]}
+           "Edge crossing misses one or two outgoing edges.",
+           node.pos}
         };
       }
-      assert(from.size() == 2 || from.size() == 3);
-      assert(nodes[nodeId].succs.size() == 2 || nodes[nodeId].succs.size() == 3);
-    }
-    for (auto const& e : nodes[nodeId].succs) {
-      preds[e].push_back(nodeId);
     }
   }
   return {};
@@ -437,99 +446,78 @@ std::tuple<size_t, size_t, size_t> chooseLeftMiddleRightDirs(Direction dir0, Dir
   return {2, 1, 0};
 }
 
-Direction entryAngle(
-  std::vector<DAG::Node> const& nodes,
-  std::vector<NodeCollector::Directions> const& entryAngles,
-  size_t fromNode,
-  size_t toNode
+void joinEdges(
+  std::vector<NodeCollector::Edge>& edges,
+  std::vector<NodeCollector::Node>& nodes,
+  size_t primary,
+  size_t secondary
 ) {
-  std::optional<size_t> edgeId;
-  for (size_t i = 0; i < nodes[fromNode].succs.size(); ++i) {
-    if (nodes[fromNode].succs[i] == toNode) {
-      assert(!edgeId);
-      edgeId = i;
-    }
-  }
-  assert(edgeId);
-  return entryAngles[fromNode][*edgeId];
+  assert(primary != secondary);
+  edges[primary].toNode = edges[secondary].toNode;
+  edges[primary].entryDir = edges[secondary].entryDir;
+  replace(nodes[edges[primary].toNode].predEdges, secondary, primary);
 }
 
-std::vector<DAG::Node> resolveCrossEdges(
-  std::vector<DAG::Node> nodes,
-  std::vector<NodeCollector::Directions> const& entryAngles,
-  std::vector<NodeCollector::Directions> const& exitAngles
-) {
-  (void)entryAngles; // TODO: use to resolve X preds properly
+void NodeCollector::resolveCrossEdges() {
   size_t nSkipped = 0;
-  std::unordered_map<size_t, std::vector<size_t>> preds; // TODO: change to vector of vectors
-  std::vector<size_t> idMap(nodes.size());
+  std::vector<size_t> nodeIdMap(nodes.size());
   for (size_t i = 0; i < nodes.size(); ++i) {
-    for (auto const& e : nodes[i].succs) {
-      preds[e].push_back(i);
-    }
-    if (nodes[i].text == "X") {
+    auto &node = nodes[i];
+    if (node.text == "X") {
       // Assertions are ensured by "validateEdgeCrossings"
-      assert(preds.count(i) != 0);
-      auto& from = preds[i];
-      if (from.size() == 2) {
-        assert(nodes[i].succs.size() == 2);
-        assert(exitAngles[i].size() == 2);
-
-        // FIXME: fix the exitAngles and entryAngles
-        auto [succLeft, succRight] = chooseLeftRightDirs(exitAngles[i][0], exitAngles[i][1]);
-        auto [predRight, predLeft] = chooseLeftRightDirs(
-          entryAngle(nodes, entryAngles, from[0], i),
-          entryAngle(nodes, entryAngles, from[1], i)
-        );
-        replace(nodes[from[predLeft]].succs, i, nodes[i].succs[succRight]);
-        replace(preds[nodes[i].succs[succRight]], i, from[predLeft]);
-
-        replace(nodes[from[predRight]].succs, i, nodes[i].succs[succLeft]);
-        replace(preds[nodes[i].succs[succLeft]], i, from[predRight]);
+      auto &preds = node.predEdges;
+      auto &succs = node.succEdges;
+      size_t nPreds = preds.size();
+      assert(2 <= nPreds);
+      if (nPreds == 2) {
+        assert(succs.size() == 2);
+        auto [succLeft, succRight] =
+          chooseLeftRightDirs(edges[succs[0]].exitDir, edges[succs[1]].exitDir);
+        auto [predRight, predLeft] =
+          chooseLeftRightDirs(edges[preds[0]].entryDir, edges[preds[1]].entryDir);
+        joinEdges(edges, nodes, preds[predLeft], succs[succRight]);
+        joinEdges(edges, nodes, preds[predRight], succs[succLeft]);
       } else {
-        assert(from.size() == 3);
-        assert(nodes[i].succs.size() == 3);
-        assert(exitAngles[i].size() == 3);
+        assert(nPreds == 3);
+        assert(succs.size() == 3);
 
-        // FIXME: fix the exitAngles and entryAngles
-        auto [succLeft, succMiddle, succRight] =
-          chooseLeftMiddleRightDirs(exitAngles[i][0], exitAngles[i][1], exitAngles[i][2]);
-        auto [predRight, predMiddle, predLeft] = chooseLeftMiddleRightDirs(
-          entryAngle(nodes, entryAngles, from[0], i),
-          entryAngle(nodes, entryAngles, from[1], i),
-          entryAngle(nodes, entryAngles, from[2], i)
+        auto [succLeft, succMid, succRight] = chooseLeftMiddleRightDirs(
+          edges[succs[0]].exitDir,
+          edges[succs[1]].exitDir,
+          edges[succs[2]].exitDir
         );
-        replace(nodes[from[predLeft]].succs, i, nodes[i].succs[succRight]);
-        replace(preds[nodes[i].succs[succRight]], i, from[predLeft]);
-
-        replace(nodes[from[predMiddle]].succs, i, nodes[i].succs[succMiddle]);
-        replace(preds[nodes[i].succs[succMiddle]], i, from[predMiddle]);
-
-        replace(nodes[from[predRight]].succs, i, nodes[i].succs[succLeft]);
-        replace(preds[nodes[i].succs[succLeft]], i, from[predRight]);
+        auto [predRight, predMid, predLeft] = chooseLeftMiddleRightDirs(
+          edges[preds[0]].entryDir,
+          edges[preds[1]].entryDir,
+          edges[preds[2]].entryDir
+        );
+        joinEdges(edges, nodes, preds[predLeft], succs[succRight]);
+        joinEdges(edges, nodes, preds[predMid], succs[succMid]);
+        joinEdges(edges, nodes, preds[predRight], succs[succLeft]);
       }
       ++nSkipped;
     }
-    idMap[i] = i - nSkipped;
+    nodeIdMap[i] = i - nSkipped;
+  }
+  for (auto &edge : edges) {
+    edge.fromNode = nodeIdMap[edge.fromNode];
+    edge.toNode = nodeIdMap[edge.toNode];
   }
   nodes.erase(
-    std::remove_if(nodes.begin(), nodes.end(), [](DAG::Node const& n) { return n.text == "X"; }),
+    std::remove_if(nodes.begin(), nodes.end(), [](auto const& n) { return n.text == "X"; }),
     nodes.end()
   );
-  for (auto& n : nodes) {
-    for (auto& e : n.succs) {
-      e = idMap[e];
-    }
-  }
-  return nodes;
+  // Note here some edges that were connected the "X" nodes
+  // are preserved and are inconsistent with the new array of nodes,
+  // but they are "dead" - not referenced from this array of nodes
 }
 
 std::optional<ParseError> NodeCollector::finalize() {
   if (hasCrossEdges(nodes)) {
-    if (auto err = validateEdgeCrossings(nodes, nodePositions)) {
+    if (auto err = validateEdgeCrossings(nodes)) {
       return err;
     }
-    nodes = resolveCrossEdges(std::move(nodes), entryAngles, exitAngles);
+    resolveCrossEdges();
   }
   finalized = true;
   return {};
@@ -575,22 +563,25 @@ std::optional<ParseError> NodeCollector::checkRectangularNewNode(Position const&
   return {};
 }
 
+void NodeCollector::addEdge(NodeCollector::Edge&& e) {
+  size_t edgeId = edges.size();
+  nodes[e.fromNode].succEdges.push_back(edgeId);
+  nodes[e.toNode].predEdges.push_back(edgeId);
+  edges.emplace_back(std::move(e));
+}
+
 void NodeCollector::startNewNode(EdgesInFlight& prevEdges, Position const& pos) {
   size_t id = nodes.size();
+  nodes.emplace_back();
+  nodes[id].text = partialNode;
+  nodes[id].pos = pos;
   for (size_t p = pos.col - partialNode.size(); p < pos.col; ++p) {
     for (auto from : prevEdges.findNRemoveEdgesToNode(p)) {
-      nodes[from.nId].succs.push_back({id});
-      exitAngles[from.nId].push_back(from.exitAngle);
-      entryAngles[from.nId].push_back(from.entryAngle);
+      addEdge({from.nId, from.exitAngle, id, from.entryAngle});
     }
     currNodes[p] = id;
   }
-  nodes.emplace_back();
-  exitAngles.emplace_back();
-  entryAngles.emplace_back();
-  nodes[id].text = partialNode;
   partialNode.clear();
-  nodePositions.push_back(pos);
 }
 
 std::optional<ParseError>
@@ -631,16 +622,12 @@ void NodeCollector::addNodeLine(size_t nodeAbove, EdgesInFlight& prevEdges, Posi
     currNodes[p] = nodeAbove;
   }
   for (auto edge : prevEdges.findNRemoveEdgesToNode(pos.col - partialNode.size())) {
-    nodes[edge.nId].succs.push_back({nodeAbove});
-    exitAngles[edge.nId].push_back(edge.exitAngle);
     assert(partialNode.size() == 1 || edge.entryAngle == Direction::Right);
-    entryAngles[edge.nId].push_back(edge.entryAngle);
+    addEdge({edge.nId, edge.exitAngle, nodeAbove, edge.entryAngle});
   }
   for (auto edge : prevEdges.findNRemoveEdgesToNode(pos.col - 1)) {
-    nodes[edge.nId].succs.push_back({nodeAbove});
-    exitAngles[edge.nId].push_back(edge.exitAngle);
     assert(partialNode.size() == 1 || edge.entryAngle == Direction::Left);
-    entryAngles[edge.nId].push_back(edge.entryAngle);
+    addEdge({edge.nId, edge.exitAngle, nodeAbove, edge.entryAngle});
   }
   nodes[nodeAbove].text += "\n" + partialNode;
   partialNode.clear();
