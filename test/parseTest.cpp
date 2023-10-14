@@ -1823,6 +1823,60 @@ TEST(parse, tripleCrossMiddleTopAboveRightTopAbove) {
   ASSERT_EQ(dag.node("F").succs(), nodes());
 }
 
+TEST(parse, chainedTwoTripleCrosses) {
+  std::string str = R"(
+    A B C D E
+     \|/ / /
+      X / /
+     /|\|/
+    F G X
+       /|\
+      H I J
+)";
+  auto dag = parseSuccessfully(str);
+  EXPECT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "E", "F", "G", "H", "I", "J"));
+  EXPECT_EQ(dag.node("A").succs(), nodes("J"));
+  EXPECT_EQ(dag.node("B").succs(), nodes("G"));
+  EXPECT_EQ(dag.node("C").succs(), nodes("F"));
+  EXPECT_EQ(dag.node("D").succs(), nodes("I"));
+  EXPECT_EQ(dag.node("E").succs(), nodes("H"));
+  EXPECT_EQ(dag.node("F").succs(), nodes());
+  EXPECT_EQ(dag.node("G").succs(), nodes());
+  EXPECT_EQ(dag.node("H").succs(), nodes());
+  EXPECT_EQ(dag.node("I").succs(), nodes());
+  EXPECT_EQ(dag.node("J").succs(), nodes());
+}
+
+TEST(parse, fourTripleCrosses) {
+  std::string str = R"(
+      C  D
+       \  \
+      B \ E\
+      |\|/||
+    A | X ||
+     \|/|\|/
+      X | X
+     /|\|/|\
+    F G X \ L
+       /|\ \
+      H I J K
+)";
+  auto dag = parseSuccessfully(str);
+  EXPECT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"));
+  EXPECT_EQ(dag.node("A").succs(), nodes("J"));
+  EXPECT_EQ(dag.node("B").succs(), nodes("G", "L"));
+  EXPECT_EQ(dag.node("C").succs(), nodes("I"));
+  EXPECT_EQ(dag.node("D").succs(), nodes("H"));
+  EXPECT_EQ(dag.node("E").succs(), nodes("F", "K"));
+  EXPECT_EQ(dag.node("F").succs(), nodes());
+  EXPECT_EQ(dag.node("G").succs(), nodes());
+  EXPECT_EQ(dag.node("H").succs(), nodes());
+  EXPECT_EQ(dag.node("I").succs(), nodes());
+  EXPECT_EQ(dag.node("J").succs(), nodes());
+  EXPECT_EQ(dag.node("K").succs(), nodes());
+  EXPECT_EQ(dag.node("L").succs(), nodes());
+}
+
 TEST(parseError, tripleCrossMissingLowerEdge) {
   std::string str = R"(
     A B C
@@ -1938,6 +1992,41 @@ TEST(parse, threeCrossings) {
   ASSERT_EQ(dag.node("G").succs(), nodes());
   ASSERT_EQ(dag.node("H").succs(), nodes());
 }
+
+// TODO:
+// TEST(parse, sixCrossings) {
+//   std::string str = R"(
+//        A B
+//         \|
+//      C D X
+//      |/  |\
+//      X   E/
+//     /|   /
+//     \F  /
+//      \ /   G
+//       X   /
+//      / \ /
+//      |  X
+//      \ /|
+//       X |
+//      / \|
+//     H   X
+//        / \
+//       I   J
+// )";
+//   auto dag = parseSuccessfully(str);
+//   ASSERT_EQ(dag.allNodes(), nodes("A", "B", "C", "D", "E", "F", "G", "H", "I", "J"));
+//   ASSERT_EQ(dag.node("A").succs(), nodes("J"));
+//   ASSERT_EQ(dag.node("B").succs(), nodes("E"));
+//   ASSERT_EQ(dag.node("C").succs(), nodes("F"));
+//   ASSERT_EQ(dag.node("D").succs(), nodes("I"));
+//   ASSERT_EQ(dag.node("G").succs(), nodes("H"));
+//   ASSERT_EQ(dag.node("E").succs(), nodes());
+//   ASSERT_EQ(dag.node("F").succs(), nodes());
+//   ASSERT_EQ(dag.node("H").succs(), nodes());
+//   ASSERT_EQ(dag.node("I").succs(), nodes());
+//   ASSERT_EQ(dag.node("J").succs(), nodes());
+// }
 
 // TODO:
 // test for crossing and joining

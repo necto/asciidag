@@ -475,6 +475,7 @@ std::vector<DAG::Node> resolveCrossEdges(
         assert(nodes[i].succs.size() == 2);
         assert(exitAngles[i].size() == 2);
 
+        // FIXME: fix the exitAngles and entryAngles
         auto [succLeft, succRight] = chooseLeftRightDirs(exitAngles[i][0], exitAngles[i][1]);
         auto [predRight, predLeft] = chooseLeftRightDirs(
           entryAngle(nodes, entryAngles, from[0], i),
@@ -482,6 +483,7 @@ std::vector<DAG::Node> resolveCrossEdges(
         );
         replace(nodes[from[predLeft]].succs, i, nodes[i].succs[succRight]);
         replace(preds[nodes[i].succs[succRight]], i, from[predLeft]);
+
         replace(nodes[from[predRight]].succs, i, nodes[i].succs[succLeft]);
         replace(preds[nodes[i].succs[succLeft]], i, from[predRight]);
       } else {
@@ -489,6 +491,7 @@ std::vector<DAG::Node> resolveCrossEdges(
         assert(nodes[i].succs.size() == 3);
         assert(exitAngles[i].size() == 3);
 
+        // FIXME: fix the exitAngles and entryAngles
         auto [succLeft, succMiddle, succRight] =
           chooseLeftMiddleRightDirs(exitAngles[i][0], exitAngles[i][1], exitAngles[i][2]);
         auto [predRight, predMiddle, predLeft] = chooseLeftMiddleRightDirs(
@@ -497,9 +500,13 @@ std::vector<DAG::Node> resolveCrossEdges(
           entryAngle(nodes, entryAngles, from[2], i)
         );
         replace(nodes[from[predLeft]].succs, i, nodes[i].succs[succRight]);
+        replace(preds[nodes[i].succs[succRight]], i, from[predLeft]);
+
         replace(nodes[from[predMiddle]].succs, i, nodes[i].succs[succMiddle]);
+        replace(preds[nodes[i].succs[succMiddle]], i, from[predMiddle]);
+
         replace(nodes[from[predRight]].succs, i, nodes[i].succs[succLeft]);
-        // FIXME: update preds!
+        replace(preds[nodes[i].succs[succLeft]], i, from[predRight]);
       }
       ++nSkipped;
     }
