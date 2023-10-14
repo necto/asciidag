@@ -396,15 +396,30 @@ R"(
 )");
 }
 
-// TODO:
-// TEST(crossingMinimizationTest, untangleCentripetalSymmetricalCrossing) {
-//   EXPECT_EQ(parseAndRender(R"(
-//  0   1   2
-//   \ / \ /
-//    X   X
-//   / \ / \
-//  3   4   5
-// )"),
-// R"(
-// )");
-// }
+TEST(crossingMinimizationTest, untangleCentripetalSymmetricalCrossingFail) {
+  // TODO
+  // Here both on the layer above and layer below, all 3 nodes
+  // aim at the center (position 1), so they stay where they are
+  // Also, moving nodes only on one layer does not reduce number of crossings
+  // you must move nodes on both layers simultaneously
+  EXPECT_EQ(parseAndRender(R"(
+ 0   1   2
+  \ / \ /
+   X   X
+  / \ / \
+ 3   4   5
+)"),
+R"(
+0 1  2
+| |\ |
+| || |
+| /| /
+|/ |/
+X  X
+|\ |\
+| \| \
+| || |
+| |/ |
+3 4  5
+)");
+}

@@ -787,6 +787,7 @@ size_t minDistBetweenLayers(
   return ret;
 }
 
+// TODO: deduplicate these two with chooseLeftMiddleRightDirs and chooseLeftRightDirs
 std::pair<size_t, size_t> chooseStraightAndRight(size_t zero, size_t one) {
   if (zero <= one) {
     return {0, 1};
