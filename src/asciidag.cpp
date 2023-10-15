@@ -1201,14 +1201,14 @@ void drawEdge(Position cur, Direction curDir, Position to, Direction finishDir, 
       step.posWhenSelecting = cur;
       step.dirWhenSelecting = curDir;
       auto altPos = nextPosInDir(cur, curDir, alternativeNextDir);
-      if (altPos.col < canvas.width() && altPos.line < canvas.height() && (canvas.getChar(altPos) == ' ')) {
+      if (altPos.col < canvas.width() && altPos.line < canvas.height() && canvas.empty(altPos)) {
         step.nextDir = alternativeNextDir;
       } else {
         step.nextDir = std::nullopt;
       }
       cur = nextPosInDir(cur, curDir, nextDir);
       curDir = nextDir;
-      if (canvas.getChar(cur) != ' ') {
+      if (!canvas.empty(cur)) {
         if (step.nextDir) {
           // Pivot immediately
           cur = altPos;

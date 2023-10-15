@@ -17,6 +17,7 @@ public:
   void newMark(Position const& pos, char c);
   void clearPos(Position const& pos);
   char getChar(Position const& pos) const;
+  bool empty(Position const& pos) const { return getChar(pos) == ' '; }
   size_t width() const;
   size_t height() const;
 
