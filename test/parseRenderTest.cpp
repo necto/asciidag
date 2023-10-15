@@ -35,7 +35,7 @@ DAG canonicalDAG(DAG const& orig) {
 }
 
 bool compareDAGs(DAG const& a, DAG const& b) {
-  if (a.nodes.size() != a.nodes.size()) {
+  if (a.nodes.size() != b.nodes.size()) {
     return false;
   }
   for (size_t i = 0; i < a.nodes.size(); ++i) {
