@@ -12,6 +12,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <sstream>
 
 namespace asciidag {
 
@@ -966,15 +967,10 @@ void adjustCoordsWithValencies(
   }
 }
 
-void placeNodes(
-  DAG const& dag,
-  std::vector<Position> const& coordinates,
-  std::vector<std::string>& canvas
-) {
+void placeNodes(DAG const& dag, std::vector<Position> const& coordinates, Canvas& canvas) {
   for (size_t n = 0; n < dag.nodes.size(); ++n) {
     assert(dag.nodes[n].text.size() == 1);
-    assert(canvas[coordinates[n].line][coordinates[n].col] == ' ' && "Nodes overlay.");
-    canvas[coordinates[n].line][coordinates[n].col] = dag.nodes[n].text[0];
+    canvas.newMark(coordinates[n], dag.nodes[n].text[0]);
   }
 }
 
@@ -986,26 +982,11 @@ std::string rtrim(std::string s) {
 void placeEdges(
   std::vector<Position> const& coordinates,
   std::vector<Connectivity::Edge> const& edges,
-  std::vector<std::string>& canvas
+  Canvas& canvas
 ) {
   for (auto const& e : edges) {
     drawEdge(coordinates[e.from], e.exitAngle, coordinates[e.to], e.entryAngle, canvas);
   }
-}
-
-std::vector<std::string> createCanvas(std::vector<Position> const& coordinates) {
-  Position max{0, 0};
-  for (auto const& p : coordinates) {
-    if (max.line < p.line) {
-      max.line = p.line;
-    }
-    if (max.col < p.col) {
-      max.col = p.col;
-    }
-  }
-  // line + 1 - to accomodate the node height
-  // col + 2 - to accomodate the node width + potential top/bottom-right edge
-  return std::vector<std::string>(max.line + 1, std::string(max.col + 2, ' '));
 }
 
 std::optional<RenderError> checkDAGCompat(DAG const& dag) {
@@ -1185,35 +1166,19 @@ std::string escapeForDOTlabel(std::string_view str) {
 }
 
 [[maybe_unused]]
-void printCanvas(std::vector<std::string>& canvas) {
-  std::cout << "------\n" << renderCanvas(canvas) << "-------\n";
+void printCanvas(Canvas const& canvas) {
+  std::cout << "------\n" << canvas.render() << "-------\n";
 }
 
 } // namespace
 
-std::string renderCanvas(std::vector<std::string> const& canvas) {
-  std::string ret;
-  ret.reserve(canvas.size() * (canvas[0].size() + 1));
-  for (auto const& line : canvas) {
-    ret += rtrim(line) + "\n";
-  }
-  return ret;
-}
-
-void drawEdge(
-  Position cur,
-  Direction curDir,
-  Position to,
-  Direction finishDir,
-  std::vector<std::string>& canvas
-) {
+void drawEdge(Position cur, Direction curDir, Position to, Direction finishDir, Canvas& canvas) {
   cur.line += 1;
   cur.col += directionShift(curDir);
-  assert(canvas[cur.line][cur.col] == ' ');
-  canvas[cur.line][cur.col] = edgeChar(curDir);
+  canvas.newMark(cur, edgeChar(curDir));
 
-  assert(cur.line < to.line && to.line < canvas.size());
-  assert(cur.col < canvas[cur.line].size() && to.col < canvas[to.line].size());
+  assert(cur.line < to.line && to.line < canvas.height());
+  assert(cur.col < canvas.width() && to.col < canvas.width());
 
   if (cur.line + 1 == to.line) {
     assert(curDir == finishDir);
@@ -1236,16 +1201,14 @@ void drawEdge(
       step.posWhenSelecting = cur;
       step.dirWhenSelecting = curDir;
       auto altPos = nextPosInDir(cur, curDir, alternativeNextDir);
-      if (altPos.col < canvas[0].size() &&
-          altPos.line < canvas.size() &&
-          (canvas[altPos.line][altPos.col] == ' ')) {
+      if (altPos.col < canvas.width() && altPos.line < canvas.height() && (canvas.getChar(altPos) == ' ')) {
         step.nextDir = alternativeNextDir;
       } else {
         step.nextDir = std::nullopt;
       }
       cur = nextPosInDir(cur, curDir, nextDir);
       curDir = nextDir;
-      if (canvas[cur.line][cur.col] != ' ') {
+      if (canvas.getChar(cur) != ' ') {
         if (step.nextDir) {
           // Pivot immediately
           cur = altPos;
@@ -1257,8 +1220,7 @@ void drawEdge(
       }
       step.posDrawnTo = cur;
       drawnPath.push_back(step);
-      assert(canvas[cur.line][cur.col] == ' ');
-      canvas[cur.line][cur.col] = edgeChar(curDir);
+      canvas.newMark(cur, edgeChar(curDir));
     }
     assert(cur.line + 2 <= to.line);
     bool
@@ -1270,26 +1232,22 @@ void drawEdge(
     }
     // backtrack, erasing the track
     while (!drawnPath.empty() && !drawnPath.back().nextDir.has_value()) {
-      auto const& pos = drawnPath.back().posDrawnTo;
-      assert(canvas[pos.line][pos.col] != ' ');
-      canvas[pos.line][pos.col] = ' ';
+      canvas.clearPos(drawnPath.back().posDrawnTo);
       drawnPath.pop_back();
     }
     if (drawnPath.empty()) {
       assert(false && "Not enough height for the edge");
     }
     assert(drawnPath.back().nextDir.has_value());
-    assert(canvas[drawnPath.back().posDrawnTo.line][drawnPath.back().posDrawnTo.col] != ' ');
-    canvas[drawnPath.back().posDrawnTo.line][drawnPath.back().posDrawnTo.col] = ' ';
+    canvas.clearPos(drawnPath.back().posDrawnTo);
     cur = drawnPath.back().posWhenSelecting;
     curDir = drawnPath.back().dirWhenSelecting;
     auto nextDir = drawnPath.back().nextDir.value();
     cur = nextPosInDir(cur, curDir, nextDir);
     drawnPath.back().posDrawnTo = cur;
     curDir = nextDir;
-    assert(canvas[cur.line][cur.col] == ' ');
     drawnPath.back().nextDir = std::nullopt;
-    canvas[cur.line][cur.col] = edgeChar(curDir);
+    canvas.newMark(cur, edgeChar(curDir));
   }
 
   to.line -= 1;
@@ -1298,8 +1256,7 @@ void drawEdge(
     cur.col - columnShift[toInt(curDir)][toInt(finishDir)] == to.col
     && "Not enough height for the edge"
   );
-  assert(canvas[to.line][to.col] == ' ');
-  canvas[to.line][to.col] = edgeChar(finishDir);
+  canvas.newMark(to, edgeChar(finishDir));
 }
 
 std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
@@ -1337,10 +1294,10 @@ std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
   auto coords = computeNodeCoordinates(dag, layers);
   auto const connectivity = computeConnectivity(dag, coords);
   adjustCoordsWithValencies(coords, connectivity, layers);
-  auto canvas = createCanvas(coords);
+  auto canvas = Canvas::create(coords);
   placeNodes(dag, coords, canvas);
   placeEdges(coords, connectivity.edges, canvas);
-  return renderCanvas(canvas);
+  return canvas.render();
 }
 
 size_t maxLineWidth(std::string_view str) {
@@ -1482,6 +1439,77 @@ std::string toDOT(DAG const& dag) {
     ret += "\n";
   }
   return ret + "}\n";
+}
+
+void Canvas::newMark(Position const& pos, char c) {
+  assert(pos.line < lines.size());
+  assert(pos.col < lines[0].size());
+  assert(lines[pos.line][pos.col] == ' ');
+  assert(c != ' ');
+  lines[pos.line][pos.col] = c;
+}
+
+void Canvas::clearPos(Position const& pos) {
+  assert(pos.line < lines.size());
+  assert(pos.col < lines[0].size());
+  assert(lines[pos.line][pos.col] != ' ');
+  lines[pos.line][pos.col] = ' ';
+}
+
+char Canvas::getChar(Position const& pos) const {
+  assert(pos.line < lines.size());
+  assert(pos.col < lines[0].size());
+  return lines[pos.line][pos.col];
+}
+
+size_t Canvas::width() const {
+  return lines[0].size();
+}
+
+size_t Canvas::height() const {
+  return lines.size();
+}
+
+std::string Canvas::render() const {
+  std::string ret;
+  ret.reserve(lines.size() * (lines[0].size() + 1));
+  for (auto const& line : lines) {
+    ret += rtrim(line) + "\n";
+  }
+  return ret;
+}
+
+Canvas Canvas::create(std::vector<Position> const& coordinates) {
+  Position max{0, 0};
+  for (auto const& p : coordinates) {
+    if (max.line < p.line) {
+      max.line = p.line;
+    }
+    if (max.col < p.col) {
+      max.col = p.col;
+    }
+  }
+  // line + 1 - to accomodate the node height
+  // col + 2 - to accomodate the node width + potential top/bottom-right edge
+  Canvas ret;
+  ret.lines = std::vector<std::string>(max.line + 1, std::string(max.col + 2, ' '));
+  return ret;
+}
+
+
+Canvas Canvas::fromString(std::string const& rendered) {
+  Canvas ret;
+  std::string curLine;
+  std::istringstream ss(rendered);
+  size_t width = 0;
+  while (getline(ss, curLine, '\n')) {
+    width = std::max(width, curLine.size());
+    ret.lines.push_back(curLine);
+  }
+  for (auto& line : ret.lines) {
+    line.resize(width, ' ');
+  }
+  return ret;
 }
 
 } // namespace asciidag

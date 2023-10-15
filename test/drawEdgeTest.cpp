@@ -1,62 +1,46 @@
 #include "asciidagImpl.h"
 
 #include <gtest/gtest.h>
-#include <sstream>
 
 namespace {
 
 using namespace asciidag;
 using std::string;
-using std::vector;
 
-vector<string> derenderCanvas(string const& rendered) {
-  vector<string> ret;
-  string curLine;
-  std::stringstream ss(rendered);
-  size_t width = 0;
-  while (getline(ss, curLine, '\n')) {
-    width = std::max(width, curLine.size());
-    ret.push_back(curLine);
-  }
-  for (auto& line : ret) {
-    line.resize(width, ' ');
-  }
-  return ret;
-}
-
-void eraseEdgeCharacters(vector<string>& canvas) {
-  for (auto& line : canvas) {
-    for (auto& c : line) {
-      if (c != '.' && c != '#') {
-        c = ' ';
+void eraseEdgeCharacters(Canvas& canvas) {
+  for (size_t line = 0; line < canvas.height(); ++line) {
+    for (size_t col = 0; col < canvas.width(); ++col) {
+      if (char c = canvas.getChar({line, col});
+          c != '.' && c != '#' && c != ' ') {
+        canvas.clearPos({line, col});
       }
     }
   }
 }
 
-Direction getEntryAngle(Position dotPos, vector<string> const& canvas) {
+Direction getEntryAngle(Position dotPos, Canvas& canvas) {
   assert(0 < dotPos.line);
-  if (0 < dotPos.col && canvas[dotPos.line - 1][dotPos.col - 1] == '\\') {
+  if (0 < dotPos.col && canvas.getChar({dotPos.line - 1, dotPos.col - 1}) == '\\') {
     return Direction::Right;
   }
-  if (canvas[dotPos.line - 1][dotPos.col] == '|') {
+  if (canvas.getChar({dotPos.line - 1, dotPos.col}) == '|') {
     return Direction::Straight;
   }
-  assert(dotPos.col + 1 < canvas[dotPos.line - 1].size());
-  assert(canvas[dotPos.line - 1][dotPos.col + 1] == '/');
+  assert(dotPos.col + 1 < canvas.width());
+  assert(canvas.getChar({dotPos.line - 1, dotPos.col + 1}) == '/');
   return Direction::Left;
 }
 
-Direction getExitAngle(Position dotPos, vector<string> const& canvas) {
-  assert(dotPos.line < canvas.size());
-  if (0 < dotPos.col && canvas[dotPos.line + 1][dotPos.col - 1] == '/') {
+Direction getExitAngle(Position dotPos, Canvas& canvas) {
+  assert(dotPos.line < canvas.height());
+  if (0 < dotPos.col && canvas.getChar({dotPos.line + 1, dotPos.col - 1}) == '/') {
     return Direction::Left;
   }
-  if (canvas[dotPos.line + 1][dotPos.col] == '|') {
+  if (canvas.getChar({dotPos.line + 1, dotPos.col}) == '|') {
     return Direction::Straight;
   }
-  assert(dotPos.col + 1 < canvas[dotPos.line + 1].size());
-  assert(canvas[dotPos.line + 1][dotPos.col + 1] == '\\');
+  assert(dotPos.col + 1 < canvas.width());
+  assert(canvas.getChar({dotPos.line + 1, dotPos.col + 1}) == '\\');
   return Direction::Right;
 }
 
@@ -67,10 +51,10 @@ string drawEdgeFromSpec(string const& spec) {
   Position to;
   Direction toAngle;
   bool toFound = false;
-  auto canvas = derenderCanvas(spec);
-  for (size_t lineNum = 0; lineNum < canvas.size(); ++lineNum) {
-    for (size_t col = 0; col < canvas[lineNum].size(); ++col) {
-      if (canvas[lineNum][col] == '.') {
+  auto canvas = Canvas::fromString(spec);
+  for (size_t lineNum = 0; lineNum < canvas.height(); ++lineNum) {
+    for (size_t col = 0; col < canvas.width(); ++col) {
+      if (canvas.getChar({lineNum, col}) == '.') {
         assert(!toFound);
         if (fromFound) {
           to = {lineNum, col};
@@ -87,7 +71,7 @@ string drawEdgeFromSpec(string const& spec) {
   assert(fromFound && toFound);
   eraseEdgeCharacters(canvas);
   drawEdge(from, fromAngle, to, toAngle, canvas);
-  return renderCanvas(canvas);
+  return canvas.render();
 }
 
 TEST(drawEdge, straightDownLen1) {
