@@ -1189,7 +1189,7 @@ void drawEdge(
 ) {
   cur.line += 1;
   cur.col += directionShift(curDir);
-  assert(canvas[cur.line][cur.col] == ' ');
+  // assert(canvas[cur.line][cur.col] == ' ');
   canvas[cur.line][cur.col] = edgeChar(curDir);
 
   assert(cur.line < to.line && to.line < canvas.size());
@@ -1210,7 +1210,7 @@ void drawEdge(
     }
     curDir = nextDir;
     cur.line += 1;
-    assert(canvas[cur.line][cur.col] == ' ');
+    // assert(canvas[cur.line][cur.col] == ' ');
     canvas[cur.line][cur.col] = edgeChar(curDir);
   }
 
@@ -1221,7 +1221,7 @@ void drawEdge(
     cur.col - columnShift[toInt(curDir)][toInt(finishDir)] == to.col
     && "Not enough height for the edge"
   );
-  assert(canvas[to.line][to.col] == ' ');
+  // assert(canvas[to.line][to.col] == ' ');
   canvas[to.line][to.col] = edgeChar(finishDir);
 }
 

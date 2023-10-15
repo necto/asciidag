@@ -18,6 +18,7 @@ line
 with "
 some" quotes and
 ] { special chars)"});
+
   EXPECT_EQ(toDOT(test), R"(digraph "DAG" {
   n0[shape=record,label="Multi\nline\nwith \"\nsome\" quotes and\n] \{ special chars"];
 
@@ -29,6 +30,7 @@ TEST(dag2dot, singleEdge) {
   DAG test;
   test.nodes.push_back(DAG::Node{{1}, "first node"});
   test.nodes.push_back(DAG::Node{{}, "second node"});
+
   EXPECT_EQ(toDOT(test),
 R"(digraph "DAG" {
   n0[shape=record,label="first node"];
@@ -46,6 +48,7 @@ TEST(dag2dot, pluralOutgoingIncomingEdges) {
   test.nodes.push_back(DAG::Node{{2, 3}, "1"});
   test.nodes.push_back(DAG::Node{{3}, "2"});
   test.nodes.push_back(DAG::Node{{}, "3"});
+
   EXPECT_EQ(toDOT(test),
 R"(digraph "DAG" {
   n0[shape=record,label="0"];

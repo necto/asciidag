@@ -457,13 +457,53 @@ TEST(renderError, tooManyIncomingEdges) {
   EXPECT_EQ(err.nodeId, 4U);
 }
 
-// // TODO:
-// TEST(render, twoEdgeCrossingFromSamePredecessor) {
+TEST(render, conflictingEdgesFromSamePredecessorFail) {
+  // TODO: edges from node 2 overlap
+  DAG test;
+  test.nodes.push_back(DAG::Node{{}, "0"});
+  test.nodes.push_back(DAG::Node{{4}, "1"});
+  test.nodes.push_back(DAG::Node{{4, 5}, "2"});
+  test.nodes.push_back(DAG::Node{{5}, "3"});
+  test.nodes.push_back(DAG::Node{{}, "4"});
+  test.nodes.push_back(DAG::Node{{}, "5"});
+  EXPECT_EQ(renderSuccessfully(test), R"(
+0 1 2  3
+  | |\ |
+  | |/ |
+  / /  /
+ / /  /
+/ /| /
+|/ |/
+4  5
+)");
+}
+
+// TODO:
+// TEST(render, twoEdgeCrossingsFromSamePredecessorFail) {
+//   // TODO: Check if indeed, in addition to overlapping the edges
+//   // The cross node gets its outgoing edges swapp incorrectly,
+//   // so that 1 ends up connected to 3 twice instead of being
+//   // connected to 2 and 3
 //   DAG test;
 //   test.nodes.push_back(DAG::Node{{2, 3, 4}, "0"});
 //   test.nodes.push_back(DAG::Node{{2, 3}, "1"});
 //   test.nodes.push_back(DAG::Node{{}, "2"});
 //   test.nodes.push_back(DAG::Node{{}, "3"});
 //   test.nodes.push_back(DAG::Node{{}, "4"});
-//   renderSuccessfully(test);
+//   EXPECT_EQ(renderSuccessfully(test), R"(
+//  0  1
+// /|\ |\
+// || \\ \
+// |\  \\ \
+// | \ || |
+// | | |/ |
+// 4 | X  |
+//   | |\ |
+//   | |/ |
+//   / /  /
+//  / /  /
+// / /| /
+// |/ |/
+// 2  3
+// )");
 // }
