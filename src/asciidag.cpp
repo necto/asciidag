@@ -1044,24 +1044,39 @@ std::optional<RenderError> checkIfEdgesFitOnNodes(DAG const& dag) {
   return {};
 }
 
-Direction chooseNextDirection(
+std::pair<Direction, Direction> chooseNextDirection(
   Position const& cur,
-  Direction startDir,
+  Direction curDir,
   Position const& to,
   Direction finishDir
 ) {
   auto targetCol = to.col - directionShift(finishDir);
   if (cur.col == targetCol) {
-    return Direction::Straight;
-  }
-  if (startDir == Direction::Straight &&
-        absDiff(cur.col, targetCol - directionShift(finishDir)) < to.line - 3 - cur.line) {
-    return Direction::Straight;
+    return {Direction::Straight, Direction::Right};
   }
   if (cur.col < targetCol) {
-    return Direction::Right;
+    if (curDir == Direction::Straight &&
+        absDiff(cur.col, targetCol - directionShift(finishDir)) < to.line - 3 - cur.line) {
+      return {Direction::Straight, Direction::Right};
+    }
+    return {Direction::Right, Direction::Straight};
   }
-  return Direction::Left;
+  if (curDir == Direction::Straight &&
+        absDiff(cur.col, targetCol - directionShift(finishDir)) < to.line - 3 - cur.line) {
+    return {Direction::Straight, Direction::Left};
+  }
+  return {Direction::Left, Direction::Straight};
+}
+
+Position nextPosInDir(Position curPos, Direction curDir, Direction nextDir) {
+  curPos.line += 1;
+  if (curDir == nextDir) {
+    // Advance when continuing in the same direction such as:
+    //  \         /
+    //   \  and  /
+    curPos.col += directionShift(nextDir);
+  }
+  return curPos;
 }
 
 size_t findTargetPos(std::vector<size_t> linkedNodes, std::vector<size_t> layer) {
@@ -1169,6 +1184,11 @@ std::string escapeForDOTlabel(std::string_view str) {
   return ret;
 }
 
+[[maybe_unused]]
+void printCanvas(std::vector<std::string>& canvas) {
+  std::cout << "------\n" << renderCanvas(canvas) << "-------\n";
+}
+
 } // namespace
 
 std::string renderCanvas(std::vector<std::string> const& canvas) {
@@ -1189,7 +1209,7 @@ void drawEdge(
 ) {
   cur.line += 1;
   cur.col += directionShift(curDir);
-  // assert(canvas[cur.line][cur.col] == ' ');
+  assert(canvas[cur.line][cur.col] == ' ');
   canvas[cur.line][cur.col] = edgeChar(curDir);
 
   assert(cur.line < to.line && to.line < canvas.size());
@@ -1200,28 +1220,85 @@ void drawEdge(
     return;
   }
 
-  while (cur.line + 2 < to.line) {
-    auto nextDir = chooseNextDirection(cur, curDir, to, finishDir);
-    if (curDir == nextDir) {
-      // Advance when continuing in the same direction such as:
-      //  \         /
-      //   \  and  /
-      cur.col += directionShift(curDir);
+  struct EdgeStep {
+    Position posWhenSelecting;
+    Position posDrawnTo;
+    Direction dirWhenSelecting;
+    std::optional<Direction> nextDir;
+  };
+
+  std::vector<EdgeStep> drawnPath;
+
+  while (true) {
+    while (cur.line + 2 < to.line) {
+      auto [nextDir, alternativeNextDir] = chooseNextDirection(cur, curDir, to, finishDir);
+      EdgeStep step;
+      step.posWhenSelecting = cur;
+      step.dirWhenSelecting = curDir;
+      auto altPos = nextPosInDir(cur, curDir, alternativeNextDir);
+      if (altPos.col < canvas[0].size() &&
+          altPos.line < canvas.size() &&
+          (canvas[altPos.line][altPos.col] == ' ')) {
+        step.nextDir = alternativeNextDir;
+      } else {
+        step.nextDir = std::nullopt;
+      }
+      cur = nextPosInDir(cur, curDir, nextDir);
+      curDir = nextDir;
+      if (canvas[cur.line][cur.col] != ' ') {
+        if (step.nextDir) {
+          // Pivot immediately
+          cur = altPos;
+          step.nextDir = std::nullopt;
+          curDir = alternativeNextDir;
+        } else {
+          break;
+        }
+      }
+      step.posDrawnTo = cur;
+      drawnPath.push_back(step);
+      assert(canvas[cur.line][cur.col] == ' ');
+      canvas[cur.line][cur.col] = edgeChar(curDir);
     }
+    assert(cur.line + 2 <= to.line);
+    bool
+      meet = cur.line + 2 == to.line
+          && (cur.col - columnShift[toInt(curDir)][toInt(finishDir)]
+              == to.col - directionShift(finishDir));
+    if (meet) {
+      break;
+    }
+    // backtrack, erasing the track
+    while (!drawnPath.empty() && !drawnPath.back().nextDir.has_value()) {
+      auto const& pos = drawnPath.back().posDrawnTo;
+      assert(canvas[pos.line][pos.col] != ' ');
+      canvas[pos.line][pos.col] = ' ';
+      drawnPath.pop_back();
+    }
+    if (drawnPath.empty()) {
+      assert(false && "Not enough height for the edge");
+    }
+    assert(drawnPath.back().nextDir.has_value());
+    assert(canvas[drawnPath.back().posDrawnTo.line][drawnPath.back().posDrawnTo.col] != ' ');
+    canvas[drawnPath.back().posDrawnTo.line][drawnPath.back().posDrawnTo.col] = ' ';
+    cur = drawnPath.back().posWhenSelecting;
+    curDir = drawnPath.back().dirWhenSelecting;
+    auto nextDir = drawnPath.back().nextDir.value();
+    cur = nextPosInDir(cur, curDir, nextDir);
+    drawnPath.back().posDrawnTo = cur;
     curDir = nextDir;
-    cur.line += 1;
-    // assert(canvas[cur.line][cur.col] == ' ');
+    assert(canvas[cur.line][cur.col] == ' ');
+    drawnPath.back().nextDir = std::nullopt;
     canvas[cur.line][cur.col] = edgeChar(curDir);
   }
 
-  assert(cur.line + 2 == to.line);
   to.line -= 1;
   to.col -= directionShift(finishDir);
   assert(
     cur.col - columnShift[toInt(curDir)][toInt(finishDir)] == to.col
     && "Not enough height for the edge"
   );
-  // assert(canvas[to.line][to.col] == ' ');
+  assert(canvas[to.line][to.col] == ' ');
   canvas[to.line][to.col] = edgeChar(finishDir);
 }
 

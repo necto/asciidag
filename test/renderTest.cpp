@@ -457,8 +457,7 @@ TEST(renderError, tooManyIncomingEdges) {
   EXPECT_EQ(err.nodeId, 4U);
 }
 
-TEST(render, conflictingEdgesFromSamePredecessorFail) {
-  // TODO: edges from node 2 overlap
+TEST(render, conflictingEdgesFromSamePredecessor) {
   DAG test;
   test.nodes.push_back(DAG::Node{{}, "0"});
   test.nodes.push_back(DAG::Node{{4}, "1"});
@@ -469,10 +468,10 @@ TEST(render, conflictingEdgesFromSamePredecessorFail) {
   EXPECT_EQ(renderSuccessfully(test), R"(
 0 1 2  3
   | |\ |
-  | |/ |
-  / /  /
- / /  /
-/ /| /
+  | || |
+  / // /
+ / // /
+/ // /
 |/ |/
 4  5
 )");

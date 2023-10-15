@@ -27,7 +27,7 @@ vector<string> derenderCanvas(string const& rendered) {
 void eraseEdgeCharacters(vector<string>& canvas) {
   for (auto& line : canvas) {
     for (auto& c : line) {
-      if (c != '.') {
+      if (c != '.' && c != '#') {
         c = ' ';
       }
     }
@@ -532,6 +532,71 @@ TEST(drawEdge, straightTurnRightBy3Len6) {
    \
     \
      .
+)";
+  EXPECT_EQ(spec, drawEdgeFromSpec(spec));
+}
+
+TEST(drawEdge, avoidOneObstacleAbove) {
+  std::string spec = R"(
+ .
+  \
+  |
+ #/
+ /
+/
+|
+.
+)";
+  EXPECT_EQ(spec, drawEdgeFromSpec(spec));
+}
+
+TEST(drawEdge, avoidTwoObstaclesAbove) {
+  std::string spec = R"(
+ .
+  \
+  /
+ #|
+ #/
+ /
+/
+|
+.
+)";
+  EXPECT_EQ(spec, drawEdgeFromSpec(spec));
+}
+
+TEST(drawEdge, avoidObstacleLeft) {
+  std::string spec = R"(
+ .
+  \
+  /
+ /
+#|
+ |
+ |
+ |
+ /
+/
+|
+.
+)";
+  EXPECT_EQ(spec, drawEdgeFromSpec(spec));
+}
+
+TEST(drawEdge, avoidObstacleInfeasibleAlternativeDirection) {
+  std::string spec = R"(
+ .
+  \
+  /
+ /#
+#|
+ |
+ |
+ |
+ /
+/
+|
+.
 )";
   EXPECT_EQ(spec, drawEdgeFromSpec(spec));
 }
