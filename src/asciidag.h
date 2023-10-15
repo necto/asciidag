@@ -59,4 +59,6 @@ std::optional<std::string> renderDAG(DAG dag, RenderError& err);
 
 std::optional<DAG> parseDAG(std::string_view str, ParseError& err);
 
+std::string toDOT(DAG const& dag);
+
 } // namespace asciidag

@@ -18,6 +18,7 @@ add_executable(
     crossingEdgesTest.cpp
     testUtils.cpp
     parseRenderTest.cpp
+    dotTest.cpp
     )
 
 target_link_libraries(unit_tests

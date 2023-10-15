@@ -1145,6 +1145,30 @@ void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag)
   }
 }
 
+std::string escapeForDOTlabel(std::string_view str) {
+  std::string ret;
+  ret.reserve(str.size());
+  for (char c : str) {
+    switch (c) {
+      case '\n':
+        ret += "\\n";
+        break;
+      case '\t':
+        ret += "\\t";
+        break;
+      case '"':
+      case '{':
+      case '}':
+        ret += '\\';
+        ret += c;
+        break;
+      default:
+        ret += c;
+    }
+  }
+  return ret;
+}
+
 } // namespace
 
 std::string renderCanvas(std::vector<std::string> const& canvas) {
@@ -1345,26 +1369,42 @@ std::ostream& operator<<(std::ostream& os, ParseError const& err) {
 }
 
 std::ostream& operator<<(std::ostream& os, DAG const& dag) {
-  os <<"DAG{";
+  os << "DAG{";
   bool first = true;
   for (auto const& node : dag.nodes) {
     if (!first) {
-      os <<", ";
+      os << ", ";
     }
-    os <<node.text <<"->[";
+    os << node.text << "->[";
     bool firstInner = true;
     for (size_t succ : node.succs) {
       if (!firstInner) {
-        os <<", ";
+        os << ", ";
       }
-      os <<dag.nodes[succ].text;
+      os << dag.nodes[succ].text;
       firstInner = false;
     }
-    os <<"]";
+    os << "]";
     first = false;
   }
-  return os <<"}";
+  return os << "}";
 }
 
+std::string toDOT(DAG const& dag) {
+  static std::string const idPrefix = "n";
+  static std::string const indent = "  ";
+  std::string ret = "digraph \"DAG\" {\n";
+  for (size_t i = 0; i < dag.nodes.size(); ++i) {
+    auto iStr = std::to_string(i);
+    ret +=
+      indent + idPrefix + iStr + "[shape=record,label=\"" + escapeForDOTlabel(dag.nodes[i].text)
+      + "\"];\n";
+    for (size_t succ : dag.nodes[i].succs) {
+      ret += indent + idPrefix + iStr + " -> " + idPrefix + std::to_string(succ) + ";\n";
+    }
+    ret += "\n";
+  }
+  return ret + "}\n";
+}
 
 } // namespace asciidag
