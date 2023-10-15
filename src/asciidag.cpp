@@ -9,10 +9,10 @@
 #include <iostream>
 #include <optional>
 #include <set>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <sstream>
 
 namespace asciidag {
 
@@ -989,41 +989,12 @@ void placeEdges(
   }
 }
 
-std::optional<RenderError> checkDAGCompat(DAG const& dag) {
-  for (size_t n = 0; n < dag.nodes.size(); ++n) {
-    if (dag.nodes[n].text.size() != 1) {
-      return {
-        {RenderError::Code::Unsupported, "Zero- or multi-character nodes are not supported.", n}
-      };
-    }
-  }
-  return {};
-}
-
-std::optional<RenderError> checkIfEdgesFitOnNodes(DAG const& dag) {
-  size_t const N = dag.nodes.size();
-  std::vector<size_t> incomingEdgesPerNode(N, 0);
-
-  for (size_t i = 0; i < N; ++i) {
-    auto const& n = dag.nodes[i];
-    if (3 < n.succs.size()) {
-      return {
-        {RenderError::Code::Overcrowded, "Too many outgoing edges from a node, they don't fit.", i}
-      };
-    }
-    for (auto const& s : n.succs) {
-      ++incomingEdgesPerNode[s];
-    }
-  }
-  for (size_t i = 0; i < N; ++i) {
-    if (3 < incomingEdgesPerNode[i]) {
-      return {
-        {RenderError::Code::Overcrowded, "Too many incoming edges to a node, they don't fit.", i}
-      };
-    }
-  }
-  return {};
-}
+struct EdgeStep {
+  Position posWhenSelecting;
+  Position posDrawnTo;
+  Direction dirWhenSelecting;
+  std::optional<Direction> nextDir;
+};
 
 std::pair<Direction, Direction> chooseNextDirection(
   Position const& cur,
@@ -1058,6 +1029,84 @@ Position nextPosInDir(Position curPos, Direction curDir, Direction nextDir) {
     curPos.col += directionShift(nextDir);
   }
   return curPos;
+}
+
+bool tryDrawLine(
+  Position cur,
+  Direction curDir,
+  Position const& to,
+  Direction const finishDir,
+  Canvas& canvas,
+  std::vector<EdgeStep> &drawnPath
+) {
+  while (cur.line + 2 < to.line) {
+    auto [nextDir, alternativeNextDir] = chooseNextDirection(cur, curDir, to, finishDir);
+    EdgeStep step;
+    step.posWhenSelecting = cur;
+    step.dirWhenSelecting = curDir;
+    auto altPos = nextPosInDir(cur, curDir, alternativeNextDir);
+    if (altPos.col < canvas.width() && altPos.line < canvas.height() && canvas.isEmpty(altPos)) {
+      step.nextDir = alternativeNextDir;
+    } else {
+      step.nextDir = std::nullopt;
+    }
+    cur = nextPosInDir(cur, curDir, nextDir);
+    curDir = nextDir;
+    if (!canvas.isEmpty(cur)) {
+      if (step.nextDir) {
+        // Pivot immediately
+        cur = altPos;
+        step.nextDir = std::nullopt;
+        curDir = alternativeNextDir;
+      } else {
+        break;
+      }
+    }
+    step.posDrawnTo = cur;
+    drawnPath.push_back(step);
+    canvas.newMark(cur, edgeChar(curDir));
+  }
+  assert(cur.line + 2 <= to.line);
+  bool reachedTheLine = cur.line + 2 == to.line;
+  bool reachedTheColumn = cur.col - columnShift[toInt(curDir)][toInt(finishDir)]
+            == to.col - directionShift(finishDir);
+  return reachedTheLine && reachedTheColumn;
+}
+
+std::optional<RenderError> checkDAGCompat(DAG const& dag) {
+  for (size_t n = 0; n < dag.nodes.size(); ++n) {
+    if (dag.nodes[n].text.size() != 1) {
+      return {
+        {RenderError::Code::Unsupported, "Zero- or multi-character nodes are not supported.", n}
+      };
+    }
+  }
+  return {};
+}
+
+std::optional<RenderError> checkIfEdgesFitOnNodes(DAG const& dag) {
+  size_t const N = dag.nodes.size();
+  std::vector<size_t> incomingEdgesPerNode(N, 0);
+
+  for (size_t i = 0; i < N; ++i) {
+    auto const& n = dag.nodes[i];
+    if (3 < n.succs.size()) {
+      return {
+        {RenderError::Code::Overcrowded, "Too many outgoing edges from a node, they don't fit.", i}
+      };
+    }
+    for (auto const& s : n.succs) {
+      ++incomingEdgesPerNode[s];
+    }
+  }
+  for (size_t i = 0; i < N; ++i) {
+    if (3 < incomingEdgesPerNode[i]) {
+      return {
+        {RenderError::Code::Overcrowded, "Too many incoming edges to a node, they don't fit.", i}
+      };
+    }
+  }
+  return {};
 }
 
 size_t findTargetPos(std::vector<size_t> linkedNodes, std::vector<size_t> layer) {
@@ -1185,49 +1234,12 @@ void drawEdge(Position cur, Direction curDir, Position to, Direction finishDir, 
     return;
   }
 
-  struct EdgeStep {
-    Position posWhenSelecting;
-    Position posDrawnTo;
-    Direction dirWhenSelecting;
-    std::optional<Direction> nextDir;
-  };
-
   std::vector<EdgeStep> drawnPath;
 
+  bool succeded = false;
   while (true) {
-    while (cur.line + 2 < to.line) {
-      auto [nextDir, alternativeNextDir] = chooseNextDirection(cur, curDir, to, finishDir);
-      EdgeStep step;
-      step.posWhenSelecting = cur;
-      step.dirWhenSelecting = curDir;
-      auto altPos = nextPosInDir(cur, curDir, alternativeNextDir);
-      if (altPos.col < canvas.width() && altPos.line < canvas.height() && canvas.isEmpty(altPos)) {
-        step.nextDir = alternativeNextDir;
-      } else {
-        step.nextDir = std::nullopt;
-      }
-      cur = nextPosInDir(cur, curDir, nextDir);
-      curDir = nextDir;
-      if (!canvas.isEmpty(cur)) {
-        if (step.nextDir) {
-          // Pivot immediately
-          cur = altPos;
-          step.nextDir = std::nullopt;
-          curDir = alternativeNextDir;
-        } else {
-          break;
-        }
-      }
-      step.posDrawnTo = cur;
-      drawnPath.push_back(step);
-      canvas.newMark(cur, edgeChar(curDir));
-    }
-    assert(cur.line + 2 <= to.line);
-    bool
-      meet = cur.line + 2 == to.line
-          && (cur.col - columnShift[toInt(curDir)][toInt(finishDir)]
-              == to.col - directionShift(finishDir));
-    if (meet) {
+    succeded = tryDrawLine(cur, curDir, to, finishDir, canvas, drawnPath);
+    if (succeded) {
       break;
     }
     // backtrack, erasing the track
@@ -1252,10 +1264,7 @@ void drawEdge(Position cur, Direction curDir, Position to, Direction finishDir, 
 
   to.line -= 1;
   to.col -= directionShift(finishDir);
-  assert(
-    cur.col - columnShift[toInt(curDir)][toInt(finishDir)] == to.col
-    && "Not enough height for the edge"
-  );
+  assert(succeded && "Not enough height for the edge");
   canvas.newMark(to, edgeChar(finishDir));
 }
 
@@ -1495,7 +1504,6 @@ Canvas Canvas::create(std::vector<Position> const& coordinates) {
   ret.lines = std::vector<std::string>(max.line + 1, std::string(max.col + 2, ' '));
   return ret;
 }
-
 
 Canvas Canvas::fromString(std::string const& rendered) {
   Canvas ret;
