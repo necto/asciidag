@@ -11,6 +11,7 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <unistd.h>
 #include <unordered_map>
 #include <vector>
 
@@ -990,9 +991,9 @@ void placeEdges(
 }
 
 struct EdgeStep {
-  Position posWhenSelecting;
-  Position posDrawnTo;
-  Direction dirWhenSelecting;
+  Position initialPos;
+  Position markedPos;
+  Direction initialDir;
   std::optional<Direction> nextDir;
 };
 
@@ -1031,19 +1032,37 @@ Position nextPosInDir(Position curPos, Direction curDir, Direction nextDir) {
   return curPos;
 }
 
+void eraseAndBacktrackToLastChoice(std::vector<EdgeStep>& drawnPath, Canvas& canvas) {
+  while (!drawnPath.empty() && !drawnPath.back().nextDir.has_value()) {
+    canvas.clearPos(drawnPath.back().markedPos);
+    drawnPath.pop_back();
+  }
+  if (!drawnPath.empty()) {
+    canvas.clearPos(drawnPath.back().markedPos);
+  }
+}
+
 bool tryDrawLine(
-  Position cur,
-  Direction curDir,
   Position const& to,
-  Direction const finishDir,
+  Direction const entryDir,
   Canvas& canvas,
   std::vector<EdgeStep> &drawnPath
 ) {
+  assert(!drawnPath.empty());
+  EdgeStep& lastStep = drawnPath.back();
+  auto nextDir = *drawnPath.back().nextDir;
+  lastStep.initialPos = nextPosInDir(lastStep.initialPos, lastStep.initialDir, nextDir);
+  canvas.newMark(lastStep.initialPos, edgeChar(nextDir));
+  drawnPath.back().markedPos = lastStep.initialPos;
+  drawnPath.back().nextDir = std::nullopt;
+
+  Direction curDir = nextDir;
+  Position cur = lastStep.initialPos;
   while (cur.line + 2 < to.line) {
-    auto [nextDir, alternativeNextDir] = chooseNextDirection(cur, curDir, to, finishDir);
+    auto [nextDir, alternativeNextDir] = chooseNextDirection(cur, curDir, to, entryDir);
     EdgeStep step;
-    step.posWhenSelecting = cur;
-    step.dirWhenSelecting = curDir;
+    step.initialPos = cur;
+    step.initialDir = curDir;
     auto altPos = nextPosInDir(cur, curDir, alternativeNextDir);
     if (altPos.col < canvas.width() && altPos.line < canvas.height() && canvas.isEmpty(altPos)) {
       step.nextDir = alternativeNextDir;
@@ -1056,20 +1075,20 @@ bool tryDrawLine(
       if (step.nextDir) {
         // Pivot immediately
         cur = altPos;
+        curDir = *step.nextDir;
         step.nextDir = std::nullopt;
-        curDir = alternativeNextDir;
       } else {
         break;
       }
     }
-    step.posDrawnTo = cur;
+    step.markedPos = cur;
     drawnPath.push_back(step);
     canvas.newMark(cur, edgeChar(curDir));
   }
   assert(cur.line + 2 <= to.line);
   bool reachedTheLine = cur.line + 2 == to.line;
-  bool reachedTheColumn = cur.col - columnShift[toInt(curDir)][toInt(finishDir)]
-            == to.col - directionShift(finishDir);
+  bool reachedTheColumn = cur.col - columnShift[toInt(curDir)][toInt(entryDir)]
+            == to.col - directionShift(entryDir);
   return reachedTheLine && reachedTheColumn;
 }
 
@@ -1221,51 +1240,43 @@ void printCanvas(Canvas const& canvas) {
 
 } // namespace
 
-void drawEdge(Position cur, Direction curDir, Position to, Direction finishDir, Canvas& canvas) {
-  cur.line += 1;
-  cur.col += directionShift(curDir);
-  canvas.newMark(cur, edgeChar(curDir));
+void drawEdge(
+  Position fromPos,
+  Direction exitDir,
+  Position to,
+  Direction entryDir,
+  Canvas& canvas
+) {
+  assert(fromPos.line + 1 < to.line && to.line < canvas.height());
+  assert(fromPos.col < canvas.width() && to.col < canvas.width());
 
-  assert(cur.line < to.line && to.line < canvas.height());
-  assert(cur.col < canvas.width() && to.col < canvas.width());
+  std::vector<EdgeStep> drawnPath;
+  drawnPath.emplace_back();
+  drawnPath.back().initialPos = fromPos;
+  drawnPath.back().initialDir = exitDir;
+  drawnPath.back().nextDir = exitDir;
+  fromPos = nextPosInDir(fromPos, exitDir, exitDir);
+  canvas.newMark(fromPos, edgeChar(exitDir));
+  drawnPath.back().markedPos = fromPos;
 
-  if (cur.line + 1 == to.line) {
-    assert(curDir == finishDir);
+  if (fromPos.line + 1 == to.line) {
+    assert(exitDir == entryDir);
     return;
   }
 
-  std::vector<EdgeStep> drawnPath;
-
   bool succeded = false;
-  while (true) {
-    succeded = tryDrawLine(cur, curDir, to, finishDir, canvas, drawnPath);
-    if (succeded) {
-      break;
-    }
-    // backtrack, erasing the track
-    while (!drawnPath.empty() && !drawnPath.back().nextDir.has_value()) {
-      canvas.clearPos(drawnPath.back().posDrawnTo);
-      drawnPath.pop_back();
-    }
+  do {
+    eraseAndBacktrackToLastChoice(drawnPath, canvas);
     if (drawnPath.empty()) {
       assert(false && "Not enough height for the edge");
+      return;
     }
-    assert(drawnPath.back().nextDir.has_value());
-    canvas.clearPos(drawnPath.back().posDrawnTo);
-    cur = drawnPath.back().posWhenSelecting;
-    curDir = drawnPath.back().dirWhenSelecting;
-    auto nextDir = drawnPath.back().nextDir.value();
-    cur = nextPosInDir(cur, curDir, nextDir);
-    drawnPath.back().posDrawnTo = cur;
-    curDir = nextDir;
-    drawnPath.back().nextDir = std::nullopt;
-    canvas.newMark(cur, edgeChar(curDir));
-  }
+    succeded = tryDrawLine(to, entryDir, canvas, drawnPath);
+  } while (!succeded);
 
   to.line -= 1;
-  to.col -= directionShift(finishDir);
-  assert(succeded && "Not enough height for the edge");
-  canvas.newMark(to, edgeChar(finishDir));
+  to.col -= directionShift(entryDir);
+  canvas.newMark(to, edgeChar(entryDir));
 }
 
 std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
