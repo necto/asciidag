@@ -664,6 +664,25 @@ TEST(drawEdgeError, tryingToAvoidThreeObstaclesAbove) {
   EXPECT_TRUE(drawEdgeFromSpecFails(spec));
 }
 
+TEST(drawEdgeError, limitedFlexibility) {
+  // The edge path finding is limited to a narrow set of options
+  // not deviating too far from the target direction.
+  // Here it fails to find the path that requires it to step to an opposite direction
+  // before locking on the target.
+  std::string spec = R"(
+  .
+  |
+  /
+ /##
+ \
+  \
+   \
+    \
+     .
+)";
+  EXPECT_TRUE(drawEdgeFromSpecFails(spec));
+}
+
 } // namespace
 
 // TODO: all the test from above but mirrored
