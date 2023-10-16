@@ -27,9 +27,7 @@ DAG canonicalDAG(DAG const& orig) {
     for (size_t &succ : node.succs) {
       succ = idMap[succ];
     }
-    std::sort(node.succs.begin(), node.succs.end(), [&](size_t a, size_t b) {
-      return ret.nodes[a].text < ret.nodes[b].text;
-    });
+    std::sort(node.succs.begin(), node.succs.end());
   }
   return ret;
 }
