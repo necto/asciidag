@@ -1050,13 +1050,12 @@ bool tryDrawLine(
 ) {
   assert(!drawnPath.empty());
   EdgeStep& lastStep = drawnPath.back();
-  auto nextDir = *drawnPath.back().nextDir;
-  lastStep.initialPos = nextPosInDir(lastStep.initialPos, lastStep.initialDir, nextDir);
-  canvas.newMark(lastStep.initialPos, edgeChar(nextDir));
-  drawnPath.back().markedPos = lastStep.initialPos;
-  drawnPath.back().nextDir = std::nullopt;
+  Direction curDir = *lastStep.nextDir;
+  lastStep.initialPos = nextPosInDir(lastStep.initialPos, lastStep.initialDir, curDir);
+  canvas.newMark(lastStep.initialPos, edgeChar(curDir));
+  lastStep.markedPos = lastStep.initialPos;
+  lastStep.nextDir = std::nullopt;
 
-  Direction curDir = nextDir;
   Position cur = lastStep.initialPos;
   while (cur.line + 2 < to.line) {
     auto [nextDir, alternativeNextDir] = chooseNextDirection(cur, curDir, to, entryDir);
@@ -1064,7 +1063,7 @@ bool tryDrawLine(
     step.initialPos = cur;
     step.initialDir = curDir;
     auto altPos = nextPosInDir(cur, curDir, alternativeNextDir);
-    if (altPos.col < canvas.width() && altPos.line < canvas.height() && canvas.isEmpty(altPos)) {
+    if (canvas.inBounds(altPos) && canvas.isEmpty(altPos)) {
       step.nextDir = alternativeNextDir;
     } else {
       step.nextDir = std::nullopt;
@@ -1461,24 +1460,25 @@ std::string toDOT(DAG const& dag) {
   return ret + "}\n";
 }
 
+bool Canvas::inBounds(Position const& pos) const {
+  return pos.line < lines.size() && pos.col < lines[0].size();
+}
+
 void Canvas::newMark(Position const& pos, char c) {
-  assert(pos.line < lines.size());
-  assert(pos.col < lines[0].size());
+  assert(inBounds(pos));
   assert(lines[pos.line][pos.col] == ' ');
   assert(c != ' ');
   lines[pos.line][pos.col] = c;
 }
 
 void Canvas::clearPos(Position const& pos) {
-  assert(pos.line < lines.size());
-  assert(pos.col < lines[0].size());
+  assert(inBounds(pos));
   assert(lines[pos.line][pos.col] != ' ');
   lines[pos.line][pos.col] = ' ';
 }
 
 char Canvas::getChar(Position const& pos) const {
-  assert(pos.line < lines.size());
-  assert(pos.col < lines[0].size());
+  assert(inBounds(pos));
   return lines[pos.line][pos.col];
 }
 

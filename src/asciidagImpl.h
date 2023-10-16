@@ -20,6 +20,7 @@ public:
   bool isEmpty(Position const& pos) const { return getChar(pos) == ' '; }
   size_t width() const;
   size_t height() const;
+  bool inBounds(Position const& pos) const;
 
   std::string render() const;
 
