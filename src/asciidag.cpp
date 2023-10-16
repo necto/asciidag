@@ -13,9 +13,12 @@
 #include <string>
 #include <unistd.h>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace asciidag {
+
+auto WaypointText = "|";
 
 namespace {
 
@@ -82,7 +85,7 @@ std::optional<RenderError> insertEdgeWaypoints(DAG& dag, std::vector<std::vector
         for (auto l = layerI + 1; l < rank[finalSucc]; ++l) {
           size_t nodeId = dag.nodes.size();
           *lastEdge = nodeId;
-          dag.nodes.push_back({{0}, "|"});
+          dag.nodes.push_back({{0}, WaypointText});
           layers[l].push_back(nodeId);
           lastEdge = &dag.nodes.back().succs.back();
           // No need to add it to rank
@@ -101,19 +104,67 @@ struct CrossingPair {
   size_t toRight;
 };
 
-std::vector<CrossingPair> findCrossings(
+struct SimpleEdge {
+  size_t from;
+  size_t to;
+  bool operator==(const SimpleEdge& other) const {
+    return std::tie(from, to) == std::tie(other.from, other.to);
+  }
+};
+
+struct SimpleEdgeHash {
+  size_t operator()(const SimpleEdge& e) const noexcept {
+    return e.from ^ (e.to << 1);
+  }
+};
+
+
+std::vector<CrossingPair> findNonConflictingCrossings(
   DAG const& dag,
   std::vector<size_t> const& lAbove,
   std::vector<size_t> const& lBelow
 ) {
   std::vector<CrossingPair> ret;
+  std::unordered_set<SimpleEdge, SimpleEdgeHash> takenEdges;
+  // TODO: These 5 nested loops can definitely be optmized
+  for (size_t leftTopPos = 0; leftTopPos < lAbove.size(); ++leftTopPos) {
+    for (size_t rightBottom : dag.nodes[lAbove[leftTopPos]].succs) {
+      for (size_t rightTopPos = leftTopPos + 1; rightTopPos < lAbove.size(); ++rightTopPos) {
+        bool found = false;
+        for (size_t leftBottom : dag.nodes[lAbove[rightTopPos]].succs) {
+          SimpleEdge edge{lAbove[rightTopPos], leftBottom};
+          if (takenEdges.count(edge) == 0 &&
+              findIndex(lBelow, leftBottom) < findIndex(lBelow, rightBottom)) {
+            takenEdges.insert(edge);
+            ret.push_back({lAbove[leftTopPos], lAbove[rightTopPos], leftBottom, rightBottom});
+            found = true;
+            break;
+          }
+        }
+        if (found) {
+          // For any edge
+          // can only resolve one crossing at a time
+          break;
+        }
+      }
+    }
+  }
+  return ret;
+}
+
+size_t countCrossings(
+  DAG const& dag,
+  std::vector<size_t> const& lAbove,
+  std::vector<size_t> const& lBelow
+) {
+  size_t ret = 0;
   // TODO: These 5 nested loops can definitely be optmized
   for (size_t leftTopPos = 0; leftTopPos < lAbove.size(); ++leftTopPos) {
     for (size_t rightTopPos = leftTopPos + 1; rightTopPos < lAbove.size(); ++rightTopPos) {
       for (size_t rightBottom : dag.nodes[lAbove[leftTopPos]].succs) {
         for (size_t leftBottom : dag.nodes[lAbove[rightTopPos]].succs) {
           if (findIndex(lBelow, leftBottom) < findIndex(lBelow, rightBottom)) {
-            ret.push_back({lAbove[leftTopPos], lAbove[rightTopPos], leftBottom, rightBottom});
+            ++ret;
           }
         }
       }
@@ -137,7 +188,8 @@ void insertCrossNode(DAG& dag, CrossingPair const& crossing) {
 void insertCrossNodes(DAG& dag, std::vector<std::vector<size_t>> const& layers) {
   // TODO: this might not widthstand multiple crossings between edge packs
   for (size_t layerI = 1; layerI < layers.size(); ++layerI) {
-    for (auto const& crossing : findCrossings(dag, layers[layerI - 1], layers[layerI])) {
+    for (auto const& crossing :
+         findNonConflictingCrossings(dag, layers[layerI - 1], layers[layerI])) {
       insertCrossNode(dag, crossing);
     }
   }
@@ -1158,6 +1210,17 @@ void swapEquipotentialNeighbors(
   }
 }
 
+size_t countAllCrossings(std::vector<std::vector<size_t>> const& layers, DAG const& dag) {
+  size_t ret = 0;
+  size_t const nLayers = layers.size();
+  for (size_t layerI = 1; layerI < nLayers; ++layerI) {
+    auto const& prevLayer = layers[layerI - 1];
+    auto& curLayer = layers[layerI];
+    ret += countCrossings(dag, prevLayer, curLayer);
+  }
+  return ret;
+}
+
 void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag) {
   std::vector<std::vector<size_t>> preds(dag.nodes.size());
   for (size_t i = 0; i < dag.nodes.size(); ++i) {
@@ -1179,7 +1242,7 @@ void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag)
       return targetPos[n1id] < targetPos[n2id];
     });
     swapEquipotentialNeighbors(targetPos, curLayer, [&dag, &prevLayer](auto const& curLayer) {
-      return findCrossings(dag, prevLayer, curLayer).size();
+      return countCrossings(dag, prevLayer, curLayer);
     });
   }
   // Backward pass
@@ -1200,7 +1263,7 @@ void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag)
       return targetPos[n1id] < targetPos[n2id];
     });
     swapEquipotentialNeighbors(targetPos, curLayer, [&dag, &nextLayer](auto const& curLayer) {
-      return findCrossings(dag, curLayer, nextLayer).size();
+      return countCrossings(dag, curLayer, nextLayer);
     });
   }
 }
@@ -1291,18 +1354,25 @@ std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
     return {};
   }
   minimizeCrossings(layers, dag);
-  insertCrossNodes(dag, layers); // Invalidates layers
-  layers = dagLayers(dag);
-  auto waypointErr = insertEdgeWaypoints(dag, layers);
-  assert(!waypointErr.has_value());
-  // TODO: will this preserve the edge direction over the crossings?
-  // i.e. in a   b
-  //          \ /
-  //           X
-  //          / \
-  //         c   d
-  // one cannot simply swap c & d
-  minimizeCrossings(layers, dag);
+
+  for (int i = 0; i < 10; ++i) {
+    if (countAllCrossings(layers, dag) == 0) {
+      break;
+    }
+    insertCrossNodes(dag, layers); // Invalidates layers
+    layers = dagLayers(dag);
+    auto waypointErr = insertEdgeWaypoints(dag, layers);
+    assert(!waypointErr.has_value());
+    // TODO: will this preserve the edge direction over the crossings?
+    // i.e. in a   b
+    //          \ /
+    //           X
+    //          / \
+    //         c   d
+    // one cannot simply swap c & d
+    minimizeCrossings(layers, dag);
+  }
+
   auto coords = computeNodeCoordinates(dag, layers);
   auto const connectivity = computeConnectivity(dag, coords);
   adjustCoordsWithValencies(coords, connectivity, layers);
