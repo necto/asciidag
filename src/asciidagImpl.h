@@ -29,6 +29,7 @@ private:
   std::vector<std::string> lines;
 };
 
-void drawEdge(Position cur, Direction curDir, Position to, Direction finishDir, Canvas& canvas);
+/// Returns false if it failed to draw the edge
+bool drawEdge(Position cur, Direction curDir, Position to, Direction finishDir, Canvas& canvas);
 
 } // namespace asciidag

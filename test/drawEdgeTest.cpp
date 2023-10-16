@@ -18,7 +18,7 @@ void eraseEdgeCharacters(Canvas& canvas) {
   }
 }
 
-Direction getEntryAngle(Position dotPos, Canvas& canvas) {
+Direction getEntryAngle(Position dotPos, Canvas const& canvas) {
   assert(0 < dotPos.line);
   if (0 < dotPos.col && canvas.getChar({dotPos.line - 1, dotPos.col - 1}) == '\\') {
     return Direction::Right;
@@ -31,7 +31,7 @@ Direction getEntryAngle(Position dotPos, Canvas& canvas) {
   return Direction::Left;
 }
 
-Direction getExitAngle(Position dotPos, Canvas& canvas) {
+Direction getExitAngle(Position dotPos, Canvas const& canvas) {
   assert(dotPos.line < canvas.height());
   if (0 < dotPos.col && canvas.getChar({dotPos.line + 1, dotPos.col - 1}) == '/') {
     return Direction::Left;
@@ -44,14 +44,14 @@ Direction getExitAngle(Position dotPos, Canvas& canvas) {
   return Direction::Right;
 }
 
-string drawEdgeFromSpec(string const& spec) {
+std::tuple<Position, Direction, Position, Direction>
+extractStartAndFinish(Canvas const& canvas) {
   Position from;
   Direction fromAngle;
-  bool fromFound = false;
   Position to;
   Direction toAngle;
+  bool fromFound = false;
   bool toFound = false;
-  auto canvas = Canvas::fromString(spec);
   for (size_t lineNum = 0; lineNum < canvas.height(); ++lineNum) {
     for (size_t col = 0; col < canvas.width(); ++col) {
       if (canvas.getChar({lineNum, col}) == '.') {
@@ -69,9 +69,24 @@ string drawEdgeFromSpec(string const& spec) {
     }
   }
   assert(fromFound && toFound);
+  return {from, fromAngle, to, toAngle};
+}
+
+string drawEdgeFromSpec(string const& spec) {
+  auto canvas = Canvas::fromString(spec);
+  auto [from, fromAngle, to, toAngle] = extractStartAndFinish(canvas);
   eraseEdgeCharacters(canvas);
-  drawEdge(from, fromAngle, to, toAngle, canvas);
+  bool success = drawEdge(from, fromAngle, to, toAngle, canvas);
+  EXPECT_TRUE(success);
   return canvas.render();
+}
+
+bool drawEdgeFromSpecFails(string const& spec) {
+  auto canvas = Canvas::fromString(spec);
+  auto [from, fromAngle, to, toAngle] = extractStartAndFinish(canvas);
+  eraseEdgeCharacters(canvas);
+  bool success = drawEdge(from, fromAngle, to, toAngle, canvas);
+  return !success;
 }
 
 TEST(drawEdge, straightDownLen1) {
@@ -583,6 +598,70 @@ TEST(drawEdge, avoidObstacleInfeasibleAlternativeDirection) {
 .
 )";
   EXPECT_EQ(spec, drawEdgeFromSpec(spec));
+}
+
+TEST(drawEdgeError, incompatibleDirections) {
+  std::string spec = R"(
+  .
+   \
+   \
+    .
+)";
+  EXPECT_TRUE(drawEdgeFromSpecFails(spec));
+}
+
+TEST(drawEdgeError, tooFarRight) {
+  std::string spec = R"(
+  .
+  |
+  \
+   \
+    \
+     |
+     .
+)";
+  EXPECT_TRUE(drawEdgeFromSpecFails(spec));
+}
+
+TEST(drawEdgeError, unavoidableObstacle) {
+  std::string spec = R"(
+  .
+  |
+  \
+   #
+    \
+    |
+    .
+)";
+  EXPECT_TRUE(drawEdgeFromSpecFails(spec));
+}
+
+TEST(drawEdgeError, almostAvoidableObstacle) {
+  std::string spec = R"(
+  .
+  |
+  \
+  #\
+   /
+  |
+  .
+)";
+  EXPECT_TRUE(drawEdgeFromSpecFails(spec));
+}
+
+TEST(drawEdgeError, tryingToAvoidThreeObstaclesAbove) {
+  std::string spec = R"(
+ .
+  \
+  /
+ #|
+ #/
+ #
+/
+|
+.
+)";
+  EXPECT_TRUE(drawEdgeFromSpecFails(spec));
 }
 
 } // namespace
