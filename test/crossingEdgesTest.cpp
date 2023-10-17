@@ -62,7 +62,7 @@ R"(
 )");
 }
 
-TEST(crossingEdgesTest, crossOnOneOfTwoLayersFail) {
+TEST(crossingEdgesTest, crossOnOneOfTwoLayers) {
   EXPECT_EQ(parseAndRender(R"(
    0   1
   /|\ /|
