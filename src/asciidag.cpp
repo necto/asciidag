@@ -1038,6 +1038,7 @@ void placeEdges(
   Canvas& canvas
 ) {
   for (auto const& e : edges) {
+    // TODO: assert that it returns true = success
     drawEdge(coordinates[e.from], e.exitAngle, coordinates[e.to], e.entryAngle, canvas);
   }
 }
@@ -1176,14 +1177,14 @@ std::optional<RenderError> checkIfEdgesFitOnNodes(DAG const& dag) {
   return {};
 }
 
-size_t findTargetPos(std::vector<size_t> linkedNodes, std::vector<size_t> layer) {
+size_t findTargetPosTimes6(std::vector<size_t> linkedNodes, std::vector<size_t> layer) {
   size_t const count = linkedNodes.size();
   assert(0 < count && "Leaf or root node on a non-first layer");
   size_t sum = 0;
   for (auto pred : linkedNodes) {
     sum += findIndex(layer, pred);
   }
-  return sum / count;
+  return sum * 6 / count;
 }
 
 template <typename Callable>
@@ -1229,19 +1230,19 @@ void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag)
     }
   }
   // Forward pass
-  std::vector<size_t> targetPos(dag.nodes.size());
+  std::vector<size_t> targetPos6(dag.nodes.size());
   size_t const nLayers = layers.size();
   for (size_t layerI = 1; layerI < nLayers; ++layerI) {
     auto const& prevLayer = layers[layerI - 1];
     auto& curLayer = layers[layerI];
     for (size_t nId : curLayer) {
       assert(0 < preds[nId].size() && "Root node can only be on the 0-th layer.");
-      targetPos[nId] = findTargetPos(preds[nId], prevLayer);
+      targetPos6[nId] = findTargetPosTimes6(preds[nId], prevLayer);
     }
-    std::stable_sort(curLayer.begin(), curLayer.end(), [&targetPos](size_t n1id, size_t n2id) {
-      return targetPos[n1id] < targetPos[n2id];
+    std::stable_sort(curLayer.begin(), curLayer.end(), [&targetPos6](size_t n1id, size_t n2id) {
+      return targetPos6[n1id] < targetPos6[n2id];
     });
-    swapEquipotentialNeighbors(targetPos, curLayer, [&dag, &prevLayer](auto const& curLayer) {
+    swapEquipotentialNeighbors(targetPos6, curLayer, [&dag, &prevLayer](auto const& curLayer) {
       return countCrossings(dag, prevLayer, curLayer);
     });
   }
@@ -1254,17 +1255,27 @@ void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag)
       auto const& succs = dag.nodes[nId].succs;
       if (succs.empty()) {
         // No successors, stay where you are
-        targetPos[nId] = position;
+        targetPos6[nId] = position * 6;
       } else {
-        targetPos[nId] = findTargetPos(succs, nextLayer);
+        targetPos6[nId] = findTargetPosTimes6(succs, nextLayer);
       }
     }
-    std::stable_sort(curLayer.begin(), curLayer.end(), [&targetPos](size_t n1id, size_t n2id) {
-      return targetPos[n1id] < targetPos[n2id];
+    auto layerCopy = curLayer;
+    size_t totCrossings =
+      countCrossings(dag, curLayer, nextLayer)
+      + (i + 1 < nLayers ? countCrossings(dag, layers[nLayers - i - 2], curLayer) : 0);
+    std::stable_sort(curLayer.begin(), curLayer.end(), [&targetPos6](size_t n1id, size_t n2id) {
+      return targetPos6[n1id] < targetPos6[n2id];
     });
-    swapEquipotentialNeighbors(targetPos, curLayer, [&dag, &nextLayer](auto const& curLayer) {
+    swapEquipotentialNeighbors(targetPos6, curLayer, [&dag, &nextLayer](auto const& curLayer) {
       return countCrossings(dag, curLayer, nextLayer);
     });
+    size_t newCrossings =
+      countCrossings(dag, curLayer, nextLayer)
+      + (i + 1 < nLayers ? countCrossings(dag, layers[nLayers - i - 2], curLayer) : 0);
+    if (totCrossings < newCrossings) {
+      curLayer = layerCopy;
+    }
   }
 }
 
