@@ -800,6 +800,11 @@ struct Connectivity {
   std::vector<Valency> nodeValencies;
 };
 
+bool operator<(Connectivity::Edge const& a, Connectivity::Edge const& b) {
+  return std::tie(a.from, a.exitAngle, a.to, a.entryAngle)
+       < std::tie(b.from, b.exitAngle, b.to, b.entryAngle);
+}
+
 size_t absDiff(size_t a, size_t b) {
   return a > b ? a - b : b - a;
 }
@@ -953,6 +958,7 @@ Connectivity computeConnectivity(DAG const& dag, std::vector<Position> const& co
   }
   setEntryAngles(ret, predEdges, coords);
   setExitAngles(ret, succEdges, coords);
+  std::sort(ret.edges.begin(), ret.edges.end());
   return ret;
 }
 
@@ -1027,9 +1033,27 @@ void placeNodes(DAG const& dag, std::vector<Position> const& coordinates, Canvas
   }
 }
 
+[[maybe_unused]]
+void printCanvas(Canvas const& canvas) {
+  std::cout << "------\n" << canvas.render() << "-------\n";
+}
+
 std::string rtrim(std::string s) {
   s.erase(s.find_last_not_of(' ') + 1);
   return s;
+}
+
+template <typename T>
+bool isSorted(T list) {
+  if (list.begin() == list.end()) {
+    return true;
+  }
+  for (auto i = list.begin(), j = i + 1; j < list.end(); i = j++) {
+    if (*j < *i) {
+      return false;
+    }
+  }
+  return true;
 }
 
 void placeEdges(
@@ -1037,6 +1061,7 @@ void placeEdges(
   std::vector<Connectivity::Edge> const& edges,
   Canvas& canvas
 ) {
+  assert(isSorted(edges));
   for (auto const& e : edges) {
     // TODO: assert that it returns true = success
     drawEdge(coordinates[e.from], e.exitAngle, coordinates[e.to], e.entryAngle, canvas);
@@ -1301,11 +1326,6 @@ std::string escapeForDOTlabel(std::string_view str) {
     }
   }
   return ret;
-}
-
-[[maybe_unused]]
-void printCanvas(Canvas const& canvas) {
-  std::cout << "------\n" << canvas.render() << "-------\n";
 }
 
 } // namespace

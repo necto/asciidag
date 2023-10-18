@@ -501,3 +501,23 @@ TEST(render, twoEdgeCrossingsFromSamePredecessor) {
 2  3
 )");
 }
+
+TEST(render, dependenciesRightToLeft) {
+  // If edge 2->3 is drawn before 2->4, 2->4 would have not enough space
+  DAG test;
+  test.nodes.push_back(DAG::Node{{}, "0"});
+  test.nodes.push_back(DAG::Node{{4}, "1"});
+  test.nodes.push_back(DAG::Node{{3, 4}, "2"});
+  test.nodes.push_back(DAG::Node{{}, "3"});
+  test.nodes.push_back(DAG::Node{{}, "4"});
+  EXPECT_EQ(renderSuccessfully(test), R"(
+0 1 2
+  | |\
+  | ||
+  / //
+ / //
+/ //
+|/ |
+4  3
+)");
+}
