@@ -112,6 +112,7 @@ void configureDAGFromSeed(DAG &dag, size_t seed) {
   for (auto& node : dag.nodes) {
     node.succs.clear();
   }
+  std::vector<size_t> nPreds(dag.nodes.size(), 0);
   size_t shift = 0;
   for (int node = 0; node < dag.nodes.size(); ++node) {
     for (int succ = node + 1; succ < dag.nodes.size(); ++succ) {
@@ -119,9 +120,14 @@ void configureDAGFromSeed(DAG &dag, size_t seed) {
         // single-character nodes do not support more than 3 successors
         break;
       }
+      if (3 <= nPreds[succ]) {
+        // single-character nodes do not support more than 3 predecessors
+        continue;
+      }
       size_t mask = 1 << shift;
       if (seed & mask) {
         dag.nodes[node].succs.push_back(succ);
+        ++nPreds[succ];
       }
       ++shift;
     }
@@ -158,17 +164,16 @@ TEST(parseRender, generated4) {
   }
 }
 
-// TODO:
-// TEST(parseRender, generated5) {
-//   DAG dag;
-//   dag.nodes.push_back({{}, "0"});
-//   dag.nodes.push_back({{}, "1"});
-//   dag.nodes.push_back({{}, "2"});
-//   dag.nodes.push_back({{}, "3"});
-//   dag.nodes.push_back({{}, "4"});
-//   size_t const nPermutations = numberOfEdgeConfigurations(dag.nodes.size());
-//   for (size_t seed = 0; seed < nPermutations; ++seed) {
-//     configureDAGFromSeed(dag, seed);
-//     ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
-//   }
-// }
+TEST(parseRender, generated5) {
+  DAG dag;
+  dag.nodes.push_back({{}, "0"});
+  dag.nodes.push_back({{}, "1"});
+  dag.nodes.push_back({{}, "2"});
+  dag.nodes.push_back({{}, "3"});
+  dag.nodes.push_back({{}, "4"});
+  size_t const nPermutations = numberOfEdgeConfigurations(dag.nodes.size());
+  for (size_t seed = 0; seed < nPermutations; ++seed) {
+    configureDAGFromSeed(dag, seed);
+    ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
+  }
+}
