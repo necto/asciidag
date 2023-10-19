@@ -18,7 +18,8 @@
 
 namespace asciidag {
 
-auto WaypointText = "|";
+auto constexpr sketchMode = false;
+auto waypointText = "|";
 
 namespace {
 
@@ -85,7 +86,7 @@ std::optional<RenderError> insertEdgeWaypoints(DAG& dag, std::vector<std::vector
         for (auto l = layerI + 1; l < rank[finalSucc]; ++l) {
           size_t nodeId = dag.nodes.size();
           *lastEdge = nodeId;
-          dag.nodes.push_back({{0}, WaypointText});
+          dag.nodes.push_back({{0}, waypointText});
           layers[l].push_back(nodeId);
           lastEdge = &dag.nodes.back().succs.back();
           // No need to add it to rank
@@ -118,6 +119,9 @@ struct SimpleEdgeHash {
   }
 };
 
+bool contains(std::vector<size_t> list, size_t val) {
+  return std::find(list.begin(), list.end(), val) != list.end();
+}
 
 std::vector<CrossingPair> findNonConflictingCrossings(
   DAG const& dag,
@@ -128,15 +132,25 @@ std::vector<CrossingPair> findNonConflictingCrossings(
   std::unordered_set<SimpleEdge, SimpleEdgeHash> takenEdges;
   // TODO: These 5 nested loops can definitely be optmized
   for (size_t leftTopPos = 0; leftTopPos < lAbove.size(); ++leftTopPos) {
-    for (size_t rightBottom : dag.nodes[lAbove[leftTopPos]].succs) {
+    auto leftTop = lAbove[leftTopPos];
+    // Starting at the other end to find the highest crossing first
+    for (size_t rightBottomPos = lBelow.size() - 1; rightBottomPos != 0; --rightBottomPos) {
+      auto rightBottom = lBelow[rightBottomPos];
+      if (!contains(dag.nodes[leftTop].succs, rightBottom)) {
+        continue;
+      }
       for (size_t rightTopPos = leftTopPos + 1; rightTopPos < lAbove.size(); ++rightTopPos) {
+        auto rightTop = lAbove[rightTopPos];
         bool found = false;
-        for (size_t leftBottom : dag.nodes[lAbove[rightTopPos]].succs) {
-          SimpleEdge edge{lAbove[rightTopPos], leftBottom};
-          if (takenEdges.count(edge) == 0 &&
-              findIndex(lBelow, leftBottom) < findIndex(lBelow, rightBottom)) {
+        for (size_t leftBottomPos = 0; leftBottomPos < rightBottomPos; ++leftBottomPos) {
+          auto leftBottom = lBelow[leftBottomPos];
+          if (!contains(dag.nodes[rightTop].succs, leftBottom)) {
+            continue;
+          }
+          SimpleEdge edge{rightTop, leftBottom};
+          if (takenEdges.count(edge) == 0) {
             takenEdges.insert(edge);
-            ret.push_back({lAbove[leftTopPos], lAbove[rightTopPos], leftBottom, rightBottom});
+            ret.push_back({leftTop, rightTop, leftBottom, rightBottom});
             found = true;
             break;
           }
@@ -173,7 +187,7 @@ size_t countCrossings(
   return ret;
 }
 
-void insertCrossNode(DAG& dag, CrossingPair const& crossing) {
+size_t insertCrossNode(DAG& dag, CrossingPair const& crossing) {
   size_t fromLeftIdx = findIndex(dag.nodes[crossing.fromLeft].succs, crossing.toRight);
   size_t fromRightIdx = findIndex(dag.nodes[crossing.fromRight].succs, crossing.toLeft);
   size_t xid = dag.nodes.size();
@@ -183,16 +197,7 @@ void insertCrossNode(DAG& dag, CrossingPair const& crossing) {
   dag.nodes[xid].succs.push_back(crossing.toRight);
   dag.nodes[crossing.fromLeft].succs[fromLeftIdx] = xid;
   dag.nodes[crossing.fromRight].succs[fromRightIdx] = xid;
-}
-
-void insertCrossNodes(DAG& dag, std::vector<std::vector<size_t>> const& layers) {
-  // TODO: this might not widthstand multiple crossings between edge packs
-  for (size_t layerI = 1; layerI < layers.size(); ++layerI) {
-    for (auto const& crossing :
-         findNonConflictingCrossings(dag, layers[layerI - 1], layers[layerI])) {
-      insertCrossNode(dag, crossing);
-    }
-  }
+  return xid;
 }
 
 template <typename A>
@@ -208,6 +213,11 @@ std::ostream& operator<<(std::ostream& os, std::set<A> v) {
   }
   os << "}";
   return os;
+}
+
+template <typename A, typename B>
+std::ostream& operator<<(std::ostream& os, std::pair<A, B> p) {
+  return os << "(" <<p.first <<", " <<p.second <<")";
 }
 
 template <typename A>
@@ -238,6 +248,25 @@ std::ostream& operator<<(std::ostream& os, std::unordered_map<A, B> map) {
   }
   os << "}";
   return os;
+}
+
+std::vector<std::vector<size_t>> insertCrossNodes(DAG& dag, std::vector<std::vector<size_t>> const& layers) {
+  std::vector<std::vector<size_t>> newLayers;
+  newLayers.push_back(layers[0]);
+  for (size_t layerI = 1; layerI < layers.size(); ++layerI) {
+    std::vector<size_t> insertedCrossings;
+    for (auto const& crossing :
+         findNonConflictingCrossings(dag, layers[layerI - 1], layers[layerI])) {
+      insertedCrossings.push_back(insertCrossNode(dag, crossing));
+    }
+    if (!insertedCrossings.empty()) {
+      newLayers.emplace_back(std::move(insertedCrossings));
+    }
+    newLayers.push_back(layers[layerI]);
+  }
+  auto waypointErr = insertEdgeWaypoints(dag, newLayers);
+  assert(!waypointErr.has_value() && "It's safe, I promise");
+  return newLayers;
 }
 
 template <typename T>
@@ -1248,15 +1277,35 @@ size_t countAllCrossings(std::vector<std::vector<size_t>> const& layers, DAG con
 }
 
 void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag) {
+  size_t const nLayers = layers.size();
   std::vector<std::vector<size_t>> preds(dag.nodes.size());
   for (size_t i = 0; i < dag.nodes.size(); ++i) {
     for (auto succ : dag.nodes[i].succs) {
+      // this might not be it justice:
+      // are preds now in the correct order?
       preds[succ].push_back(i);
+    }
+  }
+  // Keep track of the nodes connected to the "X" cross nodes
+  // so that this shuffling does not accidentally change the meaning of the crossing
+  std::vector<std::vector<std::pair<size_t, size_t>>> unswappableNodes(nLayers);
+  for (size_t layerI = 0; layerI < nLayers; ++layerI) {
+    for (size_t nodeId : layers[layerI]) {
+      if (dag.nodes[nodeId].text == "X") {
+        // No triple-crossings supported
+        assert(preds[nodeId].size() == 2);
+        assert(dag.nodes[nodeId].succs.size() == 2);
+        // Cross nodes cannot be inserted to the first or the last layer
+        assert(layerI != 0 && layerI + 1 < nLayers);
+        unswappableNodes[layerI - 1].push_back({preds[nodeId][0], preds[nodeId][1]});
+        unswappableNodes[layerI + 1].push_back(
+          {dag.nodes[nodeId].succs[0], dag.nodes[nodeId].succs[1]}
+        );
+      }
     }
   }
   // Forward pass
   std::vector<size_t> targetPos6(dag.nodes.size());
-  size_t const nLayers = layers.size();
   for (size_t layerI = 1; layerI < nLayers; ++layerI) {
     auto const& prevLayer = layers[layerI - 1];
     auto& curLayer = layers[layerI];
@@ -1264,12 +1313,28 @@ void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag)
       assert(0 < preds[nId].size() && "Root node can only be on the 0-th layer.");
       targetPos6[nId] = findTargetPosTimes6(preds[nId], prevLayer);
     }
+    // Preserve the order of predecessors and successors of the "X" cross nodes
+    for (auto [left, right] : unswappableNodes[layerI]) {
+      if (targetPos6[right] <= targetPos6[left]) {
+        targetPos6[right] = targetPos6[left] + 1;
+      }
+    }
+    auto layerCopy = curLayer;
+    size_t totCrossings =
+      countCrossings(dag, prevLayer, curLayer)
+      + (layerI + 1 < nLayers ? countCrossings(dag, curLayer, layers[layerI + 1]) : 0);
     std::stable_sort(curLayer.begin(), curLayer.end(), [&targetPos6](size_t n1id, size_t n2id) {
       return targetPos6[n1id] < targetPos6[n2id];
     });
     swapEquipotentialNeighbors(targetPos6, curLayer, [&dag, &prevLayer](auto const& curLayer) {
       return countCrossings(dag, prevLayer, curLayer);
     });
+    size_t newCrossings =
+      countCrossings(dag, prevLayer, curLayer)
+      + (layerI + 1 < nLayers ? countCrossings(dag, curLayer, layers[layerI + 1]) : 0);
+    if (totCrossings < newCrossings) {
+      curLayer = layerCopy;
+    }
   }
   // Backward pass
   for (size_t i = 1; i < nLayers; ++i) {
@@ -1283,6 +1348,12 @@ void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag)
         targetPos6[nId] = position * 6;
       } else {
         targetPos6[nId] = findTargetPosTimes6(succs, nextLayer);
+      }
+    }
+    // Preserve the order of predecessors and successors of the "X" cross nodes
+    for (auto [left, right] : unswappableNodes[nLayers - i - 1]) {
+      if (targetPos6[right] <= targetPos6[left]) {
+        targetPos6[right] = targetPos6[left] + 1;
       }
     }
     auto layerCopy = curLayer;
@@ -1386,21 +1457,11 @@ std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
   }
   minimizeCrossings(layers, dag);
 
-  for (int i = 0; i < 10; ++i) {
+  for (int i = 0; i < 2; ++i) {
     if (countAllCrossings(layers, dag) == 0) {
       break;
     }
-    insertCrossNodes(dag, layers); // Invalidates layers
-    layers = dagLayers(dag);
-    auto waypointErr = insertEdgeWaypoints(dag, layers);
-    assert(!waypointErr.has_value());
-    // TODO: will this preserve the edge direction over the crossings?
-    // i.e. in a   b
-    //          \ /
-    //           X
-    //          / \
-    //         c   d
-    // one cannot simply swap c & d
+    layers = insertCrossNodes(dag, layers);
     minimizeCrossings(layers, dag);
   }
 
@@ -1561,7 +1622,7 @@ bool Canvas::inBounds(Position const& pos) const {
 void Canvas::newMark(Position const& pos, char c) {
   assert(inBounds(pos));
   assert(lines[pos.line][pos.col] == ' ');
-  assert(c != ' ');
+  assert(sketchMode || c != ' ');
   lines[pos.line][pos.col] = c;
 }
 
