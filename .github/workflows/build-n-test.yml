@@ -33,7 +33,7 @@ jobs:
     - name: Build
       run: |
         build-wrapper-linux-x86-64 --out-dir ${{ env.BW_OUT_DIR }} \
-           cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+            cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
 
     - name: Test
       working-directory: ${{github.workspace}}/build
@@ -45,7 +45,8 @@ jobs:
 
     - name: Collect the coverage
       run: |
-        llvm-cov show --show-branches=count --instr-profile merged.profdata test/unit_tests > coverage.txt
+        llvm-cov show --show-branches=count --instr-profile merged.profdata \
+                 ${{github.workspace}}/build/test/unit_tests > coverage.txt
 
     - name: Run sonar-scanner
       env:
@@ -53,5 +54,5 @@ jobs:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       run: |
         sonar-scanner \
-          --define sonar.cfamily.build-wrapper-output="${{ env.BW_OUT_DIR }}" \
-          --define sonar.cfamily.llvm-cov.reportPath=coverage.txt
+            --define sonar.cfamily.build-wrapper-output="${{ env.BW_OUT_DIR }}" \
+            --define sonar.cfamily.llvm-cov.reportPath=coverage.txt
