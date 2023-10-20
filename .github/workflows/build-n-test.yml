@@ -47,7 +47,7 @@ jobs:
     - name: Collect the coverage
       working-directory: ${{github.workspace}}/build
       run: |
-        llvm-cov show --show-branches=count --instr-profile default.profdata test/unit_tests > coverage.txt
+        llvm-cov show --show-branches=count --instr-profile merged.profdata test/unit_tests > coverage.txt
 
     - name: Run sonar-scanner
       working-directory: ${{github.workspace}}/build
