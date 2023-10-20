@@ -12,6 +12,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # needed for pretty printing standard containers in GDB
 add_compile_options(-D_GLIBCXX_DEBUG)
 
+# Collect test coverage
+set(CMAKE_CXX_FLAGS " ${CMAKE_CXX_FLAGS} -fprofile-instr-generate -fcoverage-mapping -O0 -g")
+
 add_subdirectory(src)
 
 enable_testing()
