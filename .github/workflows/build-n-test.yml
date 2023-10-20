@@ -40,7 +40,6 @@ jobs:
       run: ./test/unit_tests
 
     - name: Merge counters from different runs and convert the result into an llvm-cov-compatible form
-      working-directory: ${{github.workspace}}/build
       run: |
         llvm-profdata merge -o merged.profdata ${{github.workspace}}/build/*.profraw
 
