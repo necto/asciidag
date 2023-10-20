@@ -177,3 +177,21 @@ TEST(parseRender, generated5) {
     ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
   }
 }
+
+// TODO:
+// TEST(parseRender, generated6) {
+//   DAG dag;
+//   dag.nodes.push_back({{}, "0"});
+//   dag.nodes.push_back({{}, "1"});
+//   dag.nodes.push_back({{}, "2"});
+//   dag.nodes.push_back({{}, "3"});
+//   dag.nodes.push_back({{}, "4"});
+//   dag.nodes.push_back({{}, "5"});
+//   size_t const nPermutations = numberOfEdgeConfigurations(dag.nodes.size());
+//   for (size_t seed = 0; seed < nPermutations; ++seed) {
+//     std::cout <<seed << "/" <<nPermutations <<"\n";
+//     configureDAGFromSeed(dag, seed);
+//     std::cout <<toDOT(dag) <<"\n";
+//     ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
+//   }
+// }

@@ -133,7 +133,7 @@ R"(
 )");
 }
 
-TEST(crossingEdgesTest, crossMustSwapSuccessorsFail) {
+TEST(crossingEdgesTest, crossMustSwapSuccessors) {
   EXPECT_EQ(parseAndRender(R"(
       0
      / \
@@ -169,5 +169,48 @@ X  | |
 | /|/ /
 |/ \|/
 3   4
+)");
+}
+
+TEST(crossingEdgesTest, sixNodes) {
+  EXPECT_EQ(parseAndRender(R"(
+      0
+     /|\
+    / \ \
+   /   \ \
+  / 1   2 \
+ / /|\ /| |
+ |/ | X | /
+ 3  |/ \|/
+    4   5
+)"),
+R"(
+ 0   1
+/|\ /|\
+|| \\\ \
+||  \\\ \
+|\   \\\ \
+| \  || \ \
+|  \ || | |
+|  | |/ | |
+2  | 3  | |
+|\ |    | |
+| \|    / /
+| ||   / /
+| ||  / /
+| || / /
+| |/ | |
+| X  | |
+| |\ | |
+| | \| |
+| | || |
+| | |/ |
+| | X  |
+| | |\ |
+| | || |
+| / // /
+|/ // /
+\|/ |/
+ 5  4
 )");
 }

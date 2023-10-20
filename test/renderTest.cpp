@@ -519,3 +519,48 @@ TEST(render, dependenciesRightToLeft) {
 4  3
 )");
 }
+
+TEST(render, complex6nodesFail) {
+  // Crossing minimization fails here to swap two edges
+  // then crossing insertion somehow fails to help the problem -
+  // it does not reduce the number of edge crosses
+  DAG test;
+  test.nodes.push_back(DAG::Node{{3, 4, 5}, "0"});
+  test.nodes.push_back(DAG::Node{{2, 3, 4}, "1"});
+  test.nodes.push_back(DAG::Node{{3, 5}, "2"});
+  test.nodes.push_back(DAG::Node{{}, "3"});
+  test.nodes.push_back(DAG::Node{{}, "4"});
+  test.nodes.push_back(DAG::Node{{}, "5"});
+  EXPECT_EQ(renderSuccessfully(test), R"(
+ 0   1
+/|\ /|\
+|| \\\ \
+||  \\\ \
+||  || \ \
+|\  || |  \
+| \ || |  |
+| | |/ |  |
+| | 4  2  |
+| |    |\ |
+| |    |/ |
+| |    /| |
+| |   / | |
+| |  /  / /
+| | /  / /
+| \/  / /
+| /\ / /
+|/ | | |
+X  | | |
+|\ | | |
+| \| | |
+| || | |
+| |/ | |
+| X  | |
+| |\ | |
+| || | |
+| || / /
+| /|/ /
+|/ \|/
+5   3
+)");
+}
