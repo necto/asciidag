@@ -56,5 +56,5 @@ jobs:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       run: |
         sonar-scanner \
-          --define sonar.cfamily.build-wrapper-output="${{ env.BW_OUT_DIR }} \
+          --define sonar.cfamily.build-wrapper-output="${{ env.BW_OUT_DIR }}" \
           --define sonar.cfamily.llvm-cov.reportPath=coverage.txt
