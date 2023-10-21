@@ -18,14 +18,22 @@
 
 namespace asciidag {
 
-auto constexpr sketchMode = false;
+constexpr auto sketchMode = false;
 auto waypointText = "|";
 
 namespace {
 
+template <typename T>
+using Vec = std::vector<T>;
+
+template <typename T>
+using Vec2 = Vec<Vec<T>>;
+
+using std::string;
+
 using namespace std::string_literals;
 
-size_t findIndex(std::vector<size_t> const list, size_t val) {
+size_t findIndex(Vec<size_t> const list, size_t val) {
   // This linear search might better be replaced with a lookup table
   for (size_t pos = 0; pos < list.size(); ++pos) {
     if (list[pos] == val) {
@@ -36,10 +44,10 @@ size_t findIndex(std::vector<size_t> const list, size_t val) {
   return 0;
 }
 
-std::vector<std::vector<size_t>> dagLayers(DAG const& dag) {
+Vec2<size_t> dagLayers(DAG const& dag) {
   // TODO: optimize using a queue (linear in edges)
   // instead of a fix-point (quadratic in edges)
-  std::vector<size_t> rank(dag.nodes.size(), 0);
+  Vec<size_t> rank(dag.nodes.size(), 0);
   bool changed = false;
   do {
     changed = false;
@@ -53,16 +61,16 @@ std::vector<std::vector<size_t>> dagLayers(DAG const& dag) {
     }
   } while (changed);
   size_t maxRank = *std::max_element(rank.begin(), rank.end());
-  std::vector<std::vector<size_t>> ret(maxRank + 1);
+  Vec2<size_t> ret(maxRank + 1);
   for (size_t n = 0; n < dag.nodes.size(); ++n) {
     ret[rank[n]].push_back(n);
   }
   return ret;
 }
 
-std::optional<RenderError> insertEdgeWaypoints(DAG& dag, std::vector<std::vector<size_t>>& layers) {
+std::optional<RenderError> insertEdgeWaypoints(DAG& dag, Vec2<size_t>& layers) {
   size_t const preexistingCount = dag.nodes.size();
-  std::vector<size_t> rank(preexistingCount, 0);
+  Vec<size_t> rank(preexistingCount, 0);
   for (size_t layerI = 0; layerI < layers.size(); ++layerI) {
     for (size_t n : layers[layerI]) {
       rank[n] = layerI;
@@ -120,16 +128,13 @@ struct SimpleEdgeHash {
   size_t operator()(SimpleEdge const& e) const noexcept { return e.from ^ (e.to << 1); }
 };
 
-bool contains(std::vector<size_t> list, size_t val) {
+bool contains(Vec<size_t> list, size_t val) {
   return std::find(list.begin(), list.end(), val) != list.end();
 }
 
-std::vector<CrossingPair> findNonConflictingCrossings(
-  DAG const& dag,
-  std::vector<size_t> const& lAbove,
-  std::vector<size_t> const& lBelow
-) {
-  std::vector<CrossingPair> ret;
+Vec<CrossingPair>
+findNonConflictingCrossings(DAG const& dag, Vec<size_t> const& lAbove, Vec<size_t> const& lBelow) {
+  Vec<CrossingPair> ret;
   std::unordered_set<SimpleEdge, SimpleEdgeHash> takenEdges;
   // TODO: These 5 nested loops can definitely be optmized
   for (size_t leftTopPos = 0; leftTopPos < lAbove.size(); ++leftTopPos) {
@@ -167,11 +172,7 @@ std::vector<CrossingPair> findNonConflictingCrossings(
   return ret;
 }
 
-size_t countCrossings(
-  DAG const& dag,
-  std::vector<size_t> const& lAbove,
-  std::vector<size_t> const& lBelow
-) {
+size_t countCrossings(DAG const& dag, Vec<size_t> const& lAbove, Vec<size_t> const& lBelow) {
   size_t ret = 0;
   // TODO: These 5 nested loops can definitely be optmized
   for (size_t leftTopPos = 0; leftTopPos < lAbove.size(); ++leftTopPos) {
@@ -222,7 +223,7 @@ std::ostream& operator<<(std::ostream& os, std::pair<A, B> p) {
 }
 
 template <typename A>
-std::ostream& operator<<(std::ostream& os, std::vector<A> v) {
+std::ostream& operator<<(std::ostream& os, Vec<A> v) {
   os << "[";
   bool first = true;
   for (auto const& x : v) {
@@ -251,12 +252,11 @@ std::ostream& operator<<(std::ostream& os, std::unordered_map<A, B> map) {
   return os;
 }
 
-std::vector<std::vector<size_t>>
-insertCrossNodes(DAG& dag, std::vector<std::vector<size_t>> const& layers) {
-  std::vector<std::vector<size_t>> newLayers;
+Vec2<size_t> insertCrossNodes(DAG& dag, Vec2<size_t> const& layers) {
+  Vec2<size_t> newLayers;
   newLayers.push_back(layers[0]);
   for (size_t layerI = 1; layerI < layers.size(); ++layerI) {
-    std::vector<size_t> insertedCrossings;
+    Vec<size_t> insertedCrossings;
     for (auto const& crossing :
          findNonConflictingCrossings(dag, layers[layerI - 1], layers[layerI])) {
       insertedCrossings.push_back(insertCrossNode(dag, crossing));
@@ -272,7 +272,7 @@ insertCrossNodes(DAG& dag, std::vector<std::vector<size_t>> const& layers) {
 }
 
 template <typename T>
-void append(std::vector<T>& to, std::vector<T> const& from) {
+void append(Vec<T>& to, std::vector<T> const& from) {
   for (auto const& x : from) {
     to.push_back(x);
   }
@@ -319,12 +319,12 @@ std::ostream& operator<<(std::ostream& os, ConnToNode const& conn) {
 using EdgeMap = std::unordered_map<size_t, ConnToNode>;
 
 // Map from position to a node id, if any
-using NodeMap = std::vector<std::optional<size_t>>;
+using NodeMap = Vec<std::optional<size_t>>;
 
 class EdgesInFlight {
 public:
 
-  std::vector<ConnToNode> findNRemoveEdgesToNode(size_t col);
+  Vec<ConnToNode> findNRemoveEdgesToNode(size_t col);
   std::optional<ConnToNode>
   findNRemoveEdgeToEdge(Direction dir, NodeMap const& prevNodes, size_t col);
   std::optional<ParseError> findDanglingEdge(size_t line) const;
@@ -391,8 +391,8 @@ static std::array<std::array<int, /* line above */ 4>, /* line below */ 4> const
   {-1, 0, 0, -1} // no format
 }};
 
-std::vector<ConnToNode> EdgesInFlight::findNRemoveEdgesToNode(size_t col) {
-  std::vector<ConnToNode> ret;
+Vec<ConnToNode> EdgesInFlight::findNRemoveEdgesToNode(size_t col) {
+  Vec<ConnToNode> ret;
   for (auto dir : {toInt(Direction::Left), toInt(Direction::Straight), toInt(Direction::Right)}) {
     if (auto to = findAndEraseIf(edges[dir], col + columnShift[dir][0])) {
       ret.emplace_back(*to);
@@ -467,8 +467,8 @@ public:
   struct Node {
     std::string text;
     Position pos;
-    std::vector<size_t> succEdges;
-    std::vector<size_t> predEdges;
+    Vec<size_t> succEdges;
+    Vec<size_t> predEdges;
   };
 
   std::optional<ParseError> tryAddNode(EdgesInFlight& prevEdges, Position const& pos);
@@ -495,8 +495,8 @@ private:
 
   void addEdge(Edge&& e);
 
-  std::vector<Node> nodes = {};
-  std::vector<Edge> edges = {};
+  Vec<Node> nodes = {};
+  Vec<Edge> edges = {};
   std::string partialNode = "";
   NodeMap prevNodes;
   NodeMap currNodes;
@@ -517,11 +517,11 @@ DAG NodeCollector::buildDAG() && {
   return ret;
 }
 
-bool hasCrossEdges(std::vector<NodeCollector::Node> const& nodes) {
+bool hasCrossEdges(Vec<NodeCollector::Node> const& nodes) {
   return std::any_of(nodes.begin(), nodes.end(), [](auto const& n) { return n.text == "X"; });
 }
 
-void replace(std::vector<size_t>& values, size_t dated, size_t updated) {
+void replace(Vec<size_t>& values, size_t dated, size_t updated) {
   for (auto& v : values) {
     if (v == dated) {
       v = updated;
@@ -529,7 +529,7 @@ void replace(std::vector<size_t>& values, size_t dated, size_t updated) {
   }
 }
 
-std::optional<ParseError> validateEdgeCrossings(std::vector<NodeCollector::Node> const& nodes) {
+std::optional<ParseError> validateEdgeCrossings(Vec<NodeCollector::Node> const& nodes) {
   for (auto const& node : nodes) {
     if (node.text == "X") {
       auto nPreds = node.predEdges.size();
@@ -599,8 +599,8 @@ chooseLeftMiddleRightDirs(Direction dir0, Direction dir1, Direction dir2) {
 }
 
 void joinEdges(
-  std::vector<NodeCollector::Edge>& edges,
-  std::vector<NodeCollector::Node>& nodes,
+  Vec<NodeCollector::Edge>& edges,
+  Vec<NodeCollector::Node>& nodes,
   size_t primary,
   size_t secondary
 ) {
@@ -611,10 +611,10 @@ void joinEdges(
 }
 
 void untangleTwoEdgeCrossing(
-  std::vector<size_t> const& preds,
-  std::vector<size_t> const& succs,
-  std::vector<NodeCollector::Node>& nodes,
-  std::vector<NodeCollector::Edge>& edges
+  Vec<size_t> const& preds,
+  Vec<size_t> const& succs,
+  Vec<NodeCollector::Node>& nodes,
+  Vec<NodeCollector::Edge>& edges
 ) {
   assert(preds.size() == 2);
   assert(succs.size() == 2);
@@ -627,10 +627,10 @@ void untangleTwoEdgeCrossing(
 }
 
 void untangleThreeEdgeCrossing(
-  std::vector<size_t> const& preds,
-  std::vector<size_t> const& succs,
-  std::vector<NodeCollector::Node>& nodes,
-  std::vector<NodeCollector::Edge>& edges
+  Vec<size_t> const& preds,
+  Vec<size_t> const& succs,
+  Vec<NodeCollector::Node>& nodes,
+  Vec<NodeCollector::Edge>& edges
 ) {
   assert(preds.size() == 3);
   assert(succs.size() == 3);
@@ -649,12 +649,9 @@ void untangleThreeEdgeCrossing(
   joinEdges(edges, nodes, preds[predRight], succs[succLeft]);
 }
 
-void removeXnodes(
-  std::vector<NodeCollector::Node>& nodes,
-  std::vector<NodeCollector::Edge>& edges
-) {
+void removeXnodes(Vec<NodeCollector::Node>& nodes, Vec<NodeCollector::Edge>& edges) {
   size_t nSkipped = 0;
-  std::vector<size_t> nodeIdMap(nodes.size());
+  Vec<size_t> nodeIdMap(nodes.size());
   for (size_t i = 0; i < nodes.size(); ++i) {
     if (nodes[i].text == "X") {
       ++nSkipped;
@@ -827,8 +824,8 @@ struct Connectivity {
     bool bottomRight = false;
   };
 
-  std::vector<Edge> edges;
-  std::vector<Valency> nodeValencies;
+  Vec<Edge> edges;
+  Vec<Valency> nodeValencies;
 };
 
 bool operator<(Connectivity::Edge const& a, Connectivity::Edge const& b) {
@@ -853,7 +850,7 @@ int directionShift(Direction dir) {
   return 0;
 }
 
-size_t minEdgeHeight(Connectivity::Edge const& edge, std::vector<Position> const& positions) {
+size_t minEdgeHeight(Connectivity::Edge const& edge, Vec<Position> const& positions) {
   return absDiff(
            positions[edge.from].col + directionShift(edge.entryAngle),
            positions[edge.to].col - directionShift(edge.exitAngle)
@@ -863,8 +860,8 @@ size_t minEdgeHeight(Connectivity::Edge const& edge, std::vector<Position> const
 
 size_t minDistBetweenLayers(
   Connectivity const& conn,
-  std::vector<size_t> const& edges,
-  std::vector<Position> const& positions
+  Vec<size_t> const& edges,
+  Vec<Position> const& positions
 ) {
   size_t ret = 1; // At least 1 '|' must separate any two connected nodes
   for (auto eId : edges) {
@@ -876,11 +873,7 @@ size_t minDistBetweenLayers(
   return ret;
 }
 
-void setEntryAngles(
-  Connectivity& conn,
-  std::vector<std::vector<size_t>> predEdges,
-  std::vector<Position> const& coords
-) {
+void setEntryAngles(Connectivity& conn, Vec2<size_t> predEdges, Vec<Position> const& coords) {
   for (size_t i = 0; i < predEdges.size(); ++i) {
     auto const& edgeIds = predEdges[i];
     switch (edgeIds.size()) {
@@ -920,11 +913,7 @@ void setEntryAngles(
   }
 }
 
-void setExitAngles(
-  Connectivity& conn,
-  std::vector<std::vector<size_t>> succEdges,
-  std::vector<Position> const& coords
-) {
+void setExitAngles(Connectivity& conn, Vec2<size_t> succEdges, Vec<Position> const& coords) {
   for (size_t i = 0; i < succEdges.size(); ++i) {
     auto const& edgeIds = succEdges[i];
     switch (edgeIds.size()) {
@@ -964,11 +953,11 @@ void setExitAngles(
   }
 }
 
-Connectivity computeConnectivity(DAG const& dag, std::vector<Position> const& coords) {
+Connectivity computeConnectivity(DAG const& dag, Vec<Position> const& coords) {
   size_t const N = dag.nodes.size();
-  std::vector<std::vector<size_t>> preds(N);
-  std::vector<std::vector<size_t>> predEdges(N);
-  std::vector<std::vector<size_t>> succEdges(N);
+  Vec2<size_t> preds(N);
+  Vec2<size_t> predEdges(N);
+  Vec2<size_t> succEdges(N);
   Connectivity ret;
   ret.nodeValencies.resize(N);
   for (size_t i = 0; i < N; ++i) {
@@ -993,9 +982,8 @@ Connectivity computeConnectivity(DAG const& dag, std::vector<Position> const& co
   return ret;
 }
 
-std::vector<Position>
-computeNodeCoordinates(DAG const& dag, std::vector<std::vector<size_t>> const& layers) {
-  std::vector<Position> ret(dag.nodes.size(), Position{0, 0});
+Vec<Position> computeNodeCoordinates(DAG const& dag, Vec2<size_t> const& layers) {
+  Vec<Position> ret(dag.nodes.size(), Position{0, 0});
   size_t line = 0;
   for (auto const& layer : layers) {
     size_t col = 0;
@@ -1011,11 +999,10 @@ computeNodeCoordinates(DAG const& dag, std::vector<std::vector<size_t>> const& l
   return ret;
 }
 
-std::vector<std::vector<size_t>>
-groupEdgesByLayer(Connectivity const& conn, std::vector<std::vector<size_t>> const& layers) {
+Vec2<size_t> groupEdgesByLayer(Connectivity const& conn, Vec2<size_t> const& layers) {
   size_t const N = conn.nodeValencies.size();
-  std::vector<std::vector<size_t>> ret(layers.size());
-  std::vector<size_t> nodeLayer(N);
+  Vec2<size_t> ret(layers.size());
+  Vec<size_t> nodeLayer(N);
   for (size_t i = 0; i < layers.size(); ++i) {
     for (auto n : layers[i]) {
       nodeLayer[n] = i;
@@ -1028,9 +1015,9 @@ groupEdgesByLayer(Connectivity const& conn, std::vector<std::vector<size_t>> con
 }
 
 void adjustCoordsWithValencies(
-  std::vector<Position>& coords,
+  Vec<Position>& coords,
   Connectivity const& conn,
-  std::vector<std::vector<size_t>> const& layers
+  Vec2<size_t> const& layers
 ) {
   for (auto const& layer : layers) {
     size_t lastCol = 0;
@@ -1057,7 +1044,7 @@ void adjustCoordsWithValencies(
   }
 }
 
-void placeNodes(DAG const& dag, std::vector<Position> const& coordinates, Canvas& canvas) {
+void placeNodes(DAG const& dag, Vec<Position> const& coordinates, Canvas& canvas) {
   for (size_t n = 0; n < dag.nodes.size(); ++n) {
     assert(dag.nodes[n].text.size() == 1);
     canvas.newMark(coordinates[n], dag.nodes[n].text[0]);
@@ -1088,8 +1075,8 @@ bool isSorted(T list) {
 }
 
 void placeEdges(
-  std::vector<Position> const& coordinates,
-  std::vector<Connectivity::Edge> const& edges,
+  Vec<Position> const& coordinates,
+  Vec<Connectivity::Edge> const& edges,
   Canvas& canvas
 ) {
   assert(isSorted(edges));
@@ -1141,7 +1128,7 @@ Position nextPosInDir(Position curPos, Direction curDir, Direction nextDir) {
   return curPos;
 }
 
-void eraseAndBacktrackToLastChoice(std::vector<EdgeStep>& drawnPath, Canvas& canvas) {
+void eraseAndBacktrackToLastChoice(Vec<EdgeStep>& drawnPath, Canvas& canvas) {
   while (!drawnPath.empty() && !drawnPath.back().nextDir.has_value()) {
     canvas.clearPos(drawnPath.back().markedPos);
     drawnPath.pop_back();
@@ -1155,7 +1142,7 @@ bool tryDrawLine(
   Position const& to,
   Direction const entryDir,
   Canvas& canvas,
-  std::vector<EdgeStep>& drawnPath
+  Vec<EdgeStep>& drawnPath
 ) {
   if (drawnPath.empty()) {
     return false;
@@ -1210,7 +1197,7 @@ std::optional<RenderError> checkDAGCompat(DAG const& dag) {
 
 std::optional<RenderError> checkIfEdgesFitOnNodes(DAG const& dag) {
   size_t const N = dag.nodes.size();
-  std::vector<size_t> incomingEdgesPerNode(N, 0);
+  Vec<size_t> incomingEdgesPerNode(N, 0);
 
   for (size_t i = 0; i < N; ++i) {
     auto const& n = dag.nodes[i];
@@ -1233,7 +1220,7 @@ std::optional<RenderError> checkIfEdgesFitOnNodes(DAG const& dag) {
   return {};
 }
 
-size_t findTargetPosTimes6(std::vector<size_t> linkedNodes, std::vector<size_t> layer) {
+size_t findTargetPosTimes6(Vec<size_t> linkedNodes, std::vector<size_t> layer) {
   size_t const count = linkedNodes.size();
   assert(0 < count && "Leaf or root node on a non-first layer");
   size_t sum = 0;
@@ -1245,8 +1232,8 @@ size_t findTargetPosTimes6(std::vector<size_t> linkedNodes, std::vector<size_t> 
 
 template <typename Callable>
 void swapEquipotentialNeighbors(
-  std::vector<size_t> const& targetPos,
-  std::vector<size_t>& curLayer,
+  Vec<size_t> const& targetPos,
+  Vec<size_t>& curLayer,
   Callable const& penalty
 ) {
   size_t nCrossings = penalty(curLayer);
@@ -1267,7 +1254,7 @@ void swapEquipotentialNeighbors(
   }
 }
 
-size_t countAllCrossings(std::vector<std::vector<size_t>> const& layers, DAG const& dag) {
+size_t countAllCrossings(Vec2<size_t> const& layers, DAG const& dag) {
   size_t ret = 0;
   size_t const nLayers = layers.size();
   for (size_t layerI = 1; layerI < nLayers; ++layerI) {
@@ -1278,13 +1265,10 @@ size_t countAllCrossings(std::vector<std::vector<size_t>> const& layers, DAG con
   return ret;
 }
 
-std::vector<std::vector<std::pair<size_t, size_t>>> findCrossNodeSuccsAndPreds(
-  std::vector<std::vector<size_t>> const& layers,
-  DAG const& dag,
-  std::vector<std::vector<size_t>> const& preds
-) {
+Vec2<std::pair<size_t, size_t>>
+findCrossNodeSuccsAndPreds(Vec2<size_t> const& layers, DAG const& dag, Vec2<size_t> const& preds) {
   size_t const nLayers = layers.size();
-  std::vector<std::vector<std::pair<size_t, size_t>>> ret(nLayers);
+  Vec2<std::pair<size_t, size_t>> ret(nLayers);
   for (size_t layerI = 0; layerI < nLayers; ++layerI) {
     for (size_t nodeId : layers[layerI]) {
       if (dag.nodes[nodeId].text == "X") {
@@ -1302,13 +1286,13 @@ std::vector<std::vector<std::pair<size_t, size_t>>> findCrossNodeSuccsAndPreds(
 }
 
 void minimizeCrossingsForward(
-  std::vector<std::vector<size_t>>& layers,
+  Vec2<size_t>& layers,
   DAG const& dag,
-  std::vector<std::vector<size_t>> const& preds,
-  std::vector<std::vector<std::pair<size_t, size_t>>> const unswappableNodes
+  Vec2<size_t> const& preds,
+  Vec2<std::pair<size_t, size_t>> const unswappableNodes
 ) {
   size_t const nLayers = layers.size();
-  std::vector<size_t> targetPos6(dag.nodes.size());
+  Vec<size_t> targetPos6(dag.nodes.size());
   for (size_t layerI = 1; layerI < nLayers; ++layerI) {
     auto const& prevLayer = layers[layerI - 1];
     auto& curLayer = layers[layerI];
@@ -1342,12 +1326,12 @@ void minimizeCrossingsForward(
 }
 
 void minimizeCrossingsBackward(
-  std::vector<std::vector<size_t>>& layers,
+  Vec2<size_t>& layers,
   DAG const& dag,
-  std::vector<std::vector<std::pair<size_t, size_t>>> const unswappableNodes
+  Vec2<std::pair<size_t, size_t>> const unswappableNodes
 ) {
   size_t const nLayers = layers.size();
-  std::vector<size_t> targetPos6(dag.nodes.size());
+  Vec<size_t> targetPos6(dag.nodes.size());
 
   for (size_t i = 1; i < nLayers; ++i) {
     auto& curLayer = layers[nLayers - i - 1];
@@ -1388,8 +1372,8 @@ void minimizeCrossingsBackward(
   }
 }
 
-void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag) {
-  std::vector<std::vector<size_t>> preds(dag.nodes.size());
+void minimizeCrossings(Vec2<size_t>& layers, DAG const& dag) {
+  Vec2<size_t> preds(dag.nodes.size());
   for (size_t i = 0; i < dag.nodes.size(); ++i) {
     for (auto succ : dag.nodes[i].succs) {
       // this might not be it justice:
@@ -1399,7 +1383,7 @@ void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag)
   }
   // Keep track of the nodes connected to the "X" cross nodes
   // so that this shuffling does not accidentally change the meaning of the crossing
-  std::vector<std::vector<std::pair<size_t, size_t>>> const unswappableNodes =
+  Vec2<std::pair<size_t, size_t>> const unswappableNodes =
     findCrossNodeSuccsAndPreds(layers, dag, preds);
   minimizeCrossingsForward(layers, dag, preds, unswappableNodes);
   minimizeCrossingsBackward(layers, dag, unswappableNodes);
@@ -1441,7 +1425,7 @@ bool drawEdge(
   assert(fromPos.line + 1 < to.line && to.line < canvas.height());
   assert(fromPos.col < canvas.width() && to.col < canvas.width());
 
-  std::vector<EdgeStep> drawnPath;
+  Vec<EdgeStep> drawnPath;
   drawnPath.emplace_back();
   drawnPath.back().initialPos = fromPos;
   drawnPath.back().initialDir = exitDir;
@@ -1684,7 +1668,7 @@ std::string Canvas::render() const {
   return ret;
 }
 
-Canvas Canvas::create(std::vector<Position> const& coordinates) {
+Canvas Canvas::create(Vec<Position> const& coordinates) {
   Position max{0, 0};
   for (auto const& p : coordinates) {
     if (max.line < p.line) {
@@ -1697,7 +1681,7 @@ Canvas Canvas::create(std::vector<Position> const& coordinates) {
   // line + 1 - to accomodate the node height
   // col + 2 - to accomodate the node width + potential top/bottom-right edge
   Canvas ret;
-  ret.lines = std::vector<std::string>(max.line + 1, std::string(max.col + 2, ' '));
+  ret.lines = Vec<std::string>(max.line + 1, std::string(max.col + 2, ' '));
   return ret;
 }
 
