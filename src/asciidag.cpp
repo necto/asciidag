@@ -61,8 +61,8 @@ std::vector<std::vector<size_t>> dagLayers(DAG const& dag) {
 }
 
 std::optional<RenderError> insertEdgeWaypoints(DAG& dag, std::vector<std::vector<size_t>>& layers) {
-  size_t const realNodeN = dag.nodes.size();
-  std::vector<size_t> rank(realNodeN, 0);
+  size_t const preexistingCount = dag.nodes.size();
+  std::vector<size_t> rank(preexistingCount, 0);
   for (size_t layerI = 0; layerI < layers.size(); ++layerI) {
     for (size_t n : layers[layerI]) {
       rank[n] = layerI;
@@ -70,10 +70,10 @@ std::optional<RenderError> insertEdgeWaypoints(DAG& dag, std::vector<std::vector
   }
   for (size_t layerI = 0; layerI < layers.size(); ++layerI) {
     for (size_t n : layers[layerI]) {
-      if (realNodeN <= n) {
+      if (preexistingCount <= n) {
         // This is a waypoint that by construction has its edge targeting the next layer
         assert(dag.nodes[n].succs.size() == 1);
-        assert(realNodeN <= dag.nodes[n].succs[0] || rank[dag.nodes[n].succs[0]] == layerI + 1);
+        assert(preexistingCount <= dag.nodes[n].succs[0] || rank[dag.nodes[n].succs[0]] == layerI + 1);
         continue;
       }
       for (size_t& e : dag.nodes[n].succs) {
