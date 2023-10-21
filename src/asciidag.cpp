@@ -1286,6 +1286,14 @@ findCrossNodeSuccsAndPreds(Vec2<size_t> const& layers, DAG const& dag, Vec2<size
   return ret;
 }
 
+void keepOrderOf(Vec<size_t>& targetPos6, Vec<std::pair<size_t, size_t>> const& unswappableNodes) {
+  for (auto [left, right] : unswappableNodes) {
+    if (targetPos6[right] <= targetPos6[left]) {
+      targetPos6[right] = targetPos6[left] + 1;
+    }
+  }
+}
+
 void minimizeCrossingsForward(
   Vec2<size_t>& layers,
   DAG const& dag,
@@ -1301,12 +1309,7 @@ void minimizeCrossingsForward(
       assert(0 < preds[nId].size() && "Root node can only be on the 0-th layer.");
       targetPos6[nId] = findTargetPosTimes6(preds[nId], prevLayer);
     }
-    // Preserve the order of predecessors and successors of the "X" cross nodes
-    for (auto [left, right] : unswappableNodes[layerI]) {
-      if (targetPos6[right] <= targetPos6[left]) {
-        targetPos6[right] = targetPos6[left] + 1;
-      }
-    }
+    keepOrderOf(targetPos6, unswappableNodes[layerI]);
     auto layerCopy = curLayer;
     size_t totCrossings =
       countCrossings(dag, prevLayer, curLayer)
@@ -1348,12 +1351,7 @@ void minimizeCrossingsBackward(
         targetPos6[nId] = findTargetPosTimes6(succs, nextLayer);
       }
     }
-    // Preserve the order of predecessors and successors of the "X" cross nodes
-    for (auto [left, right] : unswappableNodes[nLayers - i - 1]) {
-      if (targetPos6[right] <= targetPos6[left]) {
-        targetPos6[right] = targetPos6[left] + 1;
-      }
-    }
+    keepOrderOf(targetPos6, unswappableNodes[nLayers - i - 1]);
     auto layerCopy = curLayer;
     size_t totCrossings =
       countCrossings(dag, curLayer, nextLayer)
