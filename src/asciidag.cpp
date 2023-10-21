@@ -73,7 +73,9 @@ std::optional<RenderError> insertEdgeWaypoints(DAG& dag, std::vector<std::vector
       if (preexistingCount <= n) {
         // This is a waypoint that by construction has its edge targeting the next layer
         assert(dag.nodes[n].succs.size() == 1);
-        assert(preexistingCount <= dag.nodes[n].succs[0] || rank[dag.nodes[n].succs[0]] == layerI + 1);
+        assert(
+          preexistingCount <= dag.nodes[n].succs[0] || rank[dag.nodes[n].succs[0]] == layerI + 1
+        );
         continue;
       }
       for (size_t& e : dag.nodes[n].succs) {
@@ -108,15 +110,14 @@ struct CrossingPair {
 struct SimpleEdge {
   size_t from;
   size_t to;
-  bool operator==(const SimpleEdge& other) const {
+
+  bool operator==(SimpleEdge const& other) const {
     return std::tie(from, to) == std::tie(other.from, other.to);
   }
 };
 
 struct SimpleEdgeHash {
-  size_t operator()(const SimpleEdge& e) const noexcept {
-    return e.from ^ (e.to << 1);
-  }
+  size_t operator()(SimpleEdge const& e) const noexcept { return e.from ^ (e.to << 1); }
 };
 
 bool contains(std::vector<size_t> list, size_t val) {
@@ -217,7 +218,7 @@ std::ostream& operator<<(std::ostream& os, std::set<A> v) {
 
 template <typename A, typename B>
 std::ostream& operator<<(std::ostream& os, std::pair<A, B> p) {
-  return os << "(" <<p.first <<", " <<p.second <<")";
+  return os << "(" << p.first << ", " << p.second << ")";
 }
 
 template <typename A>
@@ -250,7 +251,8 @@ std::ostream& operator<<(std::ostream& os, std::unordered_map<A, B> map) {
   return os;
 }
 
-std::vector<std::vector<size_t>> insertCrossNodes(DAG& dag, std::vector<std::vector<size_t>> const& layers) {
+std::vector<std::vector<size_t>>
+insertCrossNodes(DAG& dag, std::vector<std::vector<size_t>> const& layers) {
   std::vector<std::vector<size_t>> newLayers;
   newLayers.push_back(layers[0]);
   for (size_t layerI = 1; layerI < layers.size(); ++layerI) {
@@ -1063,8 +1065,8 @@ void placeNodes(DAG const& dag, std::vector<Position> const& coordinates, Canvas
 }
 
 [[maybe_unused]]
-void printCanvas(Canvas const& canvas) {
-  std::cout << "------\n" << canvas.render() << "-------\n";
+void printCanvas(Canvas const& canvas, std::string_view msg) {
+  std::cout << msg << "------\n" << canvas.render() << "-------\n";
 }
 
 std::string rtrim(std::string s) {
@@ -1153,7 +1155,7 @@ bool tryDrawLine(
   Position const& to,
   Direction const entryDir,
   Canvas& canvas,
-  std::vector<EdgeStep> &drawnPath
+  std::vector<EdgeStep>& drawnPath
 ) {
   if (drawnPath.empty()) {
     return false;
@@ -1276,19 +1278,13 @@ size_t countAllCrossings(std::vector<std::vector<size_t>> const& layers, DAG con
   return ret;
 }
 
-void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag) {
+std::vector<std::vector<std::pair<size_t, size_t>>> findCrossNodeSuccsAndPreds(
+  std::vector<std::vector<size_t>> const& layers,
+  DAG const& dag,
+  std::vector<std::vector<size_t>> const& preds
+) {
   size_t const nLayers = layers.size();
-  std::vector<std::vector<size_t>> preds(dag.nodes.size());
-  for (size_t i = 0; i < dag.nodes.size(); ++i) {
-    for (auto succ : dag.nodes[i].succs) {
-      // this might not be it justice:
-      // are preds now in the correct order?
-      preds[succ].push_back(i);
-    }
-  }
-  // Keep track of the nodes connected to the "X" cross nodes
-  // so that this shuffling does not accidentally change the meaning of the crossing
-  std::vector<std::vector<std::pair<size_t, size_t>>> unswappableNodes(nLayers);
+  std::vector<std::vector<std::pair<size_t, size_t>>> ret(nLayers);
   for (size_t layerI = 0; layerI < nLayers; ++layerI) {
     for (size_t nodeId : layers[layerI]) {
       if (dag.nodes[nodeId].text == "X") {
@@ -1297,14 +1293,21 @@ void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag)
         assert(dag.nodes[nodeId].succs.size() == 2);
         // Cross nodes cannot be inserted to the first or the last layer
         assert(layerI != 0 && layerI + 1 < nLayers);
-        unswappableNodes[layerI - 1].push_back({preds[nodeId][0], preds[nodeId][1]});
-        unswappableNodes[layerI + 1].push_back(
-          {dag.nodes[nodeId].succs[0], dag.nodes[nodeId].succs[1]}
-        );
+        ret[layerI - 1].push_back({preds[nodeId][0], preds[nodeId][1]});
+        ret[layerI + 1].push_back({dag.nodes[nodeId].succs[0], dag.nodes[nodeId].succs[1]});
       }
     }
   }
-  // Forward pass
+  return ret;
+}
+
+void minimizeCrossingsForward(
+  std::vector<std::vector<size_t>>& layers,
+  DAG const& dag,
+  std::vector<std::vector<size_t>> const& preds,
+  std::vector<std::vector<std::pair<size_t, size_t>>> const unswappableNodes
+) {
+  size_t const nLayers = layers.size();
   std::vector<size_t> targetPos6(dag.nodes.size());
   for (size_t layerI = 1; layerI < nLayers; ++layerI) {
     auto const& prevLayer = layers[layerI - 1];
@@ -1336,7 +1339,16 @@ void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag)
       curLayer = layerCopy;
     }
   }
-  // Backward pass
+}
+
+void minimizeCrossingsBackward(
+  std::vector<std::vector<size_t>>& layers,
+  DAG const& dag,
+  std::vector<std::vector<std::pair<size_t, size_t>>> const unswappableNodes
+) {
+  size_t const nLayers = layers.size();
+  std::vector<size_t> targetPos6(dag.nodes.size());
+
   for (size_t i = 1; i < nLayers; ++i) {
     auto& curLayer = layers[nLayers - i - 1];
     auto const& nextLayer = layers[nLayers - i];
@@ -1345,6 +1357,7 @@ void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag)
       auto const& succs = dag.nodes[nId].succs;
       if (succs.empty()) {
         // No successors, stay where you are
+        // FIXME: this is wrong, should really ignore these now, and reinsert then then
         targetPos6[nId] = position * 6;
       } else {
         targetPos6[nId] = findTargetPosTimes6(succs, nextLayer);
@@ -1373,6 +1386,23 @@ void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag)
       curLayer = layerCopy;
     }
   }
+}
+
+void minimizeCrossings(std::vector<std::vector<size_t>>& layers, DAG const& dag) {
+  std::vector<std::vector<size_t>> preds(dag.nodes.size());
+  for (size_t i = 0; i < dag.nodes.size(); ++i) {
+    for (auto succ : dag.nodes[i].succs) {
+      // this might not be it justice:
+      // are preds now in the correct order?
+      preds[succ].push_back(i);
+    }
+  }
+  // Keep track of the nodes connected to the "X" cross nodes
+  // so that this shuffling does not accidentally change the meaning of the crossing
+  std::vector<std::vector<std::pair<size_t, size_t>>> const unswappableNodes =
+    findCrossNodeSuccsAndPreds(layers, dag, preds);
+  minimizeCrossingsForward(layers, dag, preds, unswappableNodes);
+  minimizeCrossingsBackward(layers, dag, unswappableNodes);
 }
 
 std::string escapeForDOTlabel(std::string_view str) {
