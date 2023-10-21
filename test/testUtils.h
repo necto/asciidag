@@ -1,9 +1,14 @@
 #pragma once
-#include <string>
-#include <string_view>
+
+#include "asciidag.h"
+#include "asciidagImpl.h"
 
 namespace asciidag::tests {
 
-std::string parseAndRender(std::string_view str);
+using namespace asciidag::detail;
+
+string parseAndRender(string_view str);
+
+std::pair<DAG, Vec2<size_t>> parseWithLayers(string_view str);
 
 } // namespace asciidag::tests

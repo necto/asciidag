@@ -1,10 +1,11 @@
-#include "asciidagImpl.h"
+#include "testUtils.h"
 
 #include <gtest/gtest.h>
 
 namespace {
 
 using namespace asciidag;
+using namespace asciidag::tests;
 using std::string;
 
 void eraseEdgeCharacters(Canvas& canvas) {

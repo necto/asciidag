@@ -23,16 +23,7 @@ auto waypointText = "|";
 
 namespace {
 
-template <typename T>
-using Vec = std::vector<T>;
-
-template <typename T>
-using Vec2 = Vec<Vec<T>>;
-
-using std::string;
-using std::string_view;
-
-using namespace std::string_literals;
+using namespace asciidag::detail;
 
 size_t findIndex(Vec<size_t> const list, size_t val) {
   // This linear search might better be replaced with a lookup table
@@ -251,25 +242,6 @@ std::ostream& operator<<(std::ostream& os, std::unordered_map<A, B> map) {
   }
   os << "}";
   return os;
-}
-
-Vec2<size_t> insertCrossNodes(DAG& dag, Vec2<size_t> const& layers) {
-  Vec2<size_t> newLayers;
-  newLayers.push_back(layers[0]);
-  for (size_t layerI = 1; layerI < layers.size(); ++layerI) {
-    Vec<size_t> insertedCrossings;
-    for (auto const& crossing :
-         findNonConflictingCrossings(dag, layers[layerI - 1], layers[layerI])) {
-      insertedCrossings.push_back(insertCrossNode(dag, crossing));
-    }
-    if (!insertedCrossings.empty()) {
-      newLayers.emplace_back(std::move(insertedCrossings));
-    }
-    newLayers.push_back(layers[layerI]);
-  }
-  auto waypointErr = insertEdgeWaypoints(dag, newLayers);
-  assert(!waypointErr.has_value() && "It's safe, I promise");
-  return newLayers;
 }
 
 template <typename T>
@@ -1371,23 +1343,6 @@ void minimizeCrossingsBackward(
   }
 }
 
-void minimizeCrossings(Vec2<size_t>& layers, DAG const& dag) {
-  Vec2<size_t> preds(dag.nodes.size());
-  for (size_t i = 0; i < dag.nodes.size(); ++i) {
-    for (auto succ : dag.nodes[i].succs) {
-      // this might not be it justice:
-      // are preds now in the correct order?
-      preds[succ].push_back(i);
-    }
-  }
-  // Keep track of the nodes connected to the "X" cross nodes
-  // so that this shuffling does not accidentally change the meaning of the crossing
-  Vec2<std::pair<size_t, size_t>> const unswappableNodes =
-    findCrossNodeSuccsAndPreds(layers, dag, preds);
-  minimizeCrossingsForward(layers, dag, preds, unswappableNodes);
-  minimizeCrossingsBackward(layers, dag, unswappableNodes);
-}
-
 string escapeForDOTlabel(string_view str) {
   string ret;
   ret.reserve(str.size());
@@ -1413,6 +1368,44 @@ string escapeForDOTlabel(string_view str) {
 }
 
 } // namespace
+
+namespace detail {
+
+Vec2<size_t> insertCrossNodes(DAG& dag, Vec2<size_t> const& layers) {
+  Vec2<size_t> newLayers;
+  newLayers.push_back(layers[0]);
+  for (size_t layerI = 1; layerI < layers.size(); ++layerI) {
+    Vec<size_t> insertedCrossings;
+    for (auto const& crossing :
+         findNonConflictingCrossings(dag, layers[layerI - 1], layers[layerI])) {
+      insertedCrossings.push_back(insertCrossNode(dag, crossing));
+    }
+    if (!insertedCrossings.empty()) {
+      newLayers.emplace_back(std::move(insertedCrossings));
+    }
+    newLayers.push_back(layers[layerI]);
+  }
+  auto waypointErr = insertEdgeWaypoints(dag, newLayers);
+  assert(!waypointErr.has_value() && "It's safe, I promise");
+  return newLayers;
+}
+
+void minimizeCrossings(Vec2<size_t>& layers, DAG const& dag) {
+  Vec2<size_t> preds(dag.nodes.size());
+  for (size_t i = 0; i < dag.nodes.size(); ++i) {
+    for (auto succ : dag.nodes[i].succs) {
+      // this might not be it justice:
+      // are preds now in the correct order?
+      preds[succ].push_back(i);
+    }
+  }
+  // Keep track of the nodes connected to the "X" cross nodes
+  // so that this shuffling does not accidentally change the meaning of the crossing
+  Vec2<std::pair<size_t, size_t>> const unswappableNodes =
+    findCrossNodeSuccsAndPreds(layers, dag, preds);
+  minimizeCrossingsForward(layers, dag, preds, unswappableNodes);
+  minimizeCrossingsBackward(layers, dag, unswappableNodes);
+}
 
 bool drawEdge(
   Position fromPos,
@@ -1449,12 +1442,24 @@ bool drawEdge(
   return succeded;
 }
 
+std::string renderDAGWithLayers(DAG const& dag, std::vector<std::vector<size_t>> layers) {
+  // TODO: find best horisontal position of nodes
+  auto coords = computeNodeCoordinates(dag, layers);
+  auto const connectivity = computeConnectivity(dag, coords);
+  adjustCoordsWithValencies(coords, connectivity, layers);
+  auto canvas = Canvas::create(coords);
+  placeNodes(dag, coords, canvas);
+  placeEdges(coords, connectivity.edges, canvas);
+  return canvas.render();
+}
+
+} // namespace detail
+
 std::optional<string> renderDAG(DAG dag, RenderError& err) {
   err.code = RenderError::Code::None;
   if (dag.nodes.empty()) {
     return "";
   }
-  // TODO: find best horisontal position of nodes
   if (auto compatErr = checkDAGCompat(dag)) {
     err = *compatErr;
     return {};
@@ -1478,13 +1483,7 @@ std::optional<string> renderDAG(DAG dag, RenderError& err) {
     minimizeCrossings(layers, dag);
   }
 
-  auto coords = computeNodeCoordinates(dag, layers);
-  auto const connectivity = computeConnectivity(dag, coords);
-  adjustCoordsWithValencies(coords, connectivity, layers);
-  auto canvas = Canvas::create(coords);
-  placeNodes(dag, coords, canvas);
-  placeEdges(coords, connectivity.edges, canvas);
-  return canvas.render();
+  return renderDAGWithLayers(dag, layers);
 }
 
 size_t maxLineWidth(string_view str) {

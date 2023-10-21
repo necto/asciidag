@@ -1,3 +1,4 @@
+#include "asciidagImpl.h"
 #include "testUtils.h"
 
 #include <gtest/gtest.h>
@@ -422,4 +423,76 @@ X  X
 | |/ |
 3 4  5
 )");
+}
+
+TEST(crossingMinimizationTest, deconstructedRenderingNoMinimizationParallel) {
+  auto str = R"(
+0 1
+| |
+| |
+| |
+2 3
+)";
+  auto [dag, layers] = parseWithLayers(str);
+  EXPECT_EQ(str, '\n' + renderDAGWithLayers(dag, layers));
+}
+
+TEST(crossingMinimizationTest, deconstructedRenderingNoUncrossing) {
+  auto str = R"(
+0 1
+| |
+\ /
+ X
+/ \
+| |
+2 3
+)";
+  auto [dag, layers] = parseWithLayers(str);
+  EXPECT_EQ(R"(
+0 1
+|
+\
+ \
+  \
+| |
+2 3
+)", '\n' + renderDAGWithLayers(dag, layers));
+}
+
+TEST(crossingMinimizationTest, deconstructedRenderingNoMinimizationCrossing) {
+  auto str = R"(
+0 1
+| |
+| |
+| /
+|/
+X
+|\
+| \
+| |
+| |
+2 3
+)";
+  auto [dag, layers] = parseWithLayers(str);
+  layers = insertCrossNodes(dag, layers);
+  EXPECT_EQ(str, '\n' + renderDAGWithLayers(dag, layers));
+}
+
+TEST(crossingMinimizationTest, deconstructedRenderingCrossingRemoved) {
+  auto str = R"(
+0   1
+ \ /
+  X
+ / \
+2   3
+)";
+  auto [dag, layers] = parseWithLayers(str);
+  minimizeCrossings(layers, dag);
+  EXPECT_EQ(R"(
+0 1
+| |
+| |
+| |
+3 2
+)", '\n' + renderDAGWithLayers(dag, layers));
 }

@@ -5,7 +5,18 @@
 #include <string>
 #include <vector>
 
-namespace asciidag {
+namespace asciidag::detail {
+
+template <typename T>
+using Vec = std::vector<T>;
+
+template <typename T>
+using Vec2 = Vec<Vec<T>>;
+
+using std::string;
+using std::string_view;
+
+using namespace std::string_literals;
 
 enum class Direction : int { Left = 1, Straight = 2, Right = 3 };
 
@@ -32,4 +43,10 @@ private:
 /// Returns false if it failed to draw the edge
 bool drawEdge(Position cur, Direction curDir, Position to, Direction finishDir, Canvas& canvas);
 
-} // namespace asciidag
+string renderDAGWithLayers(DAG const& dag, Vec2<size_t> layers);
+
+void minimizeCrossings(Vec2<size_t>& layers, DAG const& dag);
+
+Vec2<size_t> insertCrossNodes(DAG& dag, Vec2<size_t> const& layers);
+
+} // namespace asciidag::detail
