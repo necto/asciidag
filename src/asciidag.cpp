@@ -30,6 +30,7 @@ template <typename T>
 using Vec2 = Vec<Vec<T>>;
 
 using std::string;
+using std::string_view;
 
 using namespace std::string_literals;
 
@@ -465,7 +466,7 @@ public:
   };
 
   struct Node {
-    std::string text;
+    string text;
     Position pos;
     Vec<size_t> succEdges;
     Vec<size_t> predEdges;
@@ -497,7 +498,7 @@ private:
 
   Vec<Node> nodes = {};
   Vec<Edge> edges = {};
-  std::string partialNode = "";
+  string partialNode = "";
   NodeMap prevNodes;
   NodeMap currNodes;
   bool finalized = false;
@@ -1052,11 +1053,11 @@ void placeNodes(DAG const& dag, Vec<Position> const& coordinates, Canvas& canvas
 }
 
 [[maybe_unused]]
-void printCanvas(Canvas const& canvas, std::string_view msg) {
+void printCanvas(Canvas const& canvas, string_view msg) {
   std::cout << msg << "------\n" << canvas.render() << "-------\n";
 }
 
-std::string rtrim(std::string s) {
+string rtrim(string s) {
   s.erase(s.find_last_not_of(' ') + 1);
   return s;
 }
@@ -1389,8 +1390,8 @@ void minimizeCrossings(Vec2<size_t>& layers, DAG const& dag) {
   minimizeCrossingsBackward(layers, dag, unswappableNodes);
 }
 
-std::string escapeForDOTlabel(std::string_view str) {
-  std::string ret;
+string escapeForDOTlabel(string_view str) {
+  string ret;
   ret.reserve(str.size());
   for (char c : str) {
     switch (c) {
@@ -1450,7 +1451,7 @@ bool drawEdge(
   return succeded;
 }
 
-std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
+std::optional<string> renderDAG(DAG dag, RenderError& err) {
   err.code = RenderError::Code::None;
   if (dag.nodes.empty()) {
     return "";
@@ -1488,7 +1489,7 @@ std::optional<std::string> renderDAG(DAG dag, RenderError& err) {
   return canvas.render();
 }
 
-size_t maxLineWidth(std::string_view str) {
+size_t maxLineWidth(string_view str) {
   size_t ret = 0;
   size_t curLine = 0;
   for (char c : str) {
@@ -1501,7 +1502,7 @@ size_t maxLineWidth(std::string_view str) {
   return std::max(ret, curLine);
 }
 
-std::optional<DAG> parseDAG(std::string_view str, ParseError& err) {
+std::optional<DAG> parseDAG(string_view str, ParseError& err) {
   NodeCollector collector(maxLineWidth(str));
   EdgesInFlight prevEdges;
   EdgesInFlight currEdges;
@@ -1561,7 +1562,7 @@ std::optional<DAG> parseDAG(std::string_view str, ParseError& err) {
   return std::move(collector).buildDAG();
 }
 
-std::string parseErrorCodeToStr(ParseError::Code code) {
+string parseErrorCodeToStr(ParseError::Code code) {
   using Code = ParseError::Code;
   switch (code) {
     case Code::DanglingEdge:
@@ -1612,10 +1613,10 @@ std::ostream& operator<<(std::ostream& os, DAG const& dag) {
   return os << "}";
 }
 
-std::string toDOT(DAG const& dag) {
-  static std::string const idPrefix = "n";
-  static std::string const indent = "  ";
-  std::string ret = "digraph \"DAG\" {\n";
+string toDOT(DAG const& dag) {
+  static string const idPrefix = "n";
+  static string const indent = "  ";
+  string ret = "digraph \"DAG\" {\n";
   for (size_t i = 0; i < dag.nodes.size(); ++i) {
     auto iStr = std::to_string(i);
     ret +=
@@ -1659,8 +1660,8 @@ size_t Canvas::height() const {
   return lines.size();
 }
 
-std::string Canvas::render() const {
-  std::string ret;
+string Canvas::render() const {
+  string ret;
   ret.reserve(lines.size() * (lines[0].size() + 1));
   for (auto const& line : lines) {
     ret += rtrim(line) + "\n";
@@ -1681,13 +1682,13 @@ Canvas Canvas::create(Vec<Position> const& coordinates) {
   // line + 1 - to accomodate the node height
   // col + 2 - to accomodate the node width + potential top/bottom-right edge
   Canvas ret;
-  ret.lines = Vec<std::string>(max.line + 1, std::string(max.col + 2, ' '));
+  ret.lines = Vec<string>(max.line + 1, string(max.col + 2, ' '));
   return ret;
 }
 
-Canvas Canvas::fromString(std::string const& rendered) {
+Canvas Canvas::fromString(string const& rendered) {
   Canvas ret;
-  std::string curLine;
+  string curLine;
   std::istringstream ss(rendered);
   size_t width = 0;
   while (getline(ss, curLine, '\n')) {
