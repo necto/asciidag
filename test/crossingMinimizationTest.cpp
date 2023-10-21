@@ -496,3 +496,45 @@ TEST(crossingMinimizationTest, deconstructedRenderingCrossingRemoved) {
 3 2
 )", '\n' + renderDAGWithLayers(dag, layers));
 }
+
+TEST(crossingMinimizationTest, danglingNodePreventsSimpleSwapFail) {
+  auto str = R"(
+ 0   1
+/|\ /|\
+|| \\\ \
+||  \\\ \
+||  || \ \
+|\  || |  \
+| \ || |  |
+| | |/ |  |
+2 3 4  5  6
+| |    |  |
+\ /    /  /
+ X    /  /
+/ \  /  /
+|  \ | /
+|   \|/
+7    8
+)";
+  auto [dag, layers] = parseWithLayers(str);
+  minimizeCrossings(layers, dag);
+  EXPECT_EQ(R"(
+ 0   1
+/|\ /|\
+|| \\\ \
+||  \\\ \
+|\  || \ \
+| \ || | |
+| | |/ | |
+2 3 4  5 6
+| |    | |
+| |    | |
+| |    / /
+| |   / /
+| /  / /
+\/  / /
+/\ / /
+| \|/
+7  8
+)", '\n' + renderDAGWithLayers(dag, layers));
+}
