@@ -497,7 +497,7 @@ TEST(crossingMinimizationTest, deconstructedRenderingCrossingRemoved) {
 )", '\n' + renderDAGWithLayers(dag, layers));
 }
 
-TEST(crossingMinimizationTest, danglingNodePreventsSimpleSwapFail) {
+TEST(crossingMinimizationTest, danglingNodePreventsSimpleSwap) {
   auto str = R"(
  0   1
 /|\ /|\
@@ -526,14 +526,14 @@ TEST(crossingMinimizationTest, danglingNodePreventsSimpleSwapFail) {
 |\  || \ \
 | \ || | |
 | | |/ | |
-2 3 4  5 6
+3 2 4  5 6
 | |    | |
 | |    | |
 | |    / /
 | |   / /
-| /  / /
-\/  / /
-/\ / /
+| |  / /
+| | / /
+| |/ /
 | \|/
 7  8
 )", '\n' + renderDAGWithLayers(dag, layers));

@@ -60,6 +60,14 @@ Vec2<size_t> dagLayers(DAG const& dag) {
   return ret;
 }
 
+void replace(Vec<size_t>& values, size_t dated, size_t updated) {
+  for (auto& v : values) {
+    if (v == dated) {
+      v = updated;
+    }
+  }
+}
+
 std::optional<RenderError> insertEdgeWaypoints(DAG& dag, Vec2<size_t>& layers) {
   size_t const preexistingCount = dag.nodes.size();
   Vec<size_t> rank(preexistingCount, 0);
@@ -129,6 +137,7 @@ findNonConflictingCrossings(DAG const& dag, Vec<size_t> const& lAbove, Vec<size_
   Vec<CrossingPair> ret;
   std::unordered_set<SimpleEdge, SimpleEdgeHash> takenEdges;
   // TODO: These 5 nested loops can definitely be optmized
+  // TODO: reverse this top-level loop: it should scan right-to-left to find the highest crossing first
   for (size_t leftTopPos = 0; leftTopPos < lAbove.size(); ++leftTopPos) {
     auto leftTop = lAbove[leftTopPos];
     // Starting at the other end to find the highest crossing first
@@ -492,14 +501,6 @@ DAG NodeCollector::buildDAG() && {
 
 bool hasCrossEdges(Vec<NodeCollector::Node> const& nodes) {
   return std::any_of(nodes.begin(), nodes.end(), [](auto const& n) { return n.text == "X"; });
-}
-
-void replace(Vec<size_t>& values, size_t dated, size_t updated) {
-  for (auto& v : values) {
-    if (v == dated) {
-      v = updated;
-    }
-  }
 }
 
 std::optional<ParseError> validateEdgeCrossings(Vec<NodeCollector::Node> const& nodes) {
@@ -1024,11 +1025,6 @@ void placeNodes(DAG const& dag, Vec<Position> const& coordinates, Canvas& canvas
   }
 }
 
-[[maybe_unused]]
-void printCanvas(Canvas const& canvas, string_view msg) {
-  std::cout << msg << "------\n" << canvas.render() << "-------\n";
-}
-
 string rtrim(string s) {
   s.erase(s.find_last_not_of(' ') + 1);
   return s;
@@ -1304,6 +1300,7 @@ void minimizeCrossingsForward(
 void minimizeCrossingsBackward(
   Vec2<size_t>& layers,
   DAG const& dag,
+  Vec2<size_t> const& preds,
   Vec2<std::pair<size_t, size_t>> const unswappableNodes
 ) {
   size_t const nLayers = layers.size();
@@ -1316,9 +1313,17 @@ void minimizeCrossingsBackward(
       size_t nId = curLayer[position];
       auto const& succs = dag.nodes[nId].succs;
       if (succs.empty()) {
-        // No successors, stay where you are
-        // FIXME: this is wrong, should really ignore these now, and reinsert then then
-        targetPos6[nId] = position * 6;
+        if (i + 1 < nLayers) {
+          // No successors, look at your predecessors
+          assert(!preds[nId].empty());
+          auto& prevLayer = layers[nLayers - i - 2];
+          // Scale the nextLayer width to be comparable
+          // with positions of other nodes that are defined by nextLayers
+          targetPos6[nId] = findTargetPosTimes6(preds[nId], prevLayer) * nextLayer.size() / prevLayer.size();
+        } else {
+          // Complete orphan, stay where you are
+          targetPos6[nId] = position * 6;
+        }
       } else {
         targetPos6[nId] = findTargetPosTimes6(succs, nextLayer);
       }
@@ -1371,17 +1376,69 @@ string escapeForDOTlabel(string_view str) {
 
 namespace detail {
 
+size_t insertEdgeWaypoint(DAG& dag, size_t from, size_t to) {
+  size_t nodeId = dag.nodes.size();
+  dag.nodes.push_back({{to}, waypointText});
+  replace(dag.nodes[from].succs, to, nodeId);
+  return nodeId;
+}
+
+template<class Collection, class elem>
+[[maybe_unused]] bool contains(Collection const& cont, elem el) {
+  return std::find(std::begin(cont), std::end(cont), el) != std::end(cont);
+}
+
+void padWithWaypointToPreserveCrossPredOrder(
+  DAG& dag,
+  Vec<size_t>& layer,
+  Vec<size_t> const& predLayer,
+  size_t from,
+  size_t to
+) {
+  assert(contains(dag.nodes[from].succs, to));
+  if (dag.nodes[to].text == "X") {
+    auto leftNodeI = std::find_if(predLayer.begin(), predLayer.end(), [&](size_t id) {
+      auto const& succs = dag.nodes[id].succs;
+      return std::find(succs.begin(), succs.end(), to) != succs.end();
+    });
+    assert(leftNodeI != predLayer.end());
+    auto rightNodeI = std::find(predLayer.begin(), predLayer.end(), from);
+    assert(rightNodeI != predLayer.end());
+    if (leftNodeI < rightNodeI) {
+      layer.push_back(insertEdgeWaypoint(dag, *leftNodeI, to));
+    }
+  }
+}
+
 Vec2<size_t> insertCrossNodes(DAG& dag, Vec2<size_t> const& layers) {
   Vec2<size_t> newLayers;
   newLayers.push_back(layers[0]);
   for (size_t layerI = 1; layerI < layers.size(); ++layerI) {
-    Vec<size_t> insertedCrossings;
+    Vec<size_t> insertedNodes;
     for (auto const& crossing :
          findNonConflictingCrossings(dag, layers[layerI - 1], layers[layerI])) {
-      insertedCrossings.push_back(insertCrossNode(dag, crossing));
+      // Order (right->left then left->right) avoids introducing unnecessary crossing
+      padWithWaypointToPreserveCrossPredOrder(
+        dag,
+        insertedNodes,
+        layers[layerI - 1],
+        crossing.fromRight,
+        crossing.toLeft
+      );
+      padWithWaypointToPreserveCrossPredOrder(
+        dag,
+        insertedNodes,
+        layers[layerI - 1],
+        crossing.fromLeft,
+        crossing.toRight
+      );
+      insertedNodes.push_back(insertCrossNode(dag, crossing));
     }
-    if (!insertedCrossings.empty()) {
-      newLayers.emplace_back(std::move(insertedCrossings));
+    // This does not preserve the order of predecessors, which matters
+    // for cross nodes in the next layer.
+    // It should be fine as long as it always inserts the highest crossing
+    if (!insertedNodes.empty()) {
+      newLayers.emplace_back(std::move(insertedNodes));
     }
     newLayers.push_back(layers[layerI]);
   }
@@ -1404,7 +1461,8 @@ void minimizeCrossings(Vec2<size_t>& layers, DAG const& dag) {
   Vec2<std::pair<size_t, size_t>> const unswappableNodes =
     findCrossNodeSuccsAndPreds(layers, dag, preds);
   minimizeCrossingsForward(layers, dag, preds, unswappableNodes);
-  minimizeCrossingsBackward(layers, dag, unswappableNodes);
+  minimizeCrossingsBackward(layers, dag, preds, unswappableNodes);
+  minimizeCrossingsForward(layers, dag, preds, unswappableNodes);
 }
 
 bool drawEdge(

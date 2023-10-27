@@ -520,7 +520,7 @@ TEST(render, dependenciesRightToLeft) {
 )");
 }
 
-TEST(render, complex6nodesFail) {
+TEST(render, complex6nodes) {
   // Crossing minimization fails here to swap two edges
   // then crossing insertion somehow fails to help the problem -
   // it does not reduce the number of edge crosses
@@ -542,18 +542,11 @@ TEST(render, complex6nodesFail) {
 | | |/ |  |
 | | 4  2  |
 | |    |\ |
-| |    |/ |
-| |    /| |
-| |   / | |
-| |  /  / /
-| | /  / /
-| \/  / /
-| /\ / /
-|/ | | |
-X  | | |
-|\ | | |
-| \| | |
-| || | |
+| |    || |
+| |    // /
+| |   // /
+| |  // /
+| | // /
 | |/ | |
 | X  | |
 | |\ | |
