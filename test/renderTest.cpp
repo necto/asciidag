@@ -666,3 +666,44 @@ TEST(render, crossedPlusUncrossedGraphs) {
 3  4 5
 )");
 }
+
+TEST(render, wellConnected6nodes3) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{3, 5}, "0"});
+  test.nodes.push_back(DAG::Node{{3, 4, 5}, "1"});
+  test.nodes.push_back(DAG::Node{{3, 5}, "2"});
+  test.nodes.push_back(DAG::Node{{}, "3"});
+  test.nodes.push_back(DAG::Node{{}, "4"});
+  test.nodes.push_back(DAG::Node{{}, "5"});
+  EXPECT_EQ(renderSuccessfully(test), R"(
+0   1  2
+|\ /|\ |\
+| \|| \\ \
+| ||\  \\ \
+| || \ || |
+| |/ | |/ |
+| X  | X  |
+| |\ | |\ |
+| | \| | \\
+| | || | | \
+| | |/ | | |
+| | X  | | |
+| | |\ | | |
+| | | \| | |
+| | | || | |
+| | | |/ | |
+| | | X  | |
+| | | |\ | |
+| | | || | |
+| | | /| | |
+| | |/ | | |
+| | X  | | |
+| | |\ | | |
+| | |/ | | |
+| | || / / /
+| / /// / /
+|/ // |/ /
+\|/ | \|/
+ 3  4  5
+)");
+}
