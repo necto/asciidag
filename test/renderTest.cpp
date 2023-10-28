@@ -839,3 +839,48 @@ X   | |
 6   5
 )");
 }
+
+TEST(render, notHemmingInAnyEdge) {
+  // Here the edges around the edge 0->6 can come too
+  // close to each other and prevent the edge 0->6 from passing,
+  // even though there is enough space for all three of them
+  DAG test;
+  test.nodes.push_back(DAG::Node{{5, 6, 7}, "0"});
+  test.nodes.push_back(DAG::Node{{2, 3, 4}, "1"});
+  test.nodes.push_back(DAG::Node{{3, 5, 6}, "2"});
+  test.nodes.push_back(DAG::Node{{5}, "3"});
+  test.nodes.push_back(DAG::Node{{}, "4"});
+  test.nodes.push_back(DAG::Node{{}, "5"});
+  test.nodes.push_back(DAG::Node{{}, "6"});
+  test.nodes.push_back(DAG::Node{{}, "7"});
+  EXPECT_EQ(renderSuccessfully(test), R"(
+  0     1
+ /|\   /|\
+/ | \  \\ \
+| | |   \\ \
+| | |   | \ \
+| | |   |  \ \
+| | |   |   \ \
+| | |   |   | |
+| | |   |   | |
+7 | |   2   4 |
+  | |  /|\    |
+  | | / |/    |
+  | |/  ||    /
+  | ||  ||   /
+  / /|  /|  /
+ / / / / / /
+/ / / / / /
+| |/  | |/
+| 6   | 3
+|     | |
+|     | |
+|     / /
+|    / /
+|   / /
+|  / /
+\ / /
+ \|/
+  5
+)");
+}

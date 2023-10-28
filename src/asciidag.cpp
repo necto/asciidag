@@ -743,11 +743,6 @@ struct Connectivity {
   Vec<Valency> nodeValencies;
 };
 
-bool operator<(Connectivity::Edge const& a, Connectivity::Edge const& b) {
-  return std::tie(a.from, a.exitAngle, a.to, a.entryAngle)
-       < std::tie(b.from, b.exitAngle, b.to, b.entryAngle);
-}
-
 size_t absDiff(size_t a, size_t b) {
   return a > b ? a - b : b - a;
 }
@@ -868,6 +863,30 @@ void setExitAngles(Connectivity& conn, Vec2<size_t> succEdges, Vec<Position> con
   }
 }
 
+[[maybe_unused]]
+std::ostream&
+operator<<(std::ostream& os, Connectivity::Edge const& e) {
+  return os << "(" << e.from << edgeChar(e.exitAngle) << edgeChar(e.entryAngle) << e.to << ")";
+}
+
+bool compareEdges(
+  Vec<Position> const& coords,
+  Connectivity::Edge const& e1,
+  Connectivity::Edge const& e2
+) {
+  auto fullTuple = [&coords](Connectivity::Edge const& e) {
+    return std::tie(
+      coords[e.from].line,
+      coords[e.from].col,
+      coords[e.to].line,
+      coords[e.to].col,
+      e.exitAngle,
+      e.entryAngle
+    );
+  };
+  return fullTuple(e1) < fullTuple(e2);
+}
+
 Connectivity computeConnectivity(DAG const& dag, Vec<Position> const& coords) {
   size_t const N = dag.nodes.size();
   Vec2<size_t> preds(N);
@@ -893,7 +912,9 @@ Connectivity computeConnectivity(DAG const& dag, Vec<Position> const& coords) {
   }
   setEntryAngles(ret, predEdges, coords);
   setExitAngles(ret, succEdges, coords);
-  std::sort(ret.edges.begin(), ret.edges.end());
+  std::sort(ret.edges.begin(), ret.edges.end(), [&coords](auto const& a, auto const& b) {
+    return compareEdges(coords, a, b);
+  });
   return ret;
 }
 
@@ -972,13 +993,13 @@ string rtrim(string s) {
   return s;
 }
 
-template <typename T>
-bool isSorted(T list) {
+template <typename T, typename C>
+[[maybe_unused]] bool isSorted(T list, C comparator) {
   if (list.begin() == list.end()) {
     return true;
   }
   for (auto i = list.begin(), j = i + 1; j < list.end(); i = j++) {
-    if (*j < *i) {
+    if (comparator(*j, *i)) {
       return false;
     }
   }
@@ -990,7 +1011,9 @@ void placeEdges(
   Vec<Connectivity::Edge> const& edges,
   Canvas& canvas
 ) {
-  assert(isSorted(edges));
+  assert(isSorted(edges, [&coordinates](auto const& e1, auto const& e2) {
+    return compareEdges(coordinates, e1, e2);
+  }));
   for (auto const& e : edges) {
     // TODO: assert that it returns true = success
     drawEdge(coordinates[e.from], e.exitAngle, coordinates[e.to], e.entryAngle, canvas);
