@@ -22,6 +22,7 @@ constexpr auto sketchMode = false;
 auto waypointText = "|";
 
 namespace {
+std::stringstream log;
 
 using namespace asciidag::detail;
 
@@ -127,6 +128,9 @@ bool contains(Collection const& cont, elem el) {
 }
 
 size_t insertCrossNode(DAG& dag, CrossingPair const& crossing) {
+  log
+    << "inserting crossing " << crossing.fromLeft << "->" << crossing.toRight << "; "
+    << crossing.fromRight << "<-" << crossing.toLeft << "\n";
   size_t fromLeftIdx = findIndex(dag.nodes[crossing.fromLeft].succs, crossing.toRight);
   size_t fromRightIdx = findIndex(dag.nodes[crossing.fromRight].succs, crossing.toLeft);
   size_t xid = dag.nodes.size();
@@ -136,6 +140,7 @@ size_t insertCrossNode(DAG& dag, CrossingPair const& crossing) {
   dag.nodes[xid].succs.push_back(crossing.toRight);
   dag.nodes[crossing.fromLeft].succs[fromLeftIdx] = xid;
   dag.nodes[crossing.fromRight].succs[fromRightIdx] = xid;
+  log <<"inserted " <<xid <<"\n";
   return xid;
 }
 
@@ -1206,6 +1211,7 @@ void minimizeCrossingsForward(
 ) {
   size_t const nLayers = layers.size();
   Vec<size_t> targetPos6(dag.nodes.size());
+  log <<leftNodes <<"\n";
   for (size_t layerI = 1; layerI < nLayers; ++layerI) {
     auto const& prevLayer = layers[layerI - 1];
     auto& curLayer = layers[layerI];
@@ -1455,7 +1461,11 @@ void minimizeCrossings(Vec2<size_t>& layers, DAG const& dag) {
   // so that this shuffling does not accidentally change the meaning of the crossing
   Vec2<size_t> const leftNodes = findForcedLeftNodesBecauseOfCrossings(dag, preds);
   minimizeCrossingsForward(layers, dag, preds, leftNodes);
+  log << "--- after first forward ---\n";
+  log << renderDAGWithLayers(dag, layers) << "\n-----\n";
   minimizeCrossingsBackward(layers, dag, preds, leftNodes);
+  log << "--- after backward ---\n";
+  log << renderDAGWithLayers(dag, layers) << "\n-----\n";
   minimizeCrossingsForward(layers, dag, preds, leftNodes);
 }
 
@@ -1525,14 +1535,22 @@ std::optional<string> renderDAG(DAG dag, RenderError& err) {
     err = *waypointErr;
     return {};
   }
+  log << "--- before min crossings ---\n";
+  log << renderDAGWithLayers(dag, layers) << "\n-----\n";
   minimizeCrossings(layers, dag);
+  log << "--- after min crossings ---\n";
+  log << renderDAGWithLayers(dag, layers) << "\n-----\n";
 
   for (int i = 0; i < 3; ++i) {
     if (countAllCrossings(layers, dag) == 0) {
       break;
     }
     layers = insertCrossNodes(dag, layers);
+    log << "--- after insert X ---\n";
+    log << renderDAGWithLayers(dag, layers) << "\n-----\n";
     minimizeCrossings(layers, dag);
+    log << "--- after min crossing in the loop ---\n";
+    log << renderDAGWithLayers(dag, layers) << "\n-----\n";
   }
 
   return renderDAGWithLayers(dag, layers);
