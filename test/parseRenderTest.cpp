@@ -1,6 +1,8 @@
 #include "asciidag.h"
 #include "testUtils.h"
 
+#include <cstddef>
+#include <gtest/gtest-param-test.h>
 #include <gtest/gtest.h>
 #include <iostream>
 
@@ -60,7 +62,10 @@ void assertEqual(DAG const& a, DAG const& b) {
   if (!compareDAGs(canonA, canonB)) {
     RenderError err;
     std::string rendering = renderDAG(a, err).value_or("");
-    GTEST_FAIL() <<"Graph \n" <<rendering <<" was transformed from " <<a <<" to " <<b;
+    GTEST_FAIL(
+    ) << "Graph \n"
+      << toDOT(a) << "\n"
+      << rendering << " was transformed from " << a << " to " << b;
   }
 }
 
@@ -134,7 +139,7 @@ void configureDAGFromSeed(DAG &dag, size_t seed) {
   }
 }
 
-size_t numberOfEdgeConfigurations(size_t nodeCount) {
+constexpr size_t numberOfEdgeConfigurations(size_t nodeCount) {
   size_t const maxEdgesCount = nodeCount * (nodeCount - 1) / 2;
   return 1 << maxEdgesCount;
 }
@@ -178,20 +183,52 @@ TEST(parseRender, generated5) {
   }
 }
 
-// TODO:
-// TEST(parseRender, generated6) {
-//   DAG dag;
-//   dag.nodes.push_back({{}, "0"});
-//   dag.nodes.push_back({{}, "1"});
-//   dag.nodes.push_back({{}, "2"});
-//   dag.nodes.push_back({{}, "3"});
-//   dag.nodes.push_back({{}, "4"});
-//   dag.nodes.push_back({{}, "5"});
-//   size_t const nPermutations = numberOfEdgeConfigurations(dag.nodes.size());
-//   for (size_t seed = 0; seed < nPermutations; ++seed) {
-//     std::cout <<seed << "/" <<nPermutations <<"\n";
-//     configureDAGFromSeed(dag, seed);
-//     std::cout <<toDOT(dag) <<"\n";
-//     ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
-//   }
-// }
+#ifdef LONG_BRUTFORCE_TESTS
+
+constexpr size_t batchSize = 10000;
+
+class enumerateAllGraphs : public testing::TestWithParam<std::tuple<size_t, size_t>> {
+};
+
+TEST_P(enumerateAllGraphs, parseOfRenderIsIdentity) {
+  DAG dag;
+  auto const [nodeCount, from] = GetParam();
+  auto param = GetParam();
+  for (size_t nodeId = 0; nodeId < nodeCount; ++nodeId) {
+    dag.nodes.push_back({{}, std::to_string(nodeId)});
+  }
+  size_t to = std::min(from + batchSize, numberOfEdgeConfigurations(nodeCount));
+  for (size_t seed = from; seed < to; ++seed) {
+    configureDAGFromSeed(dag, seed);
+    ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+  test6nodeGraphs,
+  enumerateAllGraphs,
+  testing::Combine(
+    testing::Values((size_t)6),
+    testing::Range((size_t)0, numberOfEdgeConfigurations(6), batchSize)
+  )
+);
+
+INSTANTIATE_TEST_SUITE_P(
+  test7nodeGraphs,
+  enumerateAllGraphs,
+  testing::Combine(
+    testing::Values((size_t)7),
+    testing::Range((size_t)0, numberOfEdgeConfigurations(7), batchSize)
+  )
+);
+
+INSTANTIATE_TEST_SUITE_P(
+  test8nodeGraphs,
+  enumerateAllGraphs,
+  testing::Combine(
+    testing::Values((size_t)8),
+    testing::Range((size_t)0, numberOfEdgeConfigurations(8), batchSize)
+  )
+);
+
+#endif // LONG_BRUTFORCE_TESTS
