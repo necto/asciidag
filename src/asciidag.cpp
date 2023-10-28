@@ -1541,7 +1541,7 @@ std::optional<string> renderDAG(DAG dag, RenderError& err) {
   log << "--- after min crossings ---\n";
   log << renderDAGWithLayers(dag, layers) << "\n-----\n";
 
-  for (int i = 0; i < 4; ++i) {
+  for (int i = 0; i < 5; ++i) {
     if (countAllCrossings(layers, dag) == 0) {
       break;
     }
