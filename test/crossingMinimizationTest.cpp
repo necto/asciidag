@@ -337,12 +337,12 @@ TEST(crossingMinimizationTest, untangleEquipotentialStrayNodeUpperLayer) {
 5     6
 )"),
 R"(
-3 2  4
-| |\ |
-| || |
-| /| /
-|/ |/
-5  6
+3 2   4
+| |\  |
+| | \ |
+| / | /
+|/  |/
+5   6
 )");
 }
 
@@ -357,12 +357,12 @@ TEST(crossingMinimizationTest, untangleEquipotentialStrayNodeLowerLayer) {
 2   3 4
 )"),
 R"(
-0  1
-|\ |\
-| \| \
-| || |
-| |/ |
-3 2  4
+0   1
+|\  |\
+| \ | \
+| | / |
+| |/  |
+3 2   4
 )");
 }
 
@@ -383,17 +383,17 @@ TEST(crossingMinimizationTest, untangleEquipotentialStrayNodeMiddleLayer) {
 5     6
 )"),
 R"(
-0  1
-|\ |\
-| \| \
-| || |
-| |/ |
-3 2  4
-| |\ |
-| || |
-| /| /
-|/ |/
-5  6
+0   1
+|\  |\
+| \ | \
+| | / |
+| |/  |
+3 2   4
+| |\  |
+| | \ |
+| / | /
+|/  |/
+5   6
 )");
 }
 
@@ -411,17 +411,17 @@ TEST(crossingMinimizationTest, untangleCentripetalSymmetricalCrossingFail) {
  3   4   5
 )"),
 R"(
-0 1  2
-| |\ |
-| || |
-| /| /
-|/ |/
-X  X
-|\ |\
-| \| \
-| || |
-| |/ |
-3 4  5
+0 1   2
+| |\  |
+| | \ |
+| / | /
+|/  |/
+X   X
+|\  |\
+| \ | \
+| | / |
+| |/  |
+3 4   5
 )");
 }
 
@@ -438,27 +438,27 @@ TEST(crossingMinimizationTest, untangleUnrelatedGraphInTheMiddleFail) {
  3 4 5
 )"),
 R"(
-0  1 2
-|\ | |\
-| \| | \
-| || | |
-| |/ | |
-| X  | |
-| |\ | |
-| | \| |
-| | || |
-| | |/ |
-| | X  |
-| | |\ |
-| | || |
-| | /| |
-| |/ | |
-| X  | |
-| |\ | |
-| || | |
-| /| | /
-|/ | |/
-3  4 5
+0   1 2
+|\  | |\
+| \ | | \
+| | / | |
+| |/  | |
+| X   | |
+| |\  | |
+| | \ | |
+| | | / |
+| | |/  |
+| | X   |
+| | |\  |
+| | | \ |
+| | / | |
+| |/  | |
+| X   | |
+| |\  | |
+| | \ | |
+| / | | /
+|/  | |/
+3   4 5
 )");
 }
 
@@ -535,6 +535,10 @@ TEST(crossingMinimizationTest, deconstructedRenderingCrossingRemoved) {
 }
 
 TEST(crossingMinimizationTest, danglingNodeDoesNotPreventSimpleSwap) {
+  // In the bottom-up pass, the dangling node 4 here might have prevented the
+  // proper swap of 2 and 3 that removes crossing in the lower layer, because if
+  // 4 is assigned an incorrect target position, it might introduce crossings
+  // with the upper layer
   auto str = R"(
  0   1
 /|\ /|\
@@ -556,21 +560,21 @@ TEST(crossingMinimizationTest, danglingNodeDoesNotPreventSimpleSwap) {
   auto [dag, layers] = parseWithLayers(str);
   minimizeCrossings(layers, dag);
   EXPECT_EQ(R"(
- 0    1
-/|\  /|\
-|| \ || \
-|\  \|\  \
-| \ || \ |
-| | |/ | |
-3 2 4  5 6
-| |    | |
-| |    | |
+  0     1
+ /|\   /|\
+/ | \ / | \
+| | |/  | |
+| | ||  | |
+| | |/  | |
+3 2 4   5 6
+| |     | |
+| |     | |
+| |     / /
 | |    / /
 | |   / /
 | |  / /
-| | / /
-| |/ /
-| \|/
-7  8
+| \ / /
+|  \|/
+7   8
 )", '\n' + renderDAGWithLayers(dag, layers));
 }

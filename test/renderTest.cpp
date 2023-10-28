@@ -94,11 +94,10 @@ TEST(render, threeSimpleEdgesDiverge) {
   test.nodes.push_back(DAG::Node{{}, "3"});
   EXPECT_EQ(renderSuccessfully(test),
             R"(
- 0
-/|\
-|| \
-|\  \
-| \ |
+  0
+ /|\
+/ | \
+| | |
 | | |
 1 2 3
 )");
@@ -112,11 +111,10 @@ TEST(render, threeSimpleEdgesDivergeOrder321) {
   test.nodes.push_back(DAG::Node{{}, "3"});
   EXPECT_EQ(renderSuccessfully(test),
             R"(
- 0
-/|\
-|| \
-|\  \
-| \ |
+  0
+ /|\
+/ | \
+| | |
 | | |
 1 2 3
 )");
@@ -130,11 +128,10 @@ TEST(render, threeSimpleEdgesDivergeOrder312) {
   test.nodes.push_back(DAG::Node{{}, "3"});
   EXPECT_EQ(renderSuccessfully(test),
             R"(
- 0
-/|\
-|| \
-|\  \
-| \ |
+  0
+ /|\
+/ | \
+| | |
 | | |
 1 2 3
 )");
@@ -151,10 +148,9 @@ TEST(render, threeSimpleEdgesConverge) {
 0 1 2
 | | |
 | | |
-| / /
-|/ /
-\|/
- 3
+\ | /
+ \|/
+  3
 )");
 }
 
@@ -186,11 +182,10 @@ TEST(render, nonStraightRightEdge) {
   test.nodes.push_back(DAG::Node{{}, "5"});
   EXPECT_EQ(renderSuccessfully(test),
             R"(
-0  3
-|\ |\
-| \| \
-| |\  \
-| | \ |
+0   3
+|\  |\
+| \ | \
+| | | |
 | | | |
 1 2 4 5
 )");
@@ -202,11 +197,11 @@ TEST(render, tripleEdgePair) {
   test.nodes.push_back(DAG::Node{{}, "1"});
   EXPECT_EQ(renderSuccessfully(test),
             R"(
- 0
-/|\
-|||
-\|/
- 1
+  0
+ /|\
+ |||
+ \|/
+  1
 )");
 }
 
@@ -218,11 +213,11 @@ TEST(render, twoTripleEdgePairs) {
   test.nodes.push_back(DAG::Node{{}, "3"});
   EXPECT_EQ(renderSuccessfully(test),
             R"(
- 0    2
-/|\  /|\
-|||  |||
-\|/  \|/
- 1    3
+  0     2
+ /|\   /|\
+ |||   |||
+ \|/   \|/
+  1     3
 )");
 }
 
@@ -239,10 +234,9 @@ TEST(render, nonStraightLeftEdge) {
 0 1 3 4
 | | | |
 | | | |
-| | / /
-| // /
-|/ |/
-2  5
+| / | /
+|/  |/
+2   5
 )");
 }
 
@@ -256,10 +250,10 @@ TEST(render, twoParallelRightEdges) {
   test.nodes.push_back(DAG::Node{{}, "4"});
   EXPECT_EQ(renderSuccessfully(test),
             R"(
-0  3
-|\ |
-| \\
-| | \
+0   3
+|\  |
+| \ |
+| | |
 | | |
 1 2 4
 )");
@@ -335,19 +329,19 @@ TEST(render, twoMultiLayerEdges) {
   test.nodes.push_back(DAG::Node{{}, "3"});
   EXPECT_EQ(renderSuccessfully(test),
             R"(
- 0
-/|\
-|| \
-||  \
-|\   \
-| \  |
-| |  |
-| 1  |
-| |\ |
-| || |
-| /| /
-|/ |/
-2  3
+  0
+ /|\
+/ | \
+| |  \
+| |   \
+| |   |
+| |   |
+| 1   |
+| |\  |
+| | \ |
+| / | /
+|/  |/
+2   3
 )");
 }
 
@@ -387,20 +381,20 @@ TEST(render, fourLayers) {
   test.nodes.push_back(DAG::Node{{}, "B"});
   EXPECT_EQ(renderSuccessfully(test),
             R"(
- #
-/|\
-|| \
-|\  \
-| \ |
+  #
+ /|\
+/ | \
+| | |
 | | |
 1 2 3
 | | |
-| | /
-| //
-|/ |
-4  |
-|  |
-|  |
+| | |
+| / |
+|/  |
+4   |
+|   |
+|   |
+|   /
 |  /
 | /
 |/
@@ -466,14 +460,14 @@ TEST(render, conflictingEdgesFromSamePredecessor) {
   test.nodes.push_back(DAG::Node{{}, "4"});
   test.nodes.push_back(DAG::Node{{}, "5"});
   EXPECT_EQ(renderSuccessfully(test), R"(
-0 1 2  3
-  | |\ |
-  | || |
-  / // /
- / // /
-/ // /
-|/ |/
-4  5
+0 1 2   3
+  | |\  |
+  | |/  |
+  / /|  /
+ / / / /
+/ / / /
+|/  |/
+4   5
 )");
 }
 
@@ -485,18 +479,17 @@ TEST(render, twoEdgeCrossingsFromSamePredecessor) {
   test.nodes.push_back(DAG::Node{{}, "3"});
   test.nodes.push_back(DAG::Node{{}, "4"});
   EXPECT_EQ(renderSuccessfully(test), R"(
- 0  1
-/|\ |\
-|| \\ \
-|\  \\ \
-| \ || |
-| | |/ |
-| | X  |
-| | |\ |
-| | || |
-| | /| /
-| |/ |/
-4 2  3
+  0   1
+ /|\  |\
+/ | \ | \
+| | | / |
+| | |/  |
+| | X   |
+| | |\  |
+| | | \ |
+| | / | /
+| |/  |/
+4 2   3
 )");
 }
 
@@ -511,12 +504,12 @@ TEST(render, dependenciesRightToLeft) {
   EXPECT_EQ(renderSuccessfully(test), R"(
 0 1 2
   | |\
-  | ||
-  / //
- / //
-/ //
-|/ |
-4  3
+  | |/
+  / /|
+ / / /
+/ / /
+|/  |
+4   3
 )");
 }
 
@@ -532,28 +525,29 @@ TEST(render, complex6nodes) {
   test.nodes.push_back(DAG::Node{{}, "4"});
   test.nodes.push_back(DAG::Node{{}, "5"});
   EXPECT_EQ(renderSuccessfully(test), R"(
- 0    1
-/|\  /|\
-|| \ || \
-||  \||  \
-|\  ||\   \
-| \ || \  |
-| | |/ |  |
-| | 4  2  |
-| |    |\ |
-| |    || |
-| |    // /
-| |   // /
-| |  // /
-| | // /
-| |/ | |
-| X  | |
-| |\ | |
-| || | |
-| || / /
-| /|/ /
-|/ \|/
-5   3
+  0     1
+ /|\   /|\
+/ | \ / | \
+| | |/  |  \
+| | ||  |   \
+| | ||  |   |
+| | |/  |   |
+| | 4   2   |
+| |     |\  |
+| |     |/  |
+| |     /|  /
+| |    / / /
+| |   / / /
+| |  / / /
+| | / / /
+| |/  | |
+| X   | |
+| |\  | |
+| | \ | |
+| |  \| |
+| /  || /
+|/   \|/
+5     3
 )");
 }
 
@@ -566,30 +560,32 @@ TEST(render, wellConnected6nodes) {
   test.nodes.push_back(DAG::Node{{}, "4"});
   test.nodes.push_back(DAG::Node{{}, "5"});
   EXPECT_EQ(renderSuccessfully(test), R"(
- 0    1
-/|\  /|\
-|| \ || \
-|\  \|\  \
-| \ || \ |
-| | |/ | |
-| | X  | |
-| | |\ | |
-| | || | /
-| | /| //
-| |/ |/ |
-| 2  3  |
-| |  |  |
-| |  |  /
+  0     1
+ /|\   /|\
+/ | \ / | \
+| | |/  | |
+| | ||  | |
+| | |/  | |
+| | X   | |
+| | |\  | |
+| | | \ | |
+| | / | / |
+| |/  |/  |
+| 2   3   |
+| |   |   |
+| |   |   /
+| |   |  /
+| |   / /
 | |  / /
-| | / /
-| // /
-|/ | |
-X  | |
-|\ | |
-| \| |
-| || /
-| \|/
-5  4
+| / / /
+|/  | |
+X   | |
+|\  | |
+| \ | |
+|  \| |
+|  || /
+|  \|/
+5   4
 )");
 }
 
@@ -602,31 +598,29 @@ TEST(render, wellConnected6nodes2) {
   test.nodes.push_back(DAG::Node{{}, "4"});
   test.nodes.push_back(DAG::Node{{}, "5"});
   EXPECT_EQ(renderSuccessfully(test), R"(
- 0    1  2
-/|\  /|\ |\
-|| \ || \\ \
-|\  \|\  \\ \
-| \ || \ || |
-| | |/ | |/ |
-| | X  | X  |
-| | |\ | |\ |
-| | || | /| |
-| | /| // | |
-| |/ |/ | | |
-| X  X  | | |
-| |\ |\ | | |
-| | \| \\ | |
-| | |\  \\\ \
-| | | \ || \ \
-| | | | |/ | |
-| | | | X  | |
-| | | | |\ | |
-| | | | |/ | |
-| | / / /| / /
-| |/ / / // /
-| /|/ / // /
-|/ \|/  \|/
-5   3    4
+  0     1   2
+ /|\   /|\  |\
+/ | \ / | \ | \
+| | |/  | | | |
+| | ||  | | / |
+| | |/  | |/  |
+| | X   | X   |
+| | |\  | |\  |
+| | | \ | | \ |
+| | / | / | | |
+| |/  |/  | | |
+| X   X   | | |
+| |\  |\  | | |
+| | \ | \ | | |
+| | | | | / | |
+| | | | |/  | |
+| | | | X   | |
+| | | | |\  | |
+| | | | | \ | |
+| | | | |  \| |
+| / \ | /  || /
+|/   \|/   \|/
+5     3     4
 )");
 }
 
@@ -639,27 +633,27 @@ TEST(render, crossedPlusUncrossedGraphs) {
   test.nodes.push_back(DAG::Node{{}, "4"});
   test.nodes.push_back(DAG::Node{{}, "5"});
   EXPECT_EQ(renderSuccessfully(test), R"(
-0  1 2
-|\ | |\
-| \| | \
-| || | |
-| |/ | |
-| X  | |
-| |\ | |
-| | \| |
-| | || |
-| | |/ |
-| | X  |
-| | |\ |
-| | || |
-| | /| |
-| |/ | |
-| X  | |
-| |\ | |
-| || | |
-| /| | /
-|/ | |/
-3  4 5
+0   1 2
+|\  | |\
+| \ | | \
+| | / | |
+| |/  | |
+| X   | |
+| |\  | |
+| | \ | |
+| | | / |
+| | |/  |
+| | X   |
+| | |\  |
+| | | \ |
+| | / | |
+| |/  | |
+| X   | |
+| |\  | |
+| | \ | |
+| / | | /
+|/  | |/
+3   4 5
 )");
 }
 
@@ -672,35 +666,33 @@ TEST(render, wellConnected6nodes3) {
   test.nodes.push_back(DAG::Node{{}, "4"});
   test.nodes.push_back(DAG::Node{{}, "5"});
   EXPECT_EQ(renderSuccessfully(test), R"(
-0   1  2
-|\ /|\ |\
-| \|| \\ \
-| ||\  \\ \
-| || \ || |
-| |/ | |/ |
-| X  | X  |
-| |\ | |\ |
-| | \| | \\
-| | || | | \
-| | |/ | | |
-| | X  | | |
-| | |\ | | |
-| | | \| | |
-| | | || | |
-| | | |/ | |
-| | | X  | |
-| | | |\ | |
-| | | || | |
-| | | /| | |
-| | |/ | | |
-| | X  | | |
-| | |\ | | |
-| | |/ | | |
-| | || / / /
-| / /// / /
-|/ // |/ /
-\|/ | \|/
- 3  4  5
+0     1   2
+|\   /|\  |\
+| \ / | \ | \
+| |/  | | | |
+| ||  | | / |
+| |/  | |/  |
+| X   | X   |
+| |\  | |\  |
+| | \ | | \ |
+| | | / | | |
+| | |/  | | |
+| | X   | | |
+| | |\  | | |
+| | | \ | | |
+| | | | / | |
+| | | |/  | |
+| | | X   | |
+| | | |\  | |
+| | | | \ | |
+| | | / | | |
+| | |/  | | |
+| | X   | | |
+| | |\  | | |
+| | | \ | | |
+\ | / | \ | /
+ \|/  |  \|/
+  3   4   5
 )");
 }
 
@@ -714,56 +706,53 @@ TEST(render, fullyConnected3x3) {
   test.nodes.push_back(DAG::Node{{}, "4"});
   test.nodes.push_back(DAG::Node{{}, "5"});
   EXPECT_EQ(renderSuccessfully(test), R"(
- 0    1    2
-/|\  /|\  /|\
-|| \ || \ || \
-|\  \|\  \|\  \
-| \ || \ || \ |
-| | |/ | |/ | |
-| | X  | X  | |
-| | |\ | |\ | |
-| | | \\ | \\ \
-| | | | \| | \ \
-| | | | |/ | | |
-| | | | X  | | |
-| | | | |\ | | |
-| | | | || | | /
-| | | / // / //
-| | // // / //
-| |/ |/ | |/ |
-| X  X  | X  |
-| |\ |\ | |\ |
-| | \| \| | \\
-| | || |\ \  \\
-| | || | \ \ | \
-| | |/ | | | | |
-| | X  | | | | |
-| | |\ | | | | |
-| | | \| | | | |
-| | | || | | | |
-| | | |/ | | | |
-| | | X  | | | |
-| | | |\ | | | |
-| | | | \| | | |
-| | | | || | | |
-| | | | |/ | | |
-| | | | X  | | |
-| | | | |\ | | |
-| | | | | \| | |
-| | | | | || | |
-| | | | | |/ | |
-| | | | | X  | |
-| | | | | |\ | |
-| | | | | |/ | |
-| | | / / /| / /
-| / // / / // /
-|/ / |/ / // /
-\|/  \|/  \|/
- 3    4    5
+  0     1     2
+ /|\   /|\   /|\
+/ | \ / | \ / | \
+| | |/  | |/  | |
+| | ||  | ||  | |
+| | |/  | |/  | |
+| | X   | X   | |
+| | |\  | |\  | |
+| | | \ | | \ | |
+| | | | | / | | |
+| | | | |/  | | |
+| | | | X   | | |
+| | | | |\  | | |
+| | | | | \ | | |
+| | / | / | | / |
+| |/  |/  | |/  |
+| X   X   | X   |
+| |\  |\  | |\  |
+| | \ | \ | | \ |
+| | | / | | | | |
+| | |/  | | | | |
+| | X   | | | | |
+| | |\  | | | | |
+| | | \ | | | | |
+| | | | / | | | |
+| | | |/  | | | |
+| | | X   | | | |
+| | | |\  | | | |
+| | | | \ | | | |
+| | | | | / | | |
+| | | | |/  | | |
+| | | | X   | | |
+| | | | |\  | | |
+| | | | | \ | | |
+| | | | | | / | |
+| | | | | |/  | |
+| | | | | X   | |
+| | | | | |\  | |
+| | | | | | \ | |
+| | | | | |  \| |
+\ | / \ | /  || /
+ \|/   \|/   \|/
+  3     4     5
 )");
 }
 
-TEST(render, case7nodes) {
+TEST(render, narrowGapForAnEdgeEgress) {
   DAG test;
   test.nodes.push_back(DAG::Node{{3, 4, 5}, "0"});
   test.nodes.push_back(DAG::Node{{3, 6}, "1"});
@@ -773,24 +762,80 @@ TEST(render, case7nodes) {
   test.nodes.push_back(DAG::Node{{}, "5"});
   test.nodes.push_back(DAG::Node{{}, "6"});
   EXPECT_EQ(renderSuccessfully(test), R"(
- 0    2  1
-/|\  /|\ |\
-|| \ || \| \
-||  \|| |\  \
-|\  ||\ \ \  \
-| \ || \ \ \ |
-| | |/ | | | |
-| | X  | | | |
-| | |\ | | | |
-| | || | / / /
-| | /| // / /
-| |/ |/ | | |
-| X  X  | | |
-| |\ |\ | | |
-| || || | | /
-| || || / //
-| /| /|/ //
-|/ |/ \|/ |
-4  5   3  6
+  0     2   1
+ /|\   /|\  |\
+/ | \ / | \ | \
+| | |/  | | | |
+| | ||  | | | |
+| | |/  | | | |
+| | X   | | | |
+| | |\  | | | |
+| | | \ | | | |
+| | / | / | | |
+| |/  |/  | | |
+| X   X   | | |
+| |\  |\  | | |
+| | \ | \ | | |
+| | | |  \| | |
+| / | /  || / |
+|/  |/   \|/  |
+4   5     3   6
+)");
+}
+
+TEST(render, narrowGapForAnEdgeIngress) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{3, 4, 5}, "0"});
+  test.nodes.push_back(DAG::Node{{2, 3, 4}, "1"});
+  test.nodes.push_back(DAG::Node{{3, 4, 5}, "2"});
+  test.nodes.push_back(DAG::Node{{5, 6}, "3"});
+  test.nodes.push_back(DAG::Node{{}, "4"});
+  test.nodes.push_back(DAG::Node{{}, "5"});
+  test.nodes.push_back(DAG::Node{{}, "6"});
+  EXPECT_EQ(renderSuccessfully(test), R"(
+  0     1
+ /|\   /|\
+/ | \ / | \
+| | | | |  \
+| | | | |   \
+| | | | \    \
+| | | |  \    \
+| | | |   \   |
+| | | |   |   |
+| | | |   2   |
+| | | |  /|\  |
+| | | | / | \ |
+| / | / | | | /
+|/  |/  | | |/
+X   X   | | X
+|\  |\  | | |\
+| \ | \ | | | \
+| | | | / | | |
+| | | |/  | | |
+| | | X   | | |
+| | | |\  | | |
+| | | | \ | | |
+| | | |  \| | |
+| \ | /  || / |
+|  \|/   \|/  |
+|   3     4   |
+|   |\        |
+|   |/        /
+|   ||       /
+|   ||      /
+|   ||     /
+|   ||    /
+|   ||   /
+|   /|  /
+|  / / /
+| / / /
+|/  | |
+X   | |
+|\  | |
+| \ | |
+|  \| |
+|  || /
+|  \|/
+6   5
 )");
 }

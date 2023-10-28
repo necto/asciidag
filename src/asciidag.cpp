@@ -936,24 +936,16 @@ void adjustCoordsWithValencies(
 ) {
   for (auto const& layer : layers) {
     size_t lastCol = 0;
-    bool prevNodeHadFullTop = false;
-    bool prevNodeHadFullBottom = false;
     for (auto node : layer) {
       auto const& valencies = conn.nodeValencies[node];
       if (valencies.bottomLeft || valencies.topLeft) {
-        lastCol += 1; // Accomodate left edge (incoming or outgoing)
-        if ((prevNodeHadFullBottom && valencies.bottomLeft) || (prevNodeHadFullTop && valencies.topLeft)) {
-          // Otherwise it might get too crowded for all the edges of previous node
-          lastCol += 1;
-        }
+        lastCol += 2; // Accomodate left edge (incoming or outgoing)
       }
       coords[node].col = lastCol;
       lastCol += 2; // accomodate node width and mandatory space
       if (valencies.bottomRight || valencies.topRight) {
-        lastCol += 1; // accomodate right edge (incoming or outgoing)
+        lastCol += 2; // accomodate right edge (incoming or outgoing)
       }
-      prevNodeHadFullBottom = valencies.bottomRight && valencies.bottomLeft;
-      prevNodeHadFullTop = valencies.topRight && valencies.topLeft;
     }
   }
   auto interLayerEdges = groupEdgesByLayer(conn, layers);
