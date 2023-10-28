@@ -425,6 +425,43 @@ X  X
 )");
 }
 
+TEST(crossingMinimizationTest, untangleUnrelatedGraphInTheMiddleFail) {
+  // TODO
+  // Here the 1-4 graph is best taken on the side to avoid extra edge crossings.
+  // However, moving only 1 or only 4 to either side brings no immediate improvement,
+  // so it stays in place.
+  EXPECT_EQ(parseAndRender(R"(
+ 0 1 2
+ |\|/|
+ | X |
+ |/|\|
+ 3 4 5
+)"),
+R"(
+0  1 2
+|\ | |\
+| \| | \
+| || | |
+| |/ | |
+| X  | |
+| |\ | |
+| | \| |
+| | || |
+| | |/ |
+| | X  |
+| | |\ |
+| | || |
+| | /| |
+| |/ | |
+| X  | |
+| |\ | |
+| || | |
+| /| | /
+|/ | |/
+3  4 5
+)");
+}
+
 TEST(crossingMinimizationTest, deconstructedRenderingNoMinimizationParallel) {
   auto str = R"(
 0 1
