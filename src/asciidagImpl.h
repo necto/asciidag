@@ -49,4 +49,16 @@ void minimizeCrossings(Vec2<size_t>& layers, DAG const& dag);
 
 Vec2<size_t> insertCrossNodes(DAG& dag, Vec2<size_t> const& layers);
 
+struct CrossingPair {
+  size_t fromLeft;
+  size_t fromRight;
+  size_t toLeft;
+  size_t toRight;
+};
+
+Vec<CrossingPair>
+findNonConflictingCrossings(DAG const& dag, Vec<size_t> const& lAbove, Vec<size_t> const& lBelow);
+
+size_t countCrossings(DAG const& dag, Vec<size_t> const& lAbove, Vec<size_t> const& lBelow);
+
 } // namespace asciidag::detail

@@ -108,13 +108,6 @@ std::optional<RenderError> insertEdgeWaypoints(DAG& dag, Vec2<size_t>& layers) {
   return {};
 }
 
-struct CrossingPair {
-  size_t fromLeft;
-  size_t fromRight;
-  size_t toLeft;
-  size_t toRight;
-};
-
 struct SimpleEdge {
   size_t from;
   size_t to;
@@ -128,66 +121,9 @@ struct SimpleEdgeHash {
   size_t operator()(SimpleEdge const& e) const noexcept { return e.from ^ (e.to << 1); }
 };
 
-bool contains(Vec<size_t> list, size_t val) {
-  return std::find(list.begin(), list.end(), val) != list.end();
-}
-
-Vec<CrossingPair>
-findNonConflictingCrossings(DAG const& dag, Vec<size_t> const& lAbove, Vec<size_t> const& lBelow) {
-  Vec<CrossingPair> ret;
-  std::unordered_set<SimpleEdge, SimpleEdgeHash> takenEdges;
-  // TODO: These 5 nested loops can definitely be optmized
-  // TODO: reverse this top-level loop: it should scan right-to-left to find the highest crossing first
-  for (size_t leftTopPos = 0; leftTopPos < lAbove.size(); ++leftTopPos) {
-    auto leftTop = lAbove[leftTopPos];
-    // Starting at the other end to find the highest crossing first
-    for (size_t rightBottomPos = lBelow.size() - 1; rightBottomPos != 0; --rightBottomPos) {
-      auto rightBottom = lBelow[rightBottomPos];
-      if (!contains(dag.nodes[leftTop].succs, rightBottom)) {
-        continue;
-      }
-      for (size_t rightTopPos = leftTopPos + 1; rightTopPos < lAbove.size(); ++rightTopPos) {
-        auto rightTop = lAbove[rightTopPos];
-        bool found = false;
-        for (size_t leftBottomPos = 0; leftBottomPos < rightBottomPos; ++leftBottomPos) {
-          auto leftBottom = lBelow[leftBottomPos];
-          if (!contains(dag.nodes[rightTop].succs, leftBottom)) {
-            continue;
-          }
-          SimpleEdge edge{rightTop, leftBottom};
-          if (takenEdges.count(edge) == 0) {
-            takenEdges.insert(edge);
-            ret.push_back({leftTop, rightTop, leftBottom, rightBottom});
-            found = true;
-            break;
-          }
-        }
-        if (found) {
-          // For any edge
-          // can only resolve one crossing at a time
-          break;
-        }
-      }
-    }
-  }
-  return ret;
-}
-
-size_t countCrossings(DAG const& dag, Vec<size_t> const& lAbove, Vec<size_t> const& lBelow) {
-  size_t ret = 0;
-  // TODO: These 5 nested loops can definitely be optmized
-  for (size_t leftTopPos = 0; leftTopPos < lAbove.size(); ++leftTopPos) {
-    for (size_t rightTopPos = leftTopPos + 1; rightTopPos < lAbove.size(); ++rightTopPos) {
-      for (size_t rightBottom : dag.nodes[lAbove[leftTopPos]].succs) {
-        for (size_t leftBottom : dag.nodes[lAbove[rightTopPos]].succs) {
-          if (findIndex(lBelow, leftBottom) < findIndex(lBelow, rightBottom)) {
-            ++ret;
-          }
-        }
-      }
-    }
-  }
-  return ret;
+template<class Collection, class elem>
+bool contains(Collection const& cont, elem el) {
+  return std::find(std::begin(cont), std::end(cont), el) != std::end(cont);
 }
 
 size_t insertCrossNode(DAG& dag, CrossingPair const& crossing) {
@@ -1376,16 +1312,73 @@ string escapeForDOTlabel(string_view str) {
 
 namespace detail {
 
+Vec<CrossingPair>
+findNonConflictingCrossings(DAG const& dag, Vec<size_t> const& lAbove, Vec<size_t> const& lBelow) {
+  Vec<CrossingPair> ret;
+  std::unordered_set<SimpleEdge, SimpleEdgeHash> takenEdges;
+  // TODO: These 5 nested loops can definitely be optmized
+  // TODO: reverse this top-level loop: it should scan right-to-left to find the highest crossing first
+  for (size_t leftTopPos = 0; leftTopPos < lAbove.size(); ++leftTopPos) {
+    auto leftTop = lAbove[leftTopPos];
+    // Starting at the other end to find the highest crossing first
+    for (size_t rightBottomPos = lBelow.size() - 1; rightBottomPos != 0; --rightBottomPos) {
+      auto rightBottom = lBelow[rightBottomPos];
+      SimpleEdge leftRightEdge{leftTop, rightBottom};
+      if (!contains(dag.nodes[leftTop].succs, rightBottom) ||
+          takenEdges.count(leftRightEdge) != 0) {
+        continue;
+      }
+      for (size_t rightTopPos = leftTopPos + 1; rightTopPos < lAbove.size(); ++rightTopPos) {
+        auto rightTop = lAbove[rightTopPos];
+        bool found = false;
+        for (size_t leftBottomPos = 0; leftBottomPos < rightBottomPos; ++leftBottomPos) {
+          auto leftBottom = lBelow[leftBottomPos];
+          if (!contains(dag.nodes[rightTop].succs, leftBottom)) {
+            continue;
+          }
+          SimpleEdge rightLeftEdge{rightTop, leftBottom};
+          if (takenEdges.count(rightLeftEdge) == 0) {
+            takenEdges.insert(rightLeftEdge);
+            takenEdges.insert(leftRightEdge);
+            ret.push_back({leftTop, rightTop, leftBottom, rightBottom});
+            found = true;
+            break;
+          }
+        }
+        if (found) {
+          // For any edge
+          // can only resolve one crossing at a time
+          break;
+        }
+      }
+    }
+  }
+  return ret;
+}
+
+size_t countCrossings(DAG const& dag, Vec<size_t> const& lAbove, Vec<size_t> const& lBelow) {
+  size_t ret = 0;
+  // TODO: These 5 nested loops can definitely be optmized
+  for (size_t leftTopPos = 0; leftTopPos < lAbove.size(); ++leftTopPos) {
+    for (size_t rightTopPos = leftTopPos + 1; rightTopPos < lAbove.size(); ++rightTopPos) {
+      for (size_t rightBottom : dag.nodes[lAbove[leftTopPos]].succs) {
+        for (size_t leftBottom : dag.nodes[lAbove[rightTopPos]].succs) {
+          if (findIndex(lBelow, leftBottom) < findIndex(lBelow, rightBottom)) {
+            ++ret;
+          }
+        }
+      }
+    }
+  }
+  return ret;
+}
+
+
 size_t insertEdgeWaypoint(DAG& dag, size_t from, size_t to) {
   size_t nodeId = dag.nodes.size();
   dag.nodes.push_back({{to}, waypointText});
   replace(dag.nodes[from].succs, to, nodeId);
   return nodeId;
-}
-
-template<class Collection, class elem>
-[[maybe_unused]] bool contains(Collection const& cont, elem el) {
-  return std::find(std::begin(cont), std::end(cont), el) != std::end(cont);
 }
 
 void padWithWaypointToPreserveCrossPredOrder(
