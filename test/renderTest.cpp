@@ -218,11 +218,11 @@ TEST(render, twoTripleEdgePairs) {
   test.nodes.push_back(DAG::Node{{}, "3"});
   EXPECT_EQ(renderSuccessfully(test),
             R"(
- 0   2
-/|\ /|\
-||| |||
-\|/ \|/
- 1   3
+ 0    2
+/|\  /|\
+|||  |||
+\|/  \|/
+ 1    3
 )");
 }
 
@@ -532,13 +532,12 @@ TEST(render, complex6nodes) {
   test.nodes.push_back(DAG::Node{{}, "4"});
   test.nodes.push_back(DAG::Node{{}, "5"});
   EXPECT_EQ(renderSuccessfully(test), R"(
- 0   1
-/|\ /|\
-|| \\\ \
-||  \\\ \
-||  || \ \
-|\  || |  \
-| \ || |  |
+ 0    1
+/|\  /|\
+|| \ || \
+||  \||  \
+|\  ||\   \
+| \ || \  |
 | | |/ |  |
 | | 4  2  |
 | |    |\ |
@@ -567,12 +566,11 @@ TEST(render, wellConnected6nodes) {
   test.nodes.push_back(DAG::Node{{}, "4"});
   test.nodes.push_back(DAG::Node{{}, "5"});
   EXPECT_EQ(renderSuccessfully(test), R"(
- 0   1
-/|\ /|\
-|| \\\ \
-||  \\\ \
-|\  || \ \
-| \ || | |
+ 0    1
+/|\  /|\
+|| \ || \
+|\  \|\  \
+| \ || \ |
 | | |/ | |
 | | X  | |
 | | |\ | |
@@ -604,12 +602,11 @@ TEST(render, wellConnected6nodes2) {
   test.nodes.push_back(DAG::Node{{}, "4"});
   test.nodes.push_back(DAG::Node{{}, "5"});
   EXPECT_EQ(renderSuccessfully(test), R"(
- 0   1  2
-/|\ /|\ |\
-|| \\\ \\ \
-||  \\\ \\ \
-|\  || \ \\ \
-| \ || | || |
+ 0    1  2
+/|\  /|\ |\
+|| \ || \\ \
+|\  \|\  \\ \
+| \ || \ || |
 | | |/ | |/ |
 | | X  | X  |
 | | |\ | |\ |
@@ -625,12 +622,11 @@ TEST(render, wellConnected6nodes2) {
 | | | | X  | |
 | | | | |\ | |
 | | | | |/ | |
-| | | | || / /
-| | / / /// /
-| |/ / /// /
-| /|/ /// /
-|/ \|/ \|/
-5   3   4
+| | / / /| / /
+| |/ / / // /
+| /|/ / // /
+|/ \|/  \|/
+5   3    4
 )");
 }
 
@@ -709,6 +705,7 @@ TEST(render, wellConnected6nodes3) {
 }
 
 TEST(render, fullyConnected3x3) {
+  // Requires 5 iterations in crossing-insertion/crossing minimization
   DAG test;
   test.nodes.push_back(DAG::Node{{3, 4, 5}, "0"});
   test.nodes.push_back(DAG::Node{{3, 4, 5}, "1"});
@@ -717,13 +714,11 @@ TEST(render, fullyConnected3x3) {
   test.nodes.push_back(DAG::Node{{}, "4"});
   test.nodes.push_back(DAG::Node{{}, "5"});
   EXPECT_EQ(renderSuccessfully(test), R"(
- 0   1   2
-/|\ /|\ /|\
-|| \\\ \\\ \
-||  \\\ \\\ \
-||  || \ \\\ \
-|\  || | || \ \
-| \ || | || | |
+ 0    1    2
+/|\  /|\  /|\
+|| \ || \ || \
+|\  \|\  \|\  \
+| \ || \ || \ |
 | | |/ | |/ | |
 | | X  | X  | |
 | | |\ | |\ | |
@@ -760,12 +755,42 @@ TEST(render, fullyConnected3x3) {
 | | | | | X  | |
 | | | | | |\ | |
 | | | | | |/ | |
-| | | | | || / /
-| | | | / /// /
-| | | // /// /
-| / /// /// /
-|/ /// /// /
-\|/ \|/ \|/
- 3   4   5
+| | | / / /| / /
+| / // / / // /
+|/ / |/ / // /
+\|/  \|/  \|/
+ 3    4    5
+)");
+}
+
+TEST(render, case7nodes) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{3, 4, 5}, "0"});
+  test.nodes.push_back(DAG::Node{{3, 6}, "1"});
+  test.nodes.push_back(DAG::Node{{3, 4, 5}, "2"});
+  test.nodes.push_back(DAG::Node{{}, "3"});
+  test.nodes.push_back(DAG::Node{{}, "4"});
+  test.nodes.push_back(DAG::Node{{}, "5"});
+  test.nodes.push_back(DAG::Node{{}, "6"});
+  EXPECT_EQ(renderSuccessfully(test), R"(
+ 0    2  1
+/|\  /|\ |\
+|| \ || \| \
+||  \|| |\  \
+|\  ||\ \ \  \
+| \ || \ \ \ |
+| | |/ | | | |
+| | X  | | | |
+| | |\ | | | |
+| | || | / / /
+| | /| // / /
+| |/ |/ | | |
+| X  X  | | |
+| |\ |\ | | |
+| || || | | /
+| || || / //
+| /| /|/ //
+|/ |/ \|/ |
+4  5   3  6
 )");
 }

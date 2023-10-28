@@ -534,7 +534,7 @@ TEST(crossingMinimizationTest, deconstructedRenderingCrossingRemoved) {
 )", '\n' + renderDAGWithLayers(dag, layers));
 }
 
-TEST(crossingMinimizationTest, danglingNodePreventsSimpleSwap) {
+TEST(crossingMinimizationTest, danglingNodeDoesNotPreventSimpleSwap) {
   auto str = R"(
  0   1
 /|\ /|\
@@ -556,12 +556,11 @@ TEST(crossingMinimizationTest, danglingNodePreventsSimpleSwap) {
   auto [dag, layers] = parseWithLayers(str);
   minimizeCrossings(layers, dag);
   EXPECT_EQ(R"(
- 0   1
-/|\ /|\
-|| \\\ \
-||  \\\ \
-|\  || \ \
-| \ || | |
+ 0    1
+/|\  /|\
+|| \ || \
+|\  \|\  \
+| \ || \ |
 | | |/ | |
 3 2 4  5 6
 | |    | |
