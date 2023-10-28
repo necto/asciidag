@@ -1234,30 +1234,30 @@ size_t countAllCrossings(Vec2<size_t> const& layers, DAG const& dag) {
   return ret;
 }
 
-Vec2<std::pair<size_t, size_t>>
-findCrossNodeSuccsAndPreds(Vec2<size_t> const& layers, DAG const& dag, Vec2<size_t> const& preds) {
-  size_t const nLayers = layers.size();
-  Vec2<std::pair<size_t, size_t>> ret(nLayers);
-  for (size_t layerI = 0; layerI < nLayers; ++layerI) {
-    for (size_t nodeId : layers[layerI]) {
-      if (dag.nodes[nodeId].text == "X") {
-        // No triple-crossings supported
-        assert(preds[nodeId].size() == 2);
-        assert(dag.nodes[nodeId].succs.size() == 2);
-        // Cross nodes cannot be inserted to the first or the last layer
-        assert(layerI != 0 && layerI + 1 < nLayers);
-        ret[layerI - 1].push_back({preds[nodeId][0], preds[nodeId][1]});
-        ret[layerI + 1].push_back({dag.nodes[nodeId].succs[0], dag.nodes[nodeId].succs[1]});
-      }
+Vec2<size_t>
+findForcedLeftNodesBecauseOfCrossings(DAG const& dag, Vec2<size_t> const& preds) {
+  size_t const N = dag.nodes.size();
+  Vec2<size_t> leftNodes(N);
+  for (size_t nodeId = 0; nodeId < N; ++nodeId) {
+    if (dag.nodes[nodeId].text == "X") {
+      // Triple-crossings can be supported if needed
+      assert(preds[nodeId].size() == 2);
+      assert(dag.nodes[nodeId].succs.size() == 2);
+      leftNodes[preds[nodeId][1]].push_back(preds[nodeId][0]);
+      leftNodes[dag.nodes[nodeId].succs[1]].push_back(dag.nodes[nodeId].succs[0]);
     }
   }
-  return ret;
+  return leftNodes;
 }
 
-void keepOrderOf(Vec<size_t>& targetPos6, Vec<std::pair<size_t, size_t>> const& unswappableNodes) {
-  for (auto [left, right] : unswappableNodes) {
-    if (targetPos6[right] <= targetPos6[left]) {
-      targetPos6[right] = targetPos6[left] + 1;
+void keepOrderOf(Vec<size_t> const& layer, Vec<size_t>& targetPos6, Vec2<size_t> const& leftNodes) {
+  for (auto nId : layer) {
+    // Make sure the position of the right-most node is larger than the positions of its left counterparts
+    size_t& pos = targetPos6[nId];
+    for (auto left : leftNodes[nId]) {
+      if (pos <= targetPos6[left]) {
+        pos = targetPos6[left] + 1;
+      }
     }
   }
 }
@@ -1266,7 +1266,7 @@ void minimizeCrossingsForward(
   Vec2<size_t>& layers,
   DAG const& dag,
   Vec2<size_t> const& preds,
-  Vec2<std::pair<size_t, size_t>> const unswappableNodes
+  Vec2<size_t> const& leftNodes
 ) {
   size_t const nLayers = layers.size();
   Vec<size_t> targetPos6(dag.nodes.size());
@@ -1277,7 +1277,7 @@ void minimizeCrossingsForward(
       assert(0 < preds[nId].size() && "Root node can only be on the 0-th layer.");
       targetPos6[nId] = findTargetPosTimes6(preds[nId], prevLayer);
     }
-    keepOrderOf(targetPos6, unswappableNodes[layerI]);
+    keepOrderOf(curLayer, targetPos6, leftNodes);
     auto layerCopy = curLayer;
     size_t totCrossings =
       countCrossings(dag, prevLayer, curLayer)
@@ -1301,7 +1301,7 @@ void minimizeCrossingsBackward(
   Vec2<size_t>& layers,
   DAG const& dag,
   Vec2<size_t> const& preds,
-  Vec2<std::pair<size_t, size_t>> const unswappableNodes
+  Vec2<size_t> const& leftNodes
 ) {
   size_t const nLayers = layers.size();
   Vec<size_t> targetPos6(dag.nodes.size());
@@ -1328,7 +1328,7 @@ void minimizeCrossingsBackward(
         targetPos6[nId] = findTargetPosTimes6(succs, nextLayer);
       }
     }
-    keepOrderOf(targetPos6, unswappableNodes[nLayers - i - 1]);
+    keepOrderOf(curLayer, targetPos6, leftNodes);
     auto layerCopy = curLayer;
     size_t totCrossings =
       countCrossings(dag, curLayer, nextLayer)
@@ -1449,20 +1449,21 @@ Vec2<size_t> insertCrossNodes(DAG& dag, Vec2<size_t> const& layers) {
 
 void minimizeCrossings(Vec2<size_t>& layers, DAG const& dag) {
   Vec2<size_t> preds(dag.nodes.size());
-  for (size_t i = 0; i < dag.nodes.size(); ++i) {
-    for (auto succ : dag.nodes[i].succs) {
-      // this might not be it justice:
-      // are preds now in the correct order?
-      preds[succ].push_back(i);
+  // Enumerating nodes by layer to make sure preds[*] for each node have
+  // the same order as the layer they are on
+  for (auto const& layer : layers) {
+    for (auto nId : layer) {
+      for (auto succ : dag.nodes[nId].succs) {
+        preds[succ].push_back(nId);
+      }
     }
   }
   // Keep track of the nodes connected to the "X" cross nodes
   // so that this shuffling does not accidentally change the meaning of the crossing
-  Vec2<std::pair<size_t, size_t>> const unswappableNodes =
-    findCrossNodeSuccsAndPreds(layers, dag, preds);
-  minimizeCrossingsForward(layers, dag, preds, unswappableNodes);
-  minimizeCrossingsBackward(layers, dag, preds, unswappableNodes);
-  minimizeCrossingsForward(layers, dag, preds, unswappableNodes);
+  Vec2<size_t> const leftNodes = findForcedLeftNodesBecauseOfCrossings(dag, preds);
+  minimizeCrossingsForward(layers, dag, preds, leftNodes);
+  minimizeCrossingsBackward(layers, dag, preds, leftNodes);
+  minimizeCrossingsForward(layers, dag, preds, leftNodes);
 }
 
 bool drawEdge(

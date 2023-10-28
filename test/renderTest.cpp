@@ -557,3 +557,40 @@ TEST(render, complex6nodes) {
 5   3
 )");
 }
+
+TEST(render, wellConnected6nodes) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{2, 3, 4}, "0"});
+  test.nodes.push_back(DAG::Node{{2, 3, 4}, "1"});
+  test.nodes.push_back(DAG::Node{{5}, "2"});
+  test.nodes.push_back(DAG::Node{{4}, "3"});
+  test.nodes.push_back(DAG::Node{{}, "4"});
+  test.nodes.push_back(DAG::Node{{}, "5"});
+  EXPECT_EQ(renderSuccessfully(test), R"(
+ 0   1
+/|\ /|\
+|| \\\ \
+||  \\\ \
+|\  || \ \
+| \ || | |
+| | |/ | |
+| | X  | |
+| | |\ | |
+| | || | /
+| | /| //
+| |/ |/ |
+| 2  3  |
+| |  |  |
+| |  |  /
+| |  / /
+| | / /
+| // /
+|/ | |
+X  | |
+|\ | |
+| \| |
+| || /
+| \|/
+5  4
+)");
+}
