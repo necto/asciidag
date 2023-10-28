@@ -1534,7 +1534,7 @@ std::optional<string> renderDAG(DAG dag, RenderError& err) {
   }
   minimizeCrossings(layers, dag);
 
-  for (int i = 0; i < 2; ++i) {
+  for (int i = 0; i < 3; ++i) {
     if (countAllCrossings(layers, dag) == 0) {
       break;
     }

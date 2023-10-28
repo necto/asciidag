@@ -594,3 +594,42 @@ X  | |
 5  4
 )");
 }
+
+TEST(render, wellConnected6nodes2) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{3, 4, 5}, "0"});
+  test.nodes.push_back(DAG::Node{{3, 4, 5}, "1"});
+  test.nodes.push_back(DAG::Node{{3, 4}, "2"});
+  test.nodes.push_back(DAG::Node{{}, "3"});
+  test.nodes.push_back(DAG::Node{{}, "4"});
+  test.nodes.push_back(DAG::Node{{}, "5"});
+  EXPECT_EQ(renderSuccessfully(test), R"(
+ 0   1  2
+/|\ /|\ |\
+|| \\\ \\ \
+||  \\\ \\ \
+|\  || \ \\ \
+| \ || | || |
+| | |/ | |/ |
+| | X  | X  |
+| | |\ | |\ |
+| | || | /| |
+| | /| // | |
+| |/ |/ | | |
+| X  X  | | |
+| |\ |\ | | |
+| | \| \\ | |
+| | |\  \\\ \
+| | | \ || \ \
+| | | | |/ | |
+| | | | X  | |
+| | | | |\ | |
+| | | | |/ | |
+| | | | || / /
+| | / / /// /
+| |/ / /// /
+| /|/ /// /
+|/ \|/ \|/
+5   3   4
+)");
+}
