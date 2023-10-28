@@ -22,7 +22,8 @@ constexpr auto sketchMode = false;
 auto waypointText = "|";
 
 namespace {
-std::stringstream log;
+//auto& log = std::cout; // Log to the terminal
+std::stringstream log; // Log to nowhere
 
 using namespace asciidag::detail;
 
@@ -127,10 +128,16 @@ bool contains(Collection const& cont, elem el) {
   return std::find(std::begin(cont), std::end(cont), el) != std::end(cont);
 }
 
+[[maybe_unused]]
+std::ostream&
+operator<<(std::ostream& os, CrossingPair const& crossing) {
+  return os
+      << "(" << crossing.fromLeft << "->" << crossing.toRight << "; " << crossing.toLeft << "<-"
+      << crossing.fromRight << ")";
+}
+
 size_t insertCrossNode(DAG& dag, CrossingPair const& crossing) {
-  log
-    << "inserting crossing " << crossing.fromLeft << "->" << crossing.toRight << "; "
-    << crossing.fromRight << "<-" << crossing.toLeft << "\n";
+  log << "inserting crossing " <<crossing <<"\n";
   size_t fromLeftIdx = findIndex(dag.nodes[crossing.fromLeft].succs, crossing.toRight);
   size_t fromRightIdx = findIndex(dag.nodes[crossing.fromRight].succs, crossing.toLeft);
   size_t xid = dag.nodes.size();
@@ -1411,15 +1418,81 @@ size_t insertEdgeWaypoint(DAG& dag, size_t from, size_t to) {
   return nodeId;
 }
 
+// For any crossing, if any of its edges ends on a "X", any possible other
+// crossing has an edge to the same "X" node and that is to the left of the
+// current one must have been inserted.
+
+void sortCrossings(Vec<CrossingPair> &crossings, Vec<size_t> const& layer, DAG const& dag) {
+  auto leftOf = [&layer](size_t aFrom, size_t bFrom) -> bool {
+    auto aPos = std::find(layer.begin(), layer.end(), aFrom);
+    auto bPos = std::find(layer.begin(), layer.end(), bFrom);
+    assert(aPos != layer.end());
+    assert(bPos != layer.end());
+    return aPos < bPos;
+  };
+  std::
+    stable_sort(crossings.begin(), crossings.end(), [&leftOf, &dag](auto const& a, auto const& b) {
+      if (a.toLeft == b.toLeft && dag.nodes[a.toLeft].text == "X") {
+        return leftOf(a.fromRight, b.fromRight);
+      }
+      if (a.toLeft == b.toRight && dag.nodes[a.toLeft].text == "X") {
+        return leftOf(a.fromRight, b.fromLeft);
+      }
+      if (a.toRight == b.toLeft && dag.nodes[a.toRight].text == "X") {
+        return leftOf(a.fromLeft, b.fromRight);
+      }
+      // possibly (a.toRight == b.toRight && dag.nodes[a.toRight].text == "X")
+      // otherwise, any order works, so no need to check
+      return leftOf(a.fromLeft, b.fromLeft);
+    });
+}
+
+bool isLeftPred(size_t from, size_t to, Vec<size_t> const& layer, DAG const& dag) {
+  assert(contains(dag.nodes[from].succs, to));
+  for (size_t n : layer) {
+    if (n == from) {
+      // "from" is the first pred of "to" in this layer, i.e., left-most
+      return true;
+    }
+    if (contains(dag.nodes[n].succs, to)) {
+      // "from" comes after some other pred of "to" => it is not left-most
+      return false;
+    }
+  }
+  assert(false && "'to' must have at least one predecessor, and it must be in 'layer'");
+  return false;
+}
+
+// Find all the "X" nodes on the lower layer that have their left predecessors
+// in the list of crossings
+std::unordered_set<size_t>
+alreadyPaddedCrosses(Vec<CrossingPair> const& crossings, Vec<size_t> const& layer, DAG const& dag) {
+  std::unordered_set<size_t> ret;
+  for (auto const& crossing : crossings) {
+    if (dag.nodes[crossing.toLeft].text == "X") {
+      if (isLeftPred(crossing.fromRight, crossing.toLeft, layer, dag)) {
+        ret.insert(crossing.toLeft);
+      }
+    }
+    if (dag.nodes[crossing.toRight].text == "X") {
+      if (isLeftPred(crossing.fromLeft, crossing.toRight, layer, dag)) {
+        ret.insert(crossing.toRight);
+      }
+    }
+  }
+  return ret;
+}
+
 void padWithWaypointToPreserveCrossPredOrder(
   DAG& dag,
   Vec<size_t>& layer,
   Vec<size_t> const& predLayer,
   size_t from,
-  size_t to
+  size_t to,
+  std::unordered_set<size_t> paddedCrosses
 ) {
   assert(contains(dag.nodes[from].succs, to));
-  if (dag.nodes[to].text == "X") {
+  if (dag.nodes[to].text == "X" && paddedCrosses.count(to) == 0) {
     auto leftNodeI = std::find_if(predLayer.begin(), predLayer.end(), [&](size_t id) {
       auto const& succs = dag.nodes[id].succs;
       return std::find(succs.begin(), succs.end(), to) != succs.end();
@@ -1437,29 +1510,32 @@ Vec2<size_t> insertCrossNodes(DAG& dag, Vec2<size_t> const& layers) {
   Vec2<size_t> newLayers;
   newLayers.push_back(layers[0]);
   for (size_t layerI = 1; layerI < layers.size(); ++layerI) {
+    auto const& curLayer = layers[layerI];
+    auto const& layerAbove = layers[layerI - 1];
     Vec<size_t> insertedNodes;
-    for (auto const& crossing :
-         findNonConflictingCrossings(dag, layers[layerI - 1], layers[layerI])) {
+    auto crossings = findNonConflictingCrossings(dag, layerAbove, curLayer);
+    sortCrossings(crossings, layerAbove, dag);
+    auto paddedCrosses = alreadyPaddedCrosses(crossings, layerAbove, dag);
+    for (auto const& crossing : crossings) {
       // Order (right->left then left->right) avoids introducing unnecessary crossing
       padWithWaypointToPreserveCrossPredOrder(
         dag,
         insertedNodes,
-        layers[layerI - 1],
+        layerAbove,
         crossing.fromRight,
-        crossing.toLeft
+        crossing.toLeft,
+        paddedCrosses
       );
       padWithWaypointToPreserveCrossPredOrder(
         dag,
         insertedNodes,
-        layers[layerI - 1],
+        layerAbove,
         crossing.fromLeft,
-        crossing.toRight
+        crossing.toRight,
+        paddedCrosses
       );
       insertedNodes.push_back(insertCrossNode(dag, crossing));
     }
-    // This does not preserve the order of predecessors, which matters
-    // for cross nodes in the next layer.
-    // It should be fine as long as it always inserts the highest crossing
     if (!insertedNodes.empty()) {
       newLayers.emplace_back(std::move(insertedNodes));
     }
@@ -1565,7 +1641,7 @@ std::optional<string> renderDAG(DAG dag, RenderError& err) {
   log << "--- after min crossings ---\n";
   log << renderDAGWithLayers(dag, layers) << "\n-----\n";
 
-  for (int i = 0; i < 5; ++i) {
+  for (int i = 0; i < 6; ++i) {
     if (countAllCrossings(layers, dag) == 0) {
       break;
     }
