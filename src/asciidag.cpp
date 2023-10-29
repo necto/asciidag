@@ -1418,81 +1418,15 @@ size_t insertEdgeWaypoint(DAG& dag, size_t from, size_t to) {
   return nodeId;
 }
 
-// For any crossing, if any of its edges ends on a "X", any possible other
-// crossing has an edge to the same "X" node and that is to the left of the
-// current one must have been inserted.
-
-void sortCrossings(Vec<CrossingPair> &crossings, Vec<size_t> const& layer, DAG const& dag) {
-  auto leftOf = [&layer](size_t aFrom, size_t bFrom) -> bool {
-    auto aPos = std::find(layer.begin(), layer.end(), aFrom);
-    auto bPos = std::find(layer.begin(), layer.end(), bFrom);
-    assert(aPos != layer.end());
-    assert(bPos != layer.end());
-    return aPos < bPos;
-  };
-  std::
-    stable_sort(crossings.begin(), crossings.end(), [&leftOf, &dag](auto const& a, auto const& b) {
-      if (a.toLeft == b.toLeft && dag.nodes[a.toLeft].text == "X") {
-        return leftOf(a.fromRight, b.fromRight);
-      }
-      if (a.toLeft == b.toRight && dag.nodes[a.toLeft].text == "X") {
-        return leftOf(a.fromRight, b.fromLeft);
-      }
-      if (a.toRight == b.toLeft && dag.nodes[a.toRight].text == "X") {
-        return leftOf(a.fromLeft, b.fromRight);
-      }
-      // possibly (a.toRight == b.toRight && dag.nodes[a.toRight].text == "X")
-      // otherwise, any order works, so no need to check
-      return leftOf(a.fromLeft, b.fromLeft);
-    });
-}
-
-bool isLeftPred(size_t from, size_t to, Vec<size_t> const& layer, DAG const& dag) {
-  assert(contains(dag.nodes[from].succs, to));
-  for (size_t n : layer) {
-    if (n == from) {
-      // "from" is the first pred of "to" in this layer, i.e., left-most
-      return true;
-    }
-    if (contains(dag.nodes[n].succs, to)) {
-      // "from" comes after some other pred of "to" => it is not left-most
-      return false;
-    }
-  }
-  assert(false && "'to' must have at least one predecessor, and it must be in 'layer'");
-  return false;
-}
-
-// Find all the "X" nodes on the lower layer that have their left predecessors
-// in the list of crossings
-std::unordered_set<size_t>
-alreadyPaddedCrosses(Vec<CrossingPair> const& crossings, Vec<size_t> const& layer, DAG const& dag) {
-  std::unordered_set<size_t> ret;
-  for (auto const& crossing : crossings) {
-    if (dag.nodes[crossing.toLeft].text == "X") {
-      if (isLeftPred(crossing.fromRight, crossing.toLeft, layer, dag)) {
-        ret.insert(crossing.toLeft);
-      }
-    }
-    if (dag.nodes[crossing.toRight].text == "X") {
-      if (isLeftPred(crossing.fromLeft, crossing.toRight, layer, dag)) {
-        ret.insert(crossing.toRight);
-      }
-    }
-  }
-  return ret;
-}
-
 void padWithWaypointToPreserveCrossPredOrder(
   DAG& dag,
   Vec<size_t>& layer,
   Vec<size_t> const& predLayer,
   size_t from,
-  size_t to,
-  std::unordered_set<size_t> paddedCrosses
+  size_t to
 ) {
   assert(contains(dag.nodes[from].succs, to));
-  if (dag.nodes[to].text == "X" && paddedCrosses.count(to) == 0) {
+  if (dag.nodes[to].text == "X") {
     auto leftNodeI = std::find_if(predLayer.begin(), predLayer.end(), [&](size_t id) {
       auto const& succs = dag.nodes[id].succs;
       return std::find(succs.begin(), succs.end(), to) != succs.end();
@@ -1506,6 +1440,40 @@ void padWithWaypointToPreserveCrossPredOrder(
   }
 }
 
+// Inserting two crossings that involve the same "X" node on the upper or lower layer
+// might result in inadvertently mixing the predecessors or successors of that "X" node.
+// It is possible to do that safely and carefully if they share only one "X" node,
+// but might be impossible if they share two "X" nodes.
+// However, it is always tricky, so easier to insert some of these crossings at a later iteration.
+Vec<CrossingPair> keepOneCrossingPerXNode(Vec<CrossingPair> &&crossings, DAG const& dag) {
+  Vec<CrossingPair> ret;
+  ret.reserve(crossings.size());
+  std::unordered_set<size_t> takenXnodes;
+  auto checkNInsert = [&takenXnodes, &dag](size_t nId) {
+    if (dag.nodes[nId].text == "X") {
+      auto [_, inserted] = takenXnodes.insert(nId);
+      return !inserted;
+    }
+    return false;
+  };
+  for (auto && crossing : std::move(crossings)) {
+    if (checkNInsert(crossing.fromLeft)) {
+      continue;
+    }
+    if (checkNInsert(crossing.fromRight)) {
+      continue;
+    }
+    if (checkNInsert(crossing.toLeft)) {
+      continue;
+    }
+    if (checkNInsert(crossing.toRight)) {
+      continue;
+    }
+    ret.emplace_back(std::move(crossing));
+  }
+  return ret;
+}
+
 Vec2<size_t> insertCrossNodes(DAG& dag, Vec2<size_t> const& layers) {
   Vec2<size_t> newLayers;
   newLayers.push_back(layers[0]);
@@ -1513,9 +1481,7 @@ Vec2<size_t> insertCrossNodes(DAG& dag, Vec2<size_t> const& layers) {
     auto const& curLayer = layers[layerI];
     auto const& layerAbove = layers[layerI - 1];
     Vec<size_t> insertedNodes;
-    auto crossings = findNonConflictingCrossings(dag, layerAbove, curLayer);
-    sortCrossings(crossings, layerAbove, dag);
-    auto paddedCrosses = alreadyPaddedCrosses(crossings, layerAbove, dag);
+    auto crossings = keepOneCrossingPerXNode(findNonConflictingCrossings(dag, layerAbove, curLayer), dag);
     for (auto const& crossing : crossings) {
       // Order (right->left then left->right) avoids introducing unnecessary crossing
       padWithWaypointToPreserveCrossPredOrder(
@@ -1523,16 +1489,14 @@ Vec2<size_t> insertCrossNodes(DAG& dag, Vec2<size_t> const& layers) {
         insertedNodes,
         layerAbove,
         crossing.fromRight,
-        crossing.toLeft,
-        paddedCrosses
+        crossing.toLeft
       );
       padWithWaypointToPreserveCrossPredOrder(
         dag,
         insertedNodes,
         layerAbove,
         crossing.fromLeft,
-        crossing.toRight,
-        paddedCrosses
+        crossing.toRight
       );
       insertedNodes.push_back(insertCrossNode(dag, crossing));
     }
