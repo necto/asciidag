@@ -141,7 +141,7 @@ void configureDAGFromSeed(DAG &dag, size_t seed) {
 
 constexpr size_t numberOfEdgeConfigurations(size_t nodeCount) {
   size_t const maxEdgesCount = nodeCount * (nodeCount - 1) / 2;
-  return 1 << maxEdgesCount;
+  return 1ULL << maxEdgesCount;
 }
 
 TEST(parseRender, generated3) {
@@ -183,6 +183,7 @@ TEST(parseRender, generated5) {
   }
 }
 
+//#define LONG_BRUTFORCE_TESTS
 #ifdef LONG_BRUTFORCE_TESTS
 
 constexpr size_t batchSize = 10000;
