@@ -793,7 +793,7 @@ size_t minDistBetweenLayers(
   return ret;
 }
 
-void setEntryAngles(Connectivity& conn, Vec2<size_t> predEdges, Vec<Position> const& coords) {
+void setEntryAngles(Connectivity& conn, Vec2<size_t> predEdges, Vec<Position> const& coords, DAG const& dag) {
   for (size_t i = 0; i < predEdges.size(); ++i) {
     auto const& edgeIds = predEdges[i];
     switch (edgeIds.size()) {
@@ -804,13 +804,18 @@ void setEntryAngles(Connectivity& conn, Vec2<size_t> predEdges, Vec<Position> co
         break;
       }
       case 2: {
-        auto [straight, right] = increasingOrder(
+        auto [left, right] = increasingOrder(
           coords[conn.edges[edgeIds[0]].from].col,
           coords[conn.edges[edgeIds[1]].from].col
         );
-        conn.edges[edgeIds[straight]].entryAngle = Direction::Straight;
         conn.edges[edgeIds[right]].entryAngle = Direction::Left;
         conn.nodeValencies[i].topRight = true;
+        if (dag.nodes[i].text == "X") {
+          conn.edges[edgeIds[left]].entryAngle = Direction::Right;
+          conn.nodeValencies[i].topLeft = true;
+        } else {
+          conn.edges[edgeIds[left]].entryAngle = Direction::Straight;
+        }
         break;
       }
       case 3: {
@@ -833,7 +838,7 @@ void setEntryAngles(Connectivity& conn, Vec2<size_t> predEdges, Vec<Position> co
   }
 }
 
-void setExitAngles(Connectivity& conn, Vec2<size_t> succEdges, Vec<Position> const& coords) {
+void setExitAngles(Connectivity& conn, Vec2<size_t> succEdges, Vec<Position> const& coords, DAG const& dag) {
   for (size_t i = 0; i < succEdges.size(); ++i) {
     auto const& edgeIds = succEdges[i];
     switch (edgeIds.size()) {
@@ -844,13 +849,18 @@ void setExitAngles(Connectivity& conn, Vec2<size_t> succEdges, Vec<Position> con
         break;
       }
       case 2: {
-        auto [straight, right] = increasingOrder(
+        auto [left, right] = increasingOrder(
           coords[conn.edges[edgeIds[0]].to].col,
           coords[conn.edges[edgeIds[1]].to].col
         );
-        conn.edges[edgeIds[straight]].exitAngle = Direction::Straight;
         conn.edges[edgeIds[right]].exitAngle = Direction::Right;
         conn.nodeValencies[i].bottomRight = true;
+        if (dag.nodes[i].text == "X") {
+          conn.edges[edgeIds[left]].exitAngle = Direction::Left;
+          conn.nodeValencies[i].bottomLeft = true;
+        } else {
+          conn.edges[edgeIds[left]].exitAngle = Direction::Straight;
+        }
         break;
       }
       case 3: {
@@ -920,8 +930,8 @@ Connectivity computeConnectivity(DAG const& dag, Vec<Position> const& coords) {
     assert(1 <= dag.nodes[edge.from].succs.size() && "Fanthom edge");
     assert(1 <= preds[edge.to].size() && "Fanthom edge");
   }
-  setEntryAngles(ret, predEdges, coords);
-  setExitAngles(ret, succEdges, coords);
+  setEntryAngles(ret, predEdges, coords, dag);
+  setExitAngles(ret, succEdges, coords, dag);
   std::sort(ret.edges.begin(), ret.edges.end(), [&coords](auto const& a, auto const& b) {
     return compareEdges(coords, a, b);
   });
