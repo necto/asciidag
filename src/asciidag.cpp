@@ -938,17 +938,16 @@ Connectivity computeConnectivity(DAG const& dag, Vec<Position> const& coords) {
   return ret;
 }
 
-Vec<Position> computeNodeCoordinates(DAG const& dag, Vec2<size_t> const& layers) {
+Vec<Position> computeNodeCoordinates(DAG const& dag, Vec2<size_t> const& layers, Vec<Position> const& dimensions) {
   Vec<Position> ret(dag.nodes.size(), Position{0, 0});
   size_t line = 0;
   for (auto const& layer : layers) {
     size_t col = 0;
     for (size_t n : layer) {
-      assert(dag.nodes[n].text.size() == 1);
       ret[n].col = col;
       ret[n].line = line;
-      // 1 for space + 1 for the node text (single-character)
-      col += 2;
+      // 1 for space
+      col += 1 + dimensions[n].col;
     }
     ++line;
   }
@@ -973,7 +972,8 @@ Vec2<size_t> groupEdgesByLayer(Connectivity const& conn, Vec2<size_t> const& lay
 void adjustCoordsWithValencies(
   Vec<Position>& coords,
   Connectivity const& conn,
-  Vec2<size_t> const& layers
+  Vec2<size_t> const& layers,
+  Vec<Position> const& dimensions
 ) {
   for (auto const& layer : layers) {
     size_t lastCol = 0;
@@ -983,7 +983,7 @@ void adjustCoordsWithValencies(
         lastCol += 2; // Accomodate left edge (incoming or outgoing)
       }
       coords[node].col = lastCol;
-      lastCol += 2; // accomodate node width and mandatory space
+      lastCol += 1 + dimensions[node].col; // accomodate node width and mandatory space
       if (valencies.bottomRight || valencies.topRight) {
         lastCol += 2; // accomodate right edge (incoming or outgoing)
       }
@@ -993,18 +993,24 @@ void adjustCoordsWithValencies(
   assert(interLayerEdges.size() == layers.size());
   size_t line = 0;
   for (size_t i = 0; i < layers.size(); ++i) {
+    size_t maxHeight = 0;
     for (auto n : layers[i]) {
       coords[n].line = line;
+      maxHeight = std::max(maxHeight, dimensions[n].line);
     }
-    // 1 for the node height
-    line += 1 + minDistBetweenLayers(conn, interLayerEdges[i], coords);
+    line += maxHeight + minDistBetweenLayers(conn, interLayerEdges[i], coords);
   }
 }
 
 void placeNodes(DAG const& dag, Vec<Position> const& coordinates, Canvas& canvas) {
   for (size_t n = 0; n < dag.nodes.size(); ++n) {
-    assert(dag.nodes[n].text.size() == 1);
-    canvas.newMark(coordinates[n], dag.nodes[n].text[0]);
+    assert(!dag.nodes[n].text.empty());
+    assert(dag.nodes[n].text.find('\n') == std::string::npos);
+    Position pos = coordinates[n];
+    for (size_t i = 0; i < dag.nodes[n].text.size(); ++i) {
+      canvas.newMark(pos, dag.nodes[n].text[i]);
+      ++pos.col;
+    }
   }
 }
 
@@ -1140,10 +1146,11 @@ bool tryDrawLine(
 
 std::optional<RenderError> checkDAGCompat(DAG const& dag) {
   for (size_t n = 0; n < dag.nodes.size(); ++n) {
-    if (dag.nodes[n].text.size() != 1) {
-      return {
-        {RenderError::Code::Unsupported, "Zero- or multi-character nodes are not supported.", n}
-      };
+    if (dag.nodes[n].text.empty()) {
+      return {{RenderError::Code::Unsupported, "empty nodes are not supported.", n}};
+    }
+    if (dag.nodes[n].text.find('\n') != std::string::npos) {
+      return {{RenderError::Code::Unsupported, "multi-line nodes are not supported.", n}};
     }
   }
   return {};
@@ -1579,12 +1586,37 @@ bool drawEdge(
   return succeded;
 }
 
+Position singleNodeDimensions(DAG::Node const& n) {
+  assert(!n.text.empty());
+  Position ret{1, 0};
+  size_t lineLen = 0;
+  for (char c : n.text) {
+    if (c == '\n') {
+      ret.col = std::max(ret.col, lineLen);
+      ++ret.line;
+      lineLen = 0;
+      continue;
+    }
+    ++lineLen;
+  }
+  ret.col = std::max(ret.col, lineLen);
+  return ret;
+}
+
+Vec<Position> nodeDimensions(DAG const& dag) {
+  Vec<Position> ret;
+  ret.reserve(dag.nodes.size());
+  std::transform(dag.nodes.begin(), dag.nodes.end(), std::back_inserter(ret), singleNodeDimensions);
+  return ret;
+}
+
 std::string renderDAGWithLayers(DAG const& dag, std::vector<std::vector<size_t>> layers) {
   // TODO: find best horisontal position of nodes
-  auto coords = computeNodeCoordinates(dag, layers);
+  auto const dimensions = nodeDimensions(dag);
+  auto coords = computeNodeCoordinates(dag, layers, dimensions);
   auto const connectivity = computeConnectivity(dag, coords);
-  adjustCoordsWithValencies(coords, connectivity, layers);
-  auto canvas = Canvas::create(coords);
+  adjustCoordsWithValencies(coords, connectivity, layers, dimensions);
+  auto canvas = Canvas::create(coords, dimensions);
   placeNodes(dag, coords, canvas);
   placeEdges(coords, connectivity.edges, canvas);
   return canvas.render();
@@ -1808,20 +1840,16 @@ string Canvas::render() const {
   return ret;
 }
 
-Canvas Canvas::create(Vec<Position> const& coordinates) {
+Canvas Canvas::create(Vec<Position> const& coordinates, Vec<Position> const& dimensions) {
   Position max{0, 0};
-  for (auto const& p : coordinates) {
-    if (max.line < p.line) {
-      max.line = p.line;
-    }
-    if (max.col < p.col) {
-      max.col = p.col;
-    }
+  assert(coordinates.size() == dimensions.size());
+  for (size_t i = 0; i < coordinates.size(); ++i) {
+    max.line = std::max(max.line, coordinates[i].line + dimensions[i].line);
+    max.col = std::max(max.col, coordinates[i].col + dimensions[i].col);
   }
-  // line + 1 - to accomodate the node height
-  // col + 2 - to accomodate the node width + potential top/bottom-right edge
+  // col + 1 - to accomodate potential top/bottom-right edge
   Canvas ret;
-  ret.lines = Vec<string>(max.line + 1, string(max.col + 2, ' '));
+  ret.lines = Vec<string>(max.line, string(max.col + 1, ' '));
   return ret;
 }
 

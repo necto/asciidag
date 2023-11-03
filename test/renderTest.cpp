@@ -412,17 +412,6 @@ TEST(renderError, emptyStringNodeUnsupported) {
   EXPECT_EQ(err.nodeId, 0U);
 }
 
-TEST(renderError, wideStringNodeUnsupported) {
-  DAG test;
-  test.nodes.push_back(DAG::Node{{1}, "."});
-  test.nodes.push_back(DAG::Node{{}, ".."});
-  RenderError err;
-  auto result = renderDAG(test, err);
-  EXPECT_FALSE(result.has_value());
-  EXPECT_EQ(err.code, RenderError::Code::Unsupported);
-  EXPECT_EQ(err.nodeId, 1U);
-}
-
 TEST(renderError, tooManyOutgoingEdges) {
   DAG test;
   test.nodes.push_back(DAG::Node{{1, 2, 3, 4}, "."});
@@ -1188,3 +1177,74 @@ TEST(render, crossingsSharingTheSameXnodeAbove) {
   4   6   7
 )");
 }
+
+TEST(render, wideNode) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{}, "ABC"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+ABC
+)");
+}
+
+TEST(render, threeDisconnectedWideNodes) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{}, "ABC"});
+  test.nodes.push_back(DAG::Node{{}, "DE"});
+  test.nodes.push_back(DAG::Node{{}, "FGHIJ"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+ABC DE FGHIJ
+)");
+}
+
+TEST(render, edgeBetweenWideNodes) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{1}, "000"});
+  test.nodes.push_back(DAG::Node{{}, "111"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+000
+|
+|
+|
+111
+)");
+}
+
+TEST(render, twoEdgesBetweenWideNodesDiverge) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{1, 2}, "000"});
+  test.nodes.push_back(DAG::Node{{}, "111"});
+  test.nodes.push_back(DAG::Node{{}, "222"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+000
+|\
+| \
+|  \
+|   \
+|   |
+|   |
+111 222
+)");
+}
+
+TEST(render, twoEdgesBetweenWideNodesConverge) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{2}, "000"});
+  test.nodes.push_back(DAG::Node{{2}, "111"});
+  test.nodes.push_back(DAG::Node{{}, "222"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+000 111
+|   |
+|   |
+|   /
+|  /
+| /
+|/
+222
+)");
+}
+

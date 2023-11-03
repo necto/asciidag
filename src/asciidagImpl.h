@@ -22,7 +22,8 @@ enum class Direction : int { Left = 1, Straight = 2, Right = 3 };
 
 class Canvas {
 public:
-  static Canvas create(std::vector<Position> const& coordinates);
+  static Canvas
+  create(std::vector<Position> const& coordinates, std::vector<Position> const& dimensions);
   static Canvas fromString(std::string const& str);
 
   void newMark(Position const& pos, char c);
