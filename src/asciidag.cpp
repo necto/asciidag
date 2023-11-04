@@ -770,12 +770,47 @@ int directionShift(Direction dir) {
   return 0;
 }
 
-size_t minEdgeHeight(Connectivity::Edge const& edge, Vec<Position> const& positions) {
-  return absDiff(
-           positions[edge.from].col + directionShift(edge.entryAngle),
-           positions[edge.to].col - directionShift(edge.exitAngle)
-         )
-       + 3;
+std::pair<std::optional<size_t>, size_t>
+minEdgeHeight(Connectivity::Edge const& edge, Vec<Position> const& positions) {
+  size_t from = positions[edge.from].col;
+  size_t to = positions[edge.to].col;
+  switch (edge.exitAngle) {
+    case Direction::Left:
+      switch (edge.entryAngle) {
+        case Direction::Left:
+          if (to + 1 <= from - 1) {
+            return {from - to - 1, from - to + 1};
+          }
+          return {{}, to + 5 - from};
+        case Direction::Straight:
+          return {{}, to < from ? from - to + 1 : to + 4 - from};
+        case Direction::Right:
+          return {{}, absDiff(from, to) + 2};
+      }
+    case Direction::Straight:
+      switch (edge.entryAngle) {
+        case Direction::Left:
+          return {{}, to < from ? from - to + 1 : to + 4 - from};
+        case Direction::Straight:
+          return {{}, to == from ? 1 : absDiff(to, from) + 3};
+        case Direction::Right:
+          return {{}, from < to ? to - from + 1 : from + 4 - to};
+      }
+    case Direction::Right:
+      switch (edge.entryAngle) {
+        case Direction::Left:
+          return {{}, absDiff(from, to) + 2};
+        case Direction::Straight:
+          return {{}, from < to ? to - from + 1 : from + 4 - to};
+        case Direction::Right:
+          if (from + 1 <= to - 1) {
+            return {to - from - 1, to - from + 1};
+          }
+          return {{}, from + 5 - to};
+      }
+  }
+  assert(false);
+  return {{}, 0};
 }
 
 size_t minDistBetweenLayers(
@@ -783,14 +818,26 @@ size_t minDistBetweenLayers(
   Vec<size_t> const& edges,
   Vec<Position> const& positions
 ) {
-  size_t ret = 1; // At least 1 '|' must separate any two connected nodes
+  std::optional<size_t> singularMin = std::nullopt;
+  size_t minimum = 1; // At least 1 '|' must separate any two connected nodes
   for (auto eId : edges) {
-    size_t hight = minEdgeHeight(conn.edges[eId], positions);
-    if (ret < hight) {
-      ret = hight;
+    auto [edgeMinPt, edgeMin] = minEdgeHeight(conn.edges[eId], positions);
+    if (edgeMinPt) {
+      if (minimum <= *edgeMinPt) {
+        singularMin = edgeMinPt;
+      }
+      if (singularMin != edgeMinPt) {
+        singularMin = std::nullopt;
+      }
+    } else {
+      if (singularMin && *singularMin < edgeMin) {
+        singularMin = std::nullopt;
+      }
     }
+    minimum = std::max(minimum, edgeMin);
+    assert(!singularMin || *singularMin < minimum);
   }
-  return ret;
+  return singularMin ? *singularMin : minimum;
 }
 
 void setEntryAngles(Connectivity& conn, Vec2<size_t> predEdges, Vec<Position> const& coords, DAG const& dag) {

@@ -15,8 +15,6 @@ TEST(crossingMinimizationTest, preserveSingleEdge) {
 R"(
 0
 |
-|
-|
 1
 )");
 }
@@ -32,7 +30,6 @@ R"(
 |\
 | \
 | |
-| |
 1 2
 )");
 }
@@ -45,8 +42,6 @@ TEST(crossingMinimizationTest, preserveTwoParallel) {
 )"),
 R"(
 1 2
-| |
-| |
 | |
 3 4
 )");
@@ -62,8 +57,6 @@ TEST(crossingMinimizationTest, untangleTwoCrossed) {
 )"),
 R"(
 1 2
-| |
-| |
 | |
 4 3
 )");
@@ -84,11 +77,7 @@ TEST(crossingMinimizationTest, untangleDoubleCrossing) {
 R"(
 1 2
 | |
-| |
-| |
 4 3
-| |
-| |
 | |
 5 6
 )");
@@ -107,11 +96,7 @@ TEST(crossingMinimizationTest, untangleCrossThenParallel) {
 R"(
 1 2
 | |
-| |
-| |
 4 3
-| |
-| |
 | |
 6 5
 )");
@@ -130,11 +115,7 @@ TEST(crossingMinimizationTest, untangleParallelThenCross) {
 R"(
 1 2
 | |
-| |
-| |
 3 4
-| |
-| |
 | |
 6 5
 )");
@@ -154,9 +135,7 @@ R"(
 |\
 | \
 | |
-| |
 1 2
-| |
 | |
 | /
 |/
@@ -177,8 +156,6 @@ TEST(crossingMinimizationTest, untangleCrossByTwo) {
 R"(
 0 1 2
 | | |
-| | |
-| | |
 5 3 4
 )");
 }
@@ -198,8 +175,6 @@ TEST(crossingMinimizationTest, untangleCrossTwoByTwo) {
 R"(
 0 1 2 3
 | | | |
-| | | |
-| | | |
 6 7 4 5
 )");
 }
@@ -214,8 +189,6 @@ TEST(crossingMinimizationTest, untangleDiffDirections) {
 )"),
 R"(
 0 1 2
-| | |
-| | |
 | | |
 5 4 3
 )");
@@ -232,7 +205,6 @@ TEST(crossingMinimizationTest, untangleTwoPredsCrossedOne) {
 )"),
 R"(
 1 0 2
-| | |
 | | |
 | | /
 | |/
@@ -254,7 +226,6 @@ TEST(crossingMinimizationTest, untangleTwoPredsCrossedTwo) {
 R"(
 0 1 2
 | | |
-| | |
 | | /
 | |/
 4 3
@@ -274,7 +245,6 @@ R"(
 | |\
 | | \
 | | |
-| | |
 4 3 5
 )");
 }
@@ -293,7 +263,6 @@ R"(
 0 1
 | |\
 | | \
-| | |
 | | |
 5 3 4
 )");
@@ -316,9 +285,7 @@ R"(
 | |\
 | | \
 | | |
-| | |
 4 3 5
-| | |
 | | |
 | | /
 | |/
@@ -339,8 +306,7 @@ TEST(crossingMinimizationTest, untangleEquipotentialStrayNodeUpperLayer) {
 R"(
 3 2   4
 | |\  |
-| | \ |
-| / | /
+| / \ /
 |/  |/
 5   6
 )");
@@ -359,8 +325,7 @@ TEST(crossingMinimizationTest, untangleEquipotentialStrayNodeLowerLayer) {
 R"(
 0   1
 |\  |\
-| \ | \
-| | / |
+| \ / \
 | |/  |
 3 2   4
 )");
@@ -385,13 +350,11 @@ TEST(crossingMinimizationTest, untangleEquipotentialStrayNodeMiddleLayer) {
 R"(
 0   1
 |\  |\
-| \ | \
-| | / |
+| \ / \
 | |/  |
 3 2   4
 | |\  |
-| | \ |
-| / | /
+| / \ /
 |/  |/
 5   6
 )");
@@ -446,26 +409,22 @@ TEST(crossingMinimizationTest, untangleUnrelatedGraphInTheMiddleFail) {
 R"(
 0   1 2
 |\  | |\
-| \ | | \
-|  \\ \  \
-|  | \ \  \
-|  | |  \ |
+| \ \ \ \
+|  \ \ \ \
+|  | |  \ \
 |  \ /  | |
 |   X   | |
 |  / \  | |
-| /  |  | |
-| |  |  / |
+| /  |  / |
 | |  \ /  |
 | |   X   |
 | |  / \  |
-| |  |  \ |
-| \  |  | |
+| \  |  \ |
 |  \ /  | |
 |   X   | |
 |  / \  | |
-| /  /  | |
-|/  /   / /
-||  |  / /
+| /  /  / /
+|/  /  / /
 ||  | / /
 |/  | |/
 3   4 5
@@ -475,8 +434,6 @@ R"(
 TEST(crossingMinimizationTest, deconstructedRenderingNoMinimizationParallel) {
   auto str = R"(
 0 1
-| |
-| |
 | |
 2 3
 )";
@@ -538,8 +495,6 @@ TEST(crossingMinimizationTest, deconstructedRenderingCrossingRemoved) {
   EXPECT_EQ(R"(
 0 1
 | |
-| |
-| |
 3 2
 )", '\n' + renderDAGWithLayers(dag, layers));
 }
@@ -574,10 +529,7 @@ TEST(crossingMinimizationTest, danglingNodeDoesNotPreventSimpleSwap) {
  /|\   /|\
 / | \ / | \
 | | |/  | |
-| | ||  | |
-| | |/  | |
 3 2 4   5 6
-| |     | |
 | |     | |
 | |     / /
 | |    / /
