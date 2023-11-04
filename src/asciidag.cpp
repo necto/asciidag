@@ -863,12 +863,11 @@ void setEntryAngles(
     if (edgeIds.empty()) {
       continue;
     }
-    if (edgeIds.size() == 1) {
-      // Important for the waypoint nodes '|'
-      // because they are not real nodes,
-      // and the generic algorithm below won't work on them -
-      // the left or right-directed edges will miss them
+    if (dag.nodes[i].text == waypointText) {
+      assert(edgeIds.size() == 1);
+      // the left or right-directed edges will miss the "|" nodes
       conn.edges[edgeIds[0]].entryAngle = Direction::Straight;
+      conn.edges[edgeIds[0]].entryOffset = 0;
       continue;
     }
     std::sort(edgeIds.begin(), edgeIds.end(), [&coords, &conn] (size_t id1, size_t id2) {
@@ -901,7 +900,9 @@ void setEntryAngles(
     // Coming from the nodes to the left of the current
     while (
       attachedEdges < edgeIds.size()
-      && coords[conn.edges[edgeIds[attachedEdges]].from].col < coords[i].col + offset
+      && coords[conn.edges[edgeIds[attachedEdges]].from].col
+             + dimensions[conn.edges[edgeIds[attachedEdges]].from].col
+           <= coords[i].col + offset
       && offset < dimensions[i].col
     ) {
       conn.edges[edgeIds[attachedEdges]].entryAngle = Direction::Right;
@@ -911,17 +912,39 @@ void setEntryAngles(
       ++attachedEdges;
     }
 
+    bool straightInsertedOn0 = false;
     if (offset <= 1 && dimensions[i].col + 1 == edgeIds.size() - attachedEdges) {
       // Too crowded, if no edge is inserted as vertical
       // there will not be enough space for all edges.
       conn.edges[edgeIds[attachedEdges]].entryAngle = Direction::Straight;
       conn.edges[edgeIds[attachedEdges]].entryOffset = 0;
       ++attachedEdges;
+      straightInsertedOn0 = true;
+    }
+
+    size_t rightMostOffset = dimensions[i].col + attachedEdges - edgeIds.size();
+    // Avoid clashes with the \ edges
+    // and avoid clashes with the already inserted | edge if any
+    if (offset <= rightMostOffset && (rightMostOffset != 0 || !straightInsertedOn0)) {
+      while (
+        attachedEdges < edgeIds.size() && rightMostOffset < dimensions[i].col
+        && coords[conn.edges[edgeIds[attachedEdges]].from].col <= coords[i].col + rightMostOffset
+      ) {
+        offset = std::min(
+          rightMostOffset,
+          coords[conn.edges[edgeIds[attachedEdges]].from].col
+            + dimensions[conn.edges[edgeIds[attachedEdges]].from].col - coords[i].col - 1
+        );
+        conn.edges[edgeIds[attachedEdges]].entryAngle = Direction::Straight;
+        conn.edges[edgeIds[attachedEdges]].entryOffset = offset;
+        ++attachedEdges;
+        ++rightMostOffset;
+      }
     }
 
     // Coming from nodes to the right of the current
     // Shift all these edges to the right side
-    offset = dimensions[i].col - edgeIds.size() + attachedEdges;
+    offset = rightMostOffset;
     while (attachedEdges < edgeIds.size()) {
       conn.edges[edgeIds[attachedEdges]].entryAngle = Direction::Left;
       conn.edges[edgeIds[attachedEdges]].entryOffset = offset;
@@ -929,7 +952,6 @@ void setEntryAngles(
       ++offset;
       ++attachedEdges;
     }
-    // TODO: handle strictly-above nodes
   }
 }
 
@@ -945,12 +967,11 @@ void setExitAngles(
     if (edgeIds.empty()) {
       continue;
     }
-    if (edgeIds.size() == 1) {
-      // Important for the waypoint nodes '|'
-      // because they are not real nodes,
-      // and the generic algorithm below won't work on them -
-      // the left or right-directed edges will miss them
+    if (dag.nodes[i].text == waypointText) {
+      assert(edgeIds.size() == 1);
+      // the left or right-directed edges will miss the "|" nodes
       conn.edges[edgeIds[0]].exitAngle = Direction::Straight;
+      conn.edges[edgeIds[0]].exitOffset = 0;
       continue;
     }
     std::sort(edgeIds.begin(), edgeIds.end(), [&coords, &conn] (size_t id1, size_t id2) {
@@ -983,7 +1004,9 @@ void setExitAngles(
     // Going to the nodes on the left of the current
     while (
       attachedEdges < edgeIds.size()
-      && coords[conn.edges[edgeIds[attachedEdges]].to].col < coords[i].col + offset
+      && coords[conn.edges[edgeIds[attachedEdges]].to].col
+             + dimensions[conn.edges[edgeIds[attachedEdges]].to].col
+           <= coords[i].col + offset
       && offset < dimensions[i].col
     ) {
       conn.edges[edgeIds[attachedEdges]].exitAngle = Direction::Left;
@@ -993,17 +1016,40 @@ void setExitAngles(
       ++attachedEdges;
     }
 
+    bool straightInsertedOn0 = false;
     if (offset <= 1 && dimensions[i].col + 1 == edgeIds.size() - attachedEdges) {
       // Too crowded, if no edge is inserted as vertical
       // there will not be enough space for all edges.
       conn.edges[edgeIds[attachedEdges]].exitAngle = Direction::Straight;
       conn.edges[edgeIds[attachedEdges]].exitOffset = 0;
       ++attachedEdges;
+      straightInsertedOn0 = true;
+    }
+
+    size_t rightMostOffset = dimensions[i].col + attachedEdges - edgeIds.size();
+
+    // Avoid clashes with the / edges
+    // and avoid clashes with the already inserted | edge if any
+    if (offset <= rightMostOffset && (rightMostOffset != 0 || !straightInsertedOn0)) {
+      while (
+        attachedEdges < edgeIds.size()
+        && coords[conn.edges[edgeIds[attachedEdges]].to].col <= coords[i].col + rightMostOffset
+      ) {
+        offset = std::min(
+          rightMostOffset,
+          coords[conn.edges[edgeIds[attachedEdges]].to].col
+            + dimensions[conn.edges[edgeIds[attachedEdges]].to].col - coords[i].col - 1
+        );
+        conn.edges[edgeIds[attachedEdges]].exitAngle = Direction::Straight;
+        conn.edges[edgeIds[attachedEdges]].exitOffset = offset;
+        ++attachedEdges;
+        ++rightMostOffset;
+      }
     }
 
     // Coming from nodes to the right of the current
     // Shift all these edges to the right side
-    offset = dimensions[i].col - edgeIds.size() + attachedEdges;
+    offset = rightMostOffset;
     while (attachedEdges < edgeIds.size()) {
       conn.edges[edgeIds[attachedEdges]].exitAngle = Direction::Right;
       conn.edges[edgeIds[attachedEdges]].exitOffset = offset;
@@ -1011,7 +1057,6 @@ void setExitAngles(
       ++offset;
       ++attachedEdges;
     }
-    // TODO: handle strictly-below nodes
   }
 }
 
@@ -1944,8 +1989,8 @@ bool Canvas::inBounds(Position const& pos) const {
 
 void Canvas::newMark(Position const& pos, char c) {
   assert(inBounds(pos));
-  assert(lines[pos.line][pos.col] == ' ');
-  assert(sketchMode || c != ' ');
+  assert(sketchMode || lines[pos.line][pos.col] == ' ');
+  assert(c != ' ');
   lines[pos.line][pos.col] = c;
 }
 

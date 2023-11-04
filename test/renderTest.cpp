@@ -46,8 +46,8 @@ TEST(render, twoSimpleEdgesDiverge) {
 0
 |\
 | \
-| |
-1 2
+|  \
+1   2
 )");
 }
 
@@ -61,8 +61,8 @@ TEST(render, twoSimpleEdgesDivergeDiffOrder) {
 0
 |\
 | \
-| |
-1 2
+|  \
+1   2
 )");
 }
 
@@ -73,8 +73,8 @@ TEST(render, twoSimpleEdgesConverge) {
   test.nodes.push_back(DAG::Node{{}, "2"});
   EXPECT_EQ(renderSuccessfully(test),
             R"(
-0 1
-| |
+0   1
+|  /
 | /
 |/
 2
@@ -91,9 +91,13 @@ TEST(render, threeSimpleEdgesDiverge) {
             R"(
   0
  /|\
-/ | \
-| | |
-1 2 3
+ || \
+ ||  \
+ |\   \
+ | \   \
+ |  \   \
+ /   \   \
+1     2   3
 )");
 }
 
@@ -107,9 +111,13 @@ TEST(render, threeSimpleEdgesDivergeOrder321) {
             R"(
   0
  /|\
-/ | \
-| | |
-1 2 3
+ || \
+ ||  \
+ |\   \
+ | \   \
+ |  \   \
+ /   \   \
+1     2   3
 )");
 }
 
@@ -123,9 +131,13 @@ TEST(render, threeSimpleEdgesDivergeOrder312) {
             R"(
   0
  /|\
-/ | \
-| | |
-1 2 3
+ || \
+ ||  \
+ |\   \
+ | \   \
+ |  \   \
+ /   \   \
+1     2   3
 )");
 }
 
@@ -137,9 +149,13 @@ TEST(render, threeSimpleEdgesConverge) {
   test.nodes.push_back(DAG::Node{{}, "3"});
   EXPECT_EQ(renderSuccessfully(test),
             R"(
-0 1 2
-| | |
-\ | /
+0     1   2
+ \   /   /
+ |  /   /
+ | /   /
+ |/   /
+ ||  /
+ || /
  \|/
   3
 )");
@@ -174,8 +190,12 @@ TEST(render, nonStraightRightEdge) {
 0   3
 |\  |\
 | \ | \
-| | | |
-1 2 4 5
+|  \|  \
+|  |\   \
+|  | \   \
+|  |  \   \
+|  \   \   \
+1   2   4   5
 )");
 }
 
@@ -217,9 +237,13 @@ TEST(render, nonStraightLeftEdge) {
   test.nodes.push_back(DAG::Node{{}, "5"});
   EXPECT_EQ(renderSuccessfully(test),
             R"(
-0 1 3 4
-| | | |
-| / | /
+0   1   3   4
+|  /   /   /
+| /   /   /
+|/   /   /
+||  /   /
+||  |  /
+||  | /
 |/  |/
 2   5
 )");
@@ -236,10 +260,10 @@ TEST(render, twoParallelRightEdges) {
   EXPECT_EQ(renderSuccessfully(test),
             R"(
 0   3
-|\  |
-| \ |
-| | |
-1 2 4
+|\   \
+| \   \
+|  \   \
+1   2   4
 )");
 }
 
@@ -252,13 +276,11 @@ TEST(render, twoParallelLeftEdges) {
   test.nodes.push_back(DAG::Node{{}, "4"});
   EXPECT_EQ(renderSuccessfully(test),
             R"(
-0 1 3
-  | |
-  / /
- / /
-/ /
-| |
-2 4
+0   1   3
+   /   /
+  /   /
+ /   /
+2   4
 )");
 }
 
@@ -273,9 +295,9 @@ TEST(render, hammock) {
 0
 |\
 | \
-| |
-1 2
-| |
+|  \
+1   2
+|  /
 | /
 |/
 3
@@ -313,10 +335,10 @@ TEST(render, twoMultiLayerEdges) {
  /|\
 / | \
 | |  \
-| \   \
-|  \   \
-|   \   \
-|   |   |
+| |   \
+| |    \
+| \     \
+|  \    |
 |   1   |
 |  / \  |
 | /  /  /
@@ -361,11 +383,19 @@ TEST(render, fourLayers) {
             R"(
   #
  /|\
-/ | \
-| | |
-1 2 3
-| | |
-| / |
+ || \
+ ||  \
+ |\   \
+ | \   \
+ |  \   \
+ /   \   \
+1     2   3
+|    /   /
+|   /   /
+|  /   /
+| /   /
+|/   /
+||  /
 |/  |
 4   |
 |   |
@@ -424,13 +454,15 @@ TEST(render, conflictingEdgesFromSamePredecessor) {
   test.nodes.push_back(DAG::Node{{}, "4"});
   test.nodes.push_back(DAG::Node{{}, "5"});
   EXPECT_EQ(renderSuccessfully(test), R"(
-0 1   2   3
-  |  / \  |
-  | /  /  /
-  |/  /  /
-  /| /  /
- / //  /
-/ / | /
+0   1   2     3
+   /   / \   /
+  /   /  /  /
+ /   /  /  /
+/   /  /  /
+|  /  /  /
+| /  /  /
+|/  /  /
+||  | /
 |/  |/
 4   5
 )");
@@ -469,14 +501,14 @@ TEST(render, dependenciesRightToLeft) {
   test.nodes.push_back(DAG::Node{{}, "3"});
   test.nodes.push_back(DAG::Node{{}, "4"});
   EXPECT_EQ(renderSuccessfully(test), R"(
-0 1   2
-  |  / \
-  | /  /
-  |/  /
-  /| /
- / //
-/ / |
-|/  |
+0   1   2
+   /   / \
+  /   /  |
+ /   /   /
+/   /   /
+|  /   /
+| /   /
+|/   /
 4   3
 )");
 }
@@ -497,12 +529,12 @@ TEST(render, complex6nodes) {
  /|\   /|\
 / | \  || \
 | |  \ ||  \
-| |  | |\   \
-| |  | | \   \
-| |  | |  \   \
-| |  | |   \   \
-| |  | |    \   \
-| |  \ /    |   |
+| |  | ||   \
+| |  | ||    \
+| |  | |\     \
+| |  | | \     \
+| |  | |  \     \
+| |  \ /   \    |
 | |   4     2   |
 | |        / \  |
 | |       /  /  /
@@ -540,23 +572,25 @@ TEST(render, wellConnected6nodes) {
 | |  \ /  | |
 | |   X   | |
 | |  / \  | |
-| | /  /  / /
-| |/  /  / /
-| ||  | / /
-| |/  |/  |
-| 2   3   |
-| |   |   |
-| \   |   /
-|  \  |  /
+| |  |  \ \ \
+| |  |   \ \ \
+| \  |   | |  \
+|  \ /   \ /  |
+|   2     3   |
+|  /     /    |
+|  |    /     /
+|  |   /     /
+|  |  /     /
+|  |  |    /
+|  |  |   /
+|  |  |  /
 \  |  | /
  \ /  | |
   X   | |
  / \  | |
-/  |  / /
-|  | / /
-|  |/ /
-|  \|/
-5   4
+ |  \ | /
+ /   \|/
+5     4
 )");
 }
 
@@ -767,10 +801,10 @@ TEST(render, narrowGapForAnEdgeEgress) {
 | | |  \ /  | | |
 | | |   X   | | |
 | | |  / \  | | |
-| | | /  |  / / /
-| | |/   | / / /
-| / ||   |/ / /
-|/  |/   \|/  |
+| | | /  |  / / |
+| | |/   | / /  |
+| / ||   |/ /   /
+|/  |/   \|/   /
 4   5     3   6
 )");
 }
@@ -789,10 +823,10 @@ TEST(render, narrowGapForAnEdgeIngress) {
  /|\   /|\
 / | \ / | \
 | | | | |  \
-| | | | \   \
-| | | |  \   \
-| | | |   \   \
-| | | |   |   |
+| | | | |   \
+| | | | |    \
+| | | | \     \
+| | | |  \    |
 | | | |   2   |
 | | | |  /|\  |
 | | | |  \\ \ \
@@ -828,11 +862,9 @@ TEST(render, narrowGapForAnEdgeIngress) {
  \ /  | |
   X   | |
  / \  | |
-/  |  / /
-|  | / /
-|  |/ /
-|  \|/
-6   5
+ |  \ | /
+ /   \|/
+6     5
 )");
 }
 
@@ -852,22 +884,28 @@ TEST(render, notHemmingInAnyEdge) {
   EXPECT_EQ(renderSuccessfully(test), R"(
   0     1
  /|\   /|\
-/ | \  \\ \
-| | |   \\ \
-| | |   | \ \
-| | |   |  \ \
-| | |   |   \ \
-| | |   |   | |
-7 | |   2   4 |
-  | |  /|\    |
-  | | / |/    /
-  | |/  ||   /
-  / /|  /|  /
- / / / / / /
-/ / / / / /
-| |/  | |/
-| 6   | 3
-|     | |
+ || \  \\ \
+ ||  \  \\ \
+ ||   \  \\ \
+ ||   |   \\ \
+ ||   |   | \ \
+ ||   |   |  \ \
+ |\   |   |   \ \
+ | \  |   |    \ \
+ |  \ |   |    |  \
+ /  | |   |    \  |
+7   | |   2     4 |
+    | |  /|\      |
+    | | / |/      /
+    | |/  ||     /
+    / /|  /|    /
+   / / / / /   /
+  / / / / /   /
+ / / / / /   /
+/ / / /  |  /
+| |/  |  \ /
+| 6   |   3
+|     |  /
 |     / /
 |    / /
 |   / /
@@ -981,15 +1019,15 @@ TEST(render, case8nodes1) {
 | | | |  / \  | | |
 | \ \ \  \  \ | | |
 |  \ \ \  \  \\ | |
-\   \ \ \  \  \\\ \
- \   \ \ \ |  | \\ \
-  \   \ \ \|  | | \ \
-  |   |  \|/  | | | |
+|   \ \ \  \  \\\ \
+|    \ \ \ |  | \\ \
+\     \ \ \|  | | \ \
+ \    |  \|/  | | | |
   2   |   5   | | | |
- /|\  |   |   | | | |
-/ | \ |   |   / / / /
-| | | |   |  / / / /
-| | | \   / / / / /
+ /|\  |  /    | | | |
+/ | \ |  |    / / / /
+| | | |  |   / / / /
+| | | \  |  / / / /
 | | |  \ /  | | | |
 | | |   X   | | | |
 | | |  / \  | | | |
@@ -1136,7 +1174,7 @@ TEST(render, edgeBetweenWideNodes) {
   EXPECT_EQ(renderSuccessfully(test),
             R"(
 000
-|
+  |
 111
 )");
 }
@@ -1149,12 +1187,69 @@ TEST(render, twoEdgesBetweenWideNodesDiverge) {
   EXPECT_EQ(renderSuccessfully(test),
             R"(
 000
-  \\
-  / \
- /  |
-/   |
-|   |
-111 222
+ | \
+ |  \
+ \   \
+  \  |
+  |  \
+111   222
+)");
+}
+
+TEST(render, fourLegsTable) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{1, 2, 3, 4}, "0000000000"});
+  test.nodes.push_back(DAG::Node{{}, "1"});
+  test.nodes.push_back(DAG::Node{{}, "2"});
+  test.nodes.push_back(DAG::Node{{}, "3"});
+  test.nodes.push_back(DAG::Node{{}, "4"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+0000000000
+| | | |
+1 2 3 4
+)");
+}
+
+TEST(render, fourAntennasTv) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{4}, "0"});
+  test.nodes.push_back(DAG::Node{{4}, "1"});
+  test.nodes.push_back(DAG::Node{{4}, "2"});
+  test.nodes.push_back(DAG::Node{{4}, "3"});
+  test.nodes.push_back(DAG::Node{{}, "4444444"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+0 1 2 3
+| | | |
+4444444
+)");
+}
+
+TEST(render, partialCoverBottomLeft) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{2}, "000"});
+  test.nodes.push_back(DAG::Node{{2}, "1111"});
+  test.nodes.push_back(DAG::Node{{}, "22222"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+000 1111
+  | |
+22222
+)");
+}
+
+TEST(render, partialCoverBottomRight) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{2}, "000"});
+  test.nodes.push_back(DAG::Node{{3}, "1111"});
+  test.nodes.push_back(DAG::Node{{}, "22222"});
+  test.nodes.push_back(DAG::Node{{}, "3333"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+000 1111
+  |    |
+22222 3333
 )");
 }
 
@@ -1165,12 +1260,12 @@ TEST(render, twoEdgesBetweenWideNodesConverge) {
   test.nodes.push_back(DAG::Node{{}, "222"});
   EXPECT_EQ(renderSuccessfully(test),
             R"(
-000 111
-|   |
-\   |
- \  |
-  \ /
+000   111
+  |  /
+  | /
   //
+ / |
+ | /
 222
 )");
 }
@@ -1189,31 +1284,28 @@ TEST(render, edgesHaveSpaceBecauseReadjustedAfterCoordsRecalculation) {
   0   11
  /|\  |\\
 / | \ | \\
-| | | \  \\
-| | |  \  \\
-| | |   \  \\
-| | |    \  \\
-| | |     \ | \
-| | |     | | |
-| | 222   | | |
-| |   \\  | | |
-| |   | \ | | \
-| \   |  \\ \  \
-|  \  |  | \ \  \
-\  |  |  | |  \  \
+| |  \\  \\
+| |  | \  \\
+| |  |  \  \\
+| |  |   \  \\
+| |  |    \  \\
+| |  |     \  \\
+| |  |      \ | \
+| |  \      | | |
+| |   222   | | |
+| |   |  \  | | |
+| \   |  |  | | \
+\  \  |  |  / \  \
  \ /  |  \ /   \ /
   X   |   X     X
  / \  |  / \   / \
 /  |  | /   \  \  \
 |  |  | |   |   \  \
-|  |  \ |   |    \  \
-|  |   \|   |     \  \
-|  |   ||   |      \  \
-|  \   //   \      /  |
-|   3333     555555   |
-|   |                 |
-|   |                 /
-|   |                /
+|  |  | |   |    \  \
+|  |  | |   |     \ |
+|  \  | /   \     | |
+|   3333     555555 |
+|   |               |
 |   |               /
 |   |              /
 |   |             /
@@ -1224,12 +1316,48 @@ TEST(render, edgesHaveSpaceBecauseReadjustedAfterCoordsRecalculation) {
 |   |        /
 |   |       /
 |   |      /
-\   |     /
- \  |    /
-  \ |   /
-   \|  /
-   || /
-   ///
+|   |     /
+|   |    /
+|   |   /
+|   |  /
+|   | /
+|   //
 44444
+)");
+}
+
+TEST(render, exitConflictOfDirectEdgeWithLeftEdge) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{3, 4, 5}, "0"});
+  test.nodes.push_back(DAG::Node{{3, 4, 5}, "11"});
+  test.nodes.push_back(DAG::Node{{}, "222"});
+  test.nodes.push_back(DAG::Node{{}, "3333"});
+  test.nodes.push_back(DAG::Node{{}, "44444"});
+  test.nodes.push_back(DAG::Node{{}, "555555"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+  0   222   11
+ /|\       // \
+/ | \     //  /
+| |  \   //  /
+| |  |  / | /
+| |  \ /  | |
+| |   X   | |
+| |  / \  | |
+| \  |  \ | |
+|  \ /  | | |
+|   X   | | |
+|  / \  | | |
+| /  /  / | |
+| | /  /  / |
+| | |  \ /  |
+| | |   X   |
+| | |  / \  |
+| | |  \  \ |
+| | |   \  \\
+| | \   |   \\
+| |  \  |    \\
+| |   \ |     \\
+3333   44444   555555
 )");
 }

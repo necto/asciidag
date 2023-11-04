@@ -29,8 +29,8 @@ R"(
 0
 |\
 | \
-| |
-1 2
+|  \
+1   2
 )");
 }
 
@@ -134,9 +134,9 @@ R"(
 0
 |\
 | \
-| |
-1 2
-| |
+|  \
+1   2
+|  /
 | /
 |/
 3
@@ -204,8 +204,8 @@ TEST(crossingMinimizationTest, untangleTwoPredsCrossedOne) {
   3 4
 )"),
 R"(
-1 0 2
-| | |
+1 0   2
+| |  /
 | | /
 | |/
 3 4
@@ -224,8 +224,8 @@ TEST(crossingMinimizationTest, untangleTwoPredsCrossedTwo) {
   3 4
 )"),
 R"(
-0 1 2
-| | |
+0 1   2
+| |  /
 | | /
 | |/
 4 3
@@ -244,8 +244,8 @@ R"(
 0 1
 | |\
 | | \
-| | |
-4 3 5
+| |  \
+4 3   5
 )");
 }
 
@@ -263,8 +263,8 @@ R"(
 0 1
 | |\
 | | \
-| | |
-5 3 4
+| |  \
+5 3   4
 )");
 }
 
@@ -284,9 +284,9 @@ R"(
 1 2
 | |\
 | | \
-| | |
-4 3 5
-| | |
+| |  \
+4 3   5
+| |  /
 | | /
 | |/
 6 7
@@ -304,8 +304,8 @@ TEST(crossingMinimizationTest, untangleEquipotentialStrayNodeUpperLayer) {
 5     6
 )"),
 R"(
-3   2   4
-|  / \  |
+3   2     4
+|  / \   /
 | /  /  /
 |/  /  /
 ||  | /
@@ -330,8 +330,8 @@ R"(
 | \ \ \
 |  \ \ \
 |  | |  \
-|  \ /  |
-3   2   4
+|  \ /   \
+3   2     4
 )");
 }
 
@@ -357,9 +357,9 @@ R"(
 | \ \ \
 |  \ \ \
 |  | |  \
-|  \ /  |
-3   2   4
-|  / \  |
+|  \ /   \
+3   2     4
+|  / \   /
 | /  /  /
 |/  /  /
 ||  | /
@@ -382,19 +382,19 @@ TEST(crossingMinimizationTest, untangleCentripetalSymmetricalCrossingFail) {
  3   4   5
 )"),
 R"(
-0   1   2
-|  / \  |
-|  |  \ \
-|  |   \ \
-\  |   | |
+0     1     2
+ \   / \   /
+ |  /  |  /
+ | /   | /
+ | |   | |
  \ /   \ /
   X     X
  / \   / \
-/  |  /  /
-|  | /  /
-|  | |  |
-|  \ /  |
-3   4   5
+ |  \  |  \
+ |   \ |   \
+ |   | |   |
+ /   \ /   \
+3     4     5
 )");
 }
 
@@ -457,29 +457,27 @@ TEST(crossingMinimizationTest, deconstructedRenderingNoUncrossing) {
 )";
   auto [dag, layers] = parseWithLayers(str);
   EXPECT_EQ(R"(
-0 1
-|
-\
+0     1
  \
   \
-| |
-2 3
+   \
+    \
+ /   \
+2     3
 )", '\n' + renderDAGWithLayers(dag, layers));
 }
 
 TEST(crossingMinimizationTest, deconstructedRenderingNoMinimizationCrossing) {
   auto str = R"(
-0 1
-| |
-| \
-\  \
+0     1
+ \   /
+ |  /
  \ /
   X
  / \
-/  /
-| /
-| |
-2 3
+ |  \
+ /   \
+2     3
 )";
   auto [dag, layers] = parseWithLayers(str);
   layers = insertCrossNodes(dag, layers);
@@ -531,19 +529,31 @@ TEST(crossingMinimizationTest, danglingNodeDoesNotPreventSimpleSwap) {
   EXPECT_EQ(R"(
   0     1
  /|\   /|\
-/ | \  |\ \
-| |  \ | \ \
-| |  | |  \ \
-| |  \ /  | |
-3 2   4   5 6
-| |       | |
-| |       / /
-| |      / /
-| |     / /
-| |    / /
-| |   / /
-| |  / /
-| \ / /
+ || \  \\ \
+ ||  \  \\ \
+ ||   \  \\ \
+ ||    \  \\ \
+ ||     \  \\ \
+ ||      \ | \ \
+ |\      | |  \ \
+ | \     | |   \ \
+ |  \    | |   |  \
+ /   \   \ /   \   \
+3     2   4     5   6
+|     |        /   /
+|     |       /   /
+|     |      /   /
+|     |     /   /
+|     |    /   /
+|     |   /   /
+|     |  /   /
+|     | /   /
+|     |/   /
+|     /|  /
+|    / / /
+|   / / /
+|  / / /
+|  |/ /
 |  \|/
 7   8
 )", '\n' + renderDAGWithLayers(dag, layers));
