@@ -121,12 +121,11 @@ void configureDAGFromSeed(DAG &dag, size_t seed) {
   size_t shift = 0;
   for (int node = 0; node < dag.nodes.size(); ++node) {
     for (int succ = node + 1; succ < dag.nodes.size(); ++succ) {
-      if (3 <= dag.nodes[node].succs.size()) {
-        // single-character nodes do not support more than 3 successors
+      assert(dag.nodes[node].text.find('\n') == std::string::npos);
+      if (2 + dag.nodes[node].text.size() <= dag.nodes[node].succs.size()) {
         break;
       }
-      if (3 <= nPreds[succ]) {
-        // single-character nodes do not support more than 3 predecessors
+      if (2 + dag.nodes[succ].text.size() <= nPreds[succ]) {
         continue;
       }
       size_t mask = 1 << shift;
