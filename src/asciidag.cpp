@@ -851,7 +851,156 @@ size_t minDistBetweenLayers(
   return singularMin ? *singularMin : minimum;
 }
 
-void setEntryAngles(
+Vec<size_t> sortEdgeIdsPredsLeftToRight(
+  Vec<size_t> edgeIds,
+  Connectivity& conn,
+  Vec<Position> const& coords
+
+) {
+  std::sort(edgeIds.begin(), edgeIds.end(), [&coords, &conn](size_t id1, size_t id2) {
+    return coords[conn.edges[id1].from].col < coords[conn.edges[id2].from].col;
+  });
+  return edgeIds;
+}
+
+void setEntryForWaypoint(Connectivity& conn, Vec<size_t> const& edgeIds) {
+  assert(edgeIds.size() == 1);
+  // the left or right-directed edges will miss the "|" nodes
+  conn.edges[edgeIds[0]].entryAngle = Direction::Straight;
+  conn.edges[edgeIds[0]].entryOffset = 0;
+}
+
+void setEntryForCrossNode(Connectivity& conn, size_t nodeId, Vec<size_t> const& edgeIds) {
+  assert(edgeIds.size() == 2);
+  conn.edges[edgeIds[0]].entryAngle = Direction::Right;
+  conn.edges[edgeIds[0]].entryOffset = 0;
+  conn.edges[edgeIds[1]].entryAngle = Direction::Left;
+  conn.edges[edgeIds[1]].entryOffset = 0;
+  conn.nodeValencies[nodeId].topRight = true;
+  conn.nodeValencies[nodeId].topLeft = true;
+}
+
+std::pair<size_t, size_t> setEntryForNodesOnTheLeft(
+  Connectivity& conn,
+  size_t nodeId,
+  Vec<size_t> const& edgeIds,
+  Vec<Position> const& coords,
+  Vec<Position> const& dimensions
+) {
+  size_t attachedEdges = 0;
+  size_t offset = 0;
+
+  if (dimensions[nodeId].col + 2 == edgeIds.size()) {
+    // Too crowded, if no edge is inserted from the left,
+    // there will not be enough space for all edges.
+    conn.edges[edgeIds[attachedEdges]].entryAngle = Direction::Right;
+    conn.edges[edgeIds[attachedEdges]].entryOffset = 0;
+    conn.nodeValencies[nodeId].topLeft = true;
+    ++offset;
+    ++attachedEdges;
+  }
+
+  // Coming from the nodes to the left of the current
+  while (
+    attachedEdges < edgeIds.size()
+    && coords[conn.edges[edgeIds[attachedEdges]].from].col
+           + dimensions[conn.edges[edgeIds[attachedEdges]].from].col
+         <= coords[nodeId].col + offset
+    && offset < dimensions[nodeId].col
+  ) {
+    conn.edges[edgeIds[attachedEdges]].entryAngle = Direction::Right;
+    conn.edges[edgeIds[attachedEdges]].entryOffset = offset;
+    conn.nodeValencies[nodeId].topLeft = true;
+    ++offset;
+    ++attachedEdges;
+  }
+  return {attachedEdges, offset};
+}
+
+std::pair<size_t, size_t> setEntryForNodesDirectlyBelow(
+  Connectivity& conn,
+  size_t nodeId,
+  Vec<size_t> const& edgeIds,
+  Vec<Position> const& coords,
+  Vec<Position> const& dimensions,
+  size_t attachedEdges,
+  size_t rightMostOffset
+) {
+  while (
+    attachedEdges < edgeIds.size() && rightMostOffset < dimensions[nodeId].col
+    && coords[conn.edges[edgeIds[attachedEdges]].from].col <= coords[nodeId].col + rightMostOffset
+  ) {
+    size_t offset = std::min(
+      rightMostOffset,
+      coords[conn.edges[edgeIds[attachedEdges]].from].col
+        + dimensions[conn.edges[edgeIds[attachedEdges]].from].col - coords[nodeId].col - 1
+    );
+    conn.edges[edgeIds[attachedEdges]].entryAngle = Direction::Straight;
+    conn.edges[edgeIds[attachedEdges]].entryOffset = offset;
+    ++attachedEdges;
+    ++rightMostOffset;
+  }
+  return {attachedEdges, rightMostOffset};
+}
+
+void setEntryForNodesOnTheRight(
+  Connectivity& conn,
+  size_t nodeId,
+  Vec<size_t> const& edgeIds,
+  size_t attachedEdges,
+  size_t rightMostOffset
+) {
+  // Coming from nodes to the right of the current
+  // Shift all these edges to the right side
+  while (attachedEdges < edgeIds.size()) {
+    conn.edges[edgeIds[attachedEdges]].entryAngle = Direction::Left;
+    conn.edges[edgeIds[attachedEdges]].entryOffset = rightMostOffset;
+    conn.nodeValencies[nodeId].topRight = true;
+    ++rightMostOffset;
+    ++attachedEdges;
+  }
+}
+
+void setEntryForRegularNode(
+  Connectivity& conn,
+  size_t nodeId,
+  Vec<size_t> const& edgeIds,
+  Vec<Position> const& coords,
+  Vec<Position> const& dimensions
+) {
+  assert(edgeIds.size() <= dimensions[nodeId].col + 2);
+
+  auto [attachedEdges, offset] =
+    setEntryForNodesOnTheLeft(conn, nodeId, edgeIds, coords, dimensions);
+
+  bool straightInsertedOn0 = false;
+  if (offset <= 1 && dimensions[nodeId].col + 1 == edgeIds.size() - attachedEdges) {
+    // Too crowded, if no edge is inserted as vertical
+    // there will not be enough space for all edges.
+    conn.edges[edgeIds[attachedEdges]].entryAngle = Direction::Straight;
+    conn.edges[edgeIds[attachedEdges]].entryOffset = 0;
+    ++attachedEdges;
+    straightInsertedOn0 = true;
+  }
+
+  size_t rightMostOffset = dimensions[nodeId].col + attachedEdges - edgeIds.size();
+  // Avoid clashes with the \ edges
+  // and avoid clashes with the already inserted | edge if any
+  if (offset <= rightMostOffset && (rightMostOffset != 0 || !straightInsertedOn0)) {
+    std::tie(attachedEdges, rightMostOffset) = setEntryForNodesDirectlyBelow(
+      conn,
+      nodeId,
+      edgeIds,
+      coords,
+      dimensions,
+      attachedEdges,
+      rightMostOffset
+    );
+  }
+  setEntryForNodesOnTheRight(conn, nodeId, edgeIds, attachedEdges, rightMostOffset);
+}
+
+void setEdgeEntryParameters(
   Connectivity& conn,
   Vec2<size_t> const& predEdges,
   Vec<Position> const& coords,
@@ -859,103 +1008,170 @@ void setEntryAngles(
   Vec<Position> const& dimensions
 ) {
   for (size_t i = 0; i < predEdges.size(); ++i) {
-    auto edgeIds = predEdges[i];
+    auto edgeIds = sortEdgeIdsPredsLeftToRight(predEdges[i], conn, coords);
     if (edgeIds.empty()) {
       continue;
     }
     if (dag.nodes[i].text == waypointText) {
-      assert(edgeIds.size() == 1);
-      // the left or right-directed edges will miss the "|" nodes
-      conn.edges[edgeIds[0]].entryAngle = Direction::Straight;
-      conn.edges[edgeIds[0]].entryOffset = 0;
+      setEntryForWaypoint(conn, edgeIds);
       continue;
     }
-    std::sort(edgeIds.begin(), edgeIds.end(), [&coords, &conn] (size_t id1, size_t id2) {
-      return coords[conn.edges[id1].from].col < coords[conn.edges[id2].from].col;
-    });
     if (dag.nodes[i].text == "X") {
-      assert(edgeIds.size() == 2);
-      conn.edges[edgeIds[0]].entryAngle = Direction::Right;
-      conn.edges[edgeIds[0]].entryOffset = 0;
-      conn.edges[edgeIds[1]].entryAngle = Direction::Left;
-      conn.edges[edgeIds[1]].entryOffset = 0;
-      conn.nodeValencies[i].topRight = true;
-      conn.nodeValencies[i].topLeft = true;
+      setEntryForCrossNode(conn, i, edgeIds);
       continue;
     }
-    size_t attachedEdges = 0;
-    size_t offset = 0;
-
-    assert(edgeIds.size() <= dimensions[i].col + 2);
-    if (dimensions[i].col + 2 == edgeIds.size()) {
-      // Too crowded, if no edge is inserted from the left,
-      // there will not be enough space for all edges.
-      conn.edges[edgeIds[attachedEdges]].entryAngle = Direction::Right;
-      conn.edges[edgeIds[attachedEdges]].entryOffset = 0;
-      conn.nodeValencies[i].topLeft = true;
-      ++offset;
-      ++attachedEdges;
-    }
-
-    // Coming from the nodes to the left of the current
-    while (
-      attachedEdges < edgeIds.size()
-      && coords[conn.edges[edgeIds[attachedEdges]].from].col
-             + dimensions[conn.edges[edgeIds[attachedEdges]].from].col
-           <= coords[i].col + offset
-      && offset < dimensions[i].col
-    ) {
-      conn.edges[edgeIds[attachedEdges]].entryAngle = Direction::Right;
-      conn.edges[edgeIds[attachedEdges]].entryOffset = offset;
-      conn.nodeValencies[i].topLeft = true;
-      ++offset;
-      ++attachedEdges;
-    }
-
-    bool straightInsertedOn0 = false;
-    if (offset <= 1 && dimensions[i].col + 1 == edgeIds.size() - attachedEdges) {
-      // Too crowded, if no edge is inserted as vertical
-      // there will not be enough space for all edges.
-      conn.edges[edgeIds[attachedEdges]].entryAngle = Direction::Straight;
-      conn.edges[edgeIds[attachedEdges]].entryOffset = 0;
-      ++attachedEdges;
-      straightInsertedOn0 = true;
-    }
-
-    size_t rightMostOffset = dimensions[i].col + attachedEdges - edgeIds.size();
-    // Avoid clashes with the \ edges
-    // and avoid clashes with the already inserted | edge if any
-    if (offset <= rightMostOffset && (rightMostOffset != 0 || !straightInsertedOn0)) {
-      while (
-        attachedEdges < edgeIds.size() && rightMostOffset < dimensions[i].col
-        && coords[conn.edges[edgeIds[attachedEdges]].from].col <= coords[i].col + rightMostOffset
-      ) {
-        offset = std::min(
-          rightMostOffset,
-          coords[conn.edges[edgeIds[attachedEdges]].from].col
-            + dimensions[conn.edges[edgeIds[attachedEdges]].from].col - coords[i].col - 1
-        );
-        conn.edges[edgeIds[attachedEdges]].entryAngle = Direction::Straight;
-        conn.edges[edgeIds[attachedEdges]].entryOffset = offset;
-        ++attachedEdges;
-        ++rightMostOffset;
-      }
-    }
-
-    // Coming from nodes to the right of the current
-    // Shift all these edges to the right side
-    offset = rightMostOffset;
-    while (attachedEdges < edgeIds.size()) {
-      conn.edges[edgeIds[attachedEdges]].entryAngle = Direction::Left;
-      conn.edges[edgeIds[attachedEdges]].entryOffset = offset;
-      conn.nodeValencies[i].topRight = true;
-      ++offset;
-      ++attachedEdges;
-    }
+    setEntryForRegularNode(conn, i, edgeIds, coords, dimensions);
   }
 }
 
-void setExitAngles(
+void setExitForWaypoint(Connectivity& conn, Vec<size_t> const& edgeIds) {
+  assert(edgeIds.size() == 1);
+  // the left or right-directed edges will miss the "|" nodes
+  conn.edges[edgeIds[0]].exitAngle = Direction::Straight;
+  conn.edges[edgeIds[0]].exitOffset = 0;
+}
+
+void setExitForCrossNode(Connectivity& conn, size_t nodeId, Vec<size_t> const& edgeIds) {
+  assert(edgeIds.size() == 2);
+  conn.edges[edgeIds[0]].exitAngle = Direction::Left;
+  conn.edges[edgeIds[0]].exitOffset = 0;
+  conn.edges[edgeIds[1]].exitAngle = Direction::Right;
+  conn.edges[edgeIds[1]].exitOffset = 0;
+  conn.nodeValencies[nodeId].topRight = true;
+  conn.nodeValencies[nodeId].topLeft = true;
+}
+
+std::pair<size_t, size_t> setExitForNodesOnTheLeft(
+  Connectivity& conn,
+  size_t nodeId,
+  Vec<size_t> const& edgeIds,
+  Vec<Position> const& coords,
+  Vec<Position> const& dimensions
+) {
+  size_t attachedEdges = 0;
+  size_t offset = 0;
+  if (dimensions[nodeId].col + 2 == edgeIds.size()) {
+    // Too crowded, if no edge is inserted to the left,
+    // there will not be enough space for all edges.
+    conn.edges[edgeIds[attachedEdges]].exitAngle = Direction::Left;
+    conn.edges[edgeIds[attachedEdges]].exitOffset = 0;
+    conn.nodeValencies[nodeId].bottomLeft = true;
+    ++offset;
+    ++attachedEdges;
+  }
+
+  // Going to the nodes on the left of the current
+  while (
+    attachedEdges < edgeIds.size()
+    && coords[conn.edges[edgeIds[attachedEdges]].to].col
+           + dimensions[conn.edges[edgeIds[attachedEdges]].to].col
+         <= coords[nodeId].col + offset
+    && offset < dimensions[nodeId].col
+  ) {
+    conn.edges[edgeIds[attachedEdges]].exitAngle = Direction::Left;
+    conn.edges[edgeIds[attachedEdges]].exitOffset = offset;
+    conn.nodeValencies[nodeId].topLeft = true;
+    ++offset;
+    ++attachedEdges;
+  }
+  return {attachedEdges, offset};
+}
+
+std::pair<size_t, size_t> setExitForNodesDirectlyBelow(
+  Connectivity& conn,
+  size_t nodeId,
+  Vec<size_t> const& edgeIds,
+  Vec<Position> const& coords,
+  Vec<Position> const& dimensions,
+  size_t attachedEdges,
+  size_t rightMostOffset
+) {
+  while (
+    attachedEdges < edgeIds.size()
+    && coords[conn.edges[edgeIds[attachedEdges]].to].col <= coords[nodeId].col + rightMostOffset
+  ) {
+    size_t offset = std::min(
+      rightMostOffset,
+      coords[conn.edges[edgeIds[attachedEdges]].to].col
+        + dimensions[conn.edges[edgeIds[attachedEdges]].to].col - coords[nodeId].col - 1
+    );
+    conn.edges[edgeIds[attachedEdges]].exitAngle = Direction::Straight;
+    conn.edges[edgeIds[attachedEdges]].exitOffset = offset;
+    ++attachedEdges;
+    ++rightMostOffset;
+  }
+  return {attachedEdges, rightMostOffset};
+}
+
+void setExitForNodesOnTheRight(
+  Connectivity& conn,
+  size_t nodeId,
+  Vec<size_t> const& edgeIds,
+  size_t attachedEdges,
+  size_t rightMostOffset
+) {
+  // Coming from nodes to the right of the current
+  // Shift all these edges to the right side
+  while (attachedEdges < edgeIds.size()) {
+    conn.edges[edgeIds[attachedEdges]].exitAngle = Direction::Right;
+    conn.edges[edgeIds[attachedEdges]].exitOffset = rightMostOffset;
+    conn.nodeValencies[nodeId].bottomRight = true;
+    ++rightMostOffset;
+    ++attachedEdges;
+  }
+}
+
+void setExitForRegularNode(
+  Connectivity& conn,
+  size_t nodeId,
+  Vec<size_t> const& edgeIds,
+  Vec<Position> const& coords,
+  Vec<Position> const& dimensions
+) {
+  assert(edgeIds.size() <= dimensions[nodeId].col + 2);
+  auto [attachedEdges, offset] = setExitForNodesOnTheLeft(conn, nodeId, edgeIds, coords, dimensions);
+
+  bool straightInsertedOn0 = false;
+  if (offset <= 1 && dimensions[nodeId].col + 1 == edgeIds.size() - attachedEdges) {
+    // Too crowded, if no edge is inserted as vertical
+    // there will not be enough space for all edges.
+    conn.edges[edgeIds[attachedEdges]].exitAngle = Direction::Straight;
+    conn.edges[edgeIds[attachedEdges]].exitOffset = 0;
+    ++attachedEdges;
+    straightInsertedOn0 = true;
+  }
+
+  size_t rightMostOffset = dimensions[nodeId].col + attachedEdges - edgeIds.size();
+
+  // Avoid clashes with the / edges
+  // and avoid clashes with the already inserted | edge if any
+  if (offset <= rightMostOffset && (rightMostOffset != 0 || !straightInsertedOn0)) {
+    std::tie(attachedEdges, rightMostOffset) = setExitForNodesDirectlyBelow(
+      conn,
+      nodeId,
+      edgeIds,
+      coords,
+      dimensions,
+      attachedEdges,
+      rightMostOffset
+    );
+  }
+  setExitForNodesOnTheRight(conn, nodeId, edgeIds, attachedEdges, rightMostOffset);
+}
+
+Vec<size_t> sortEdgeIdsSuccsLeftToRight(
+  Vec<size_t> edgeIds,
+  Connectivity& conn,
+  Vec<Position> const& coords
+
+) {
+  std::sort(edgeIds.begin(), edgeIds.end(), [&coords, &conn](size_t id1, size_t id2) {
+    return coords[conn.edges[id1].to].col < coords[conn.edges[id2].to].col;
+  });
+  return edgeIds;
+}
+
+void setEdgeExitParameters(
   Connectivity& conn,
   Vec2<size_t> const& succEdges,
   Vec<Position> const& coords,
@@ -963,100 +1179,19 @@ void setExitAngles(
   Vec<Position> const& dimensions
 ) {
   for (size_t i = 0; i < succEdges.size(); ++i) {
-    auto edgeIds = succEdges[i];
+    auto edgeIds = sortEdgeIdsSuccsLeftToRight(succEdges[i], conn, coords);
     if (edgeIds.empty()) {
       continue;
     }
     if (dag.nodes[i].text == waypointText) {
-      assert(edgeIds.size() == 1);
-      // the left or right-directed edges will miss the "|" nodes
-      conn.edges[edgeIds[0]].exitAngle = Direction::Straight;
-      conn.edges[edgeIds[0]].exitOffset = 0;
+      setExitForWaypoint(conn, edgeIds);
       continue;
     }
-    std::sort(edgeIds.begin(), edgeIds.end(), [&coords, &conn] (size_t id1, size_t id2) {
-      return coords[conn.edges[id1].to].col < coords[conn.edges[id2].to].col;
-    });
     if (dag.nodes[i].text == "X") {
-      assert(edgeIds.size() == 2);
-      conn.edges[edgeIds[0]].exitAngle = Direction::Left;
-      conn.edges[edgeIds[0]].exitOffset = 0;
-      conn.edges[edgeIds[1]].exitAngle = Direction::Right;
-      conn.edges[edgeIds[1]].exitOffset = 0;
-      conn.nodeValencies[i].topRight = true;
-      conn.nodeValencies[i].topLeft = true;
+      setExitForCrossNode(conn, i, edgeIds);
       continue;
     }
-
-    size_t attachedEdges = 0;
-    size_t offset = 0;
-    assert(edgeIds.size() <= dimensions[i].col + 2);
-    if (dimensions[i].col + 2 == edgeIds.size()) {
-      // Too crowded, if no edge is inserted to the left,
-      // there will not be enough space for all edges.
-      conn.edges[edgeIds[attachedEdges]].exitAngle = Direction::Left;
-      conn.edges[edgeIds[attachedEdges]].exitOffset = 0;
-      conn.nodeValencies[i].bottomLeft = true;
-      ++offset;
-      ++attachedEdges;
-    }
-
-    // Going to the nodes on the left of the current
-    while (
-      attachedEdges < edgeIds.size()
-      && coords[conn.edges[edgeIds[attachedEdges]].to].col
-             + dimensions[conn.edges[edgeIds[attachedEdges]].to].col
-           <= coords[i].col + offset
-      && offset < dimensions[i].col
-    ) {
-      conn.edges[edgeIds[attachedEdges]].exitAngle = Direction::Left;
-      conn.edges[edgeIds[attachedEdges]].exitOffset = offset;
-      conn.nodeValencies[i].topLeft = true;
-      ++offset;
-      ++attachedEdges;
-    }
-
-    bool straightInsertedOn0 = false;
-    if (offset <= 1 && dimensions[i].col + 1 == edgeIds.size() - attachedEdges) {
-      // Too crowded, if no edge is inserted as vertical
-      // there will not be enough space for all edges.
-      conn.edges[edgeIds[attachedEdges]].exitAngle = Direction::Straight;
-      conn.edges[edgeIds[attachedEdges]].exitOffset = 0;
-      ++attachedEdges;
-      straightInsertedOn0 = true;
-    }
-
-    size_t rightMostOffset = dimensions[i].col + attachedEdges - edgeIds.size();
-
-    // Avoid clashes with the / edges
-    // and avoid clashes with the already inserted | edge if any
-    if (offset <= rightMostOffset && (rightMostOffset != 0 || !straightInsertedOn0)) {
-      while (
-        attachedEdges < edgeIds.size()
-        && coords[conn.edges[edgeIds[attachedEdges]].to].col <= coords[i].col + rightMostOffset
-      ) {
-        offset = std::min(
-          rightMostOffset,
-          coords[conn.edges[edgeIds[attachedEdges]].to].col
-            + dimensions[conn.edges[edgeIds[attachedEdges]].to].col - coords[i].col - 1
-        );
-        conn.edges[edgeIds[attachedEdges]].exitAngle = Direction::Straight;
-        conn.edges[edgeIds[attachedEdges]].exitOffset = offset;
-        ++attachedEdges;
-        ++rightMostOffset;
-      }
-    }
-
-    // Coming from nodes to the right of the current
-    // Shift all these edges to the right side
-    offset = rightMostOffset;
-    while (attachedEdges < edgeIds.size()) {
-      conn.edges[edgeIds[attachedEdges]].exitAngle = Direction::Right;
-      conn.edges[edgeIds[attachedEdges]].exitOffset = offset;
-      conn.nodeValencies[i].bottomRight = true;
-      ++offset;
-      ++attachedEdges;
-    }
+    setExitForRegularNode(conn, i, edgeIds, coords, dimensions);
   }
 }
 
@@ -1104,8 +1239,8 @@ computeConnectivity(DAG const& dag, Vec<Position> const& coords, Vec<Position> c
     assert(1 <= dag.nodes[edge.from].succs.size() && "Fanthom edge");
     assert(1 <= preds[edge.to].size() && "Fanthom edge");
   }
-  setEntryAngles(ret, predEdges, coords, dag, dimensions);
-  setExitAngles(ret, succEdges, coords, dag, dimensions);
+  setEdgeExitParameters(ret, succEdges, coords, dag, dimensions);
+  setEdgeEntryParameters(ret, predEdges, coords, dag, dimensions);
   std::sort(ret.edges.begin(), ret.edges.end(), [&coords](auto const& a, auto const& b) {
     return compareEdges(coords, a, b);
   });
