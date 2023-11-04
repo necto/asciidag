@@ -144,71 +144,111 @@ constexpr size_t numberOfEdgeConfigurations(size_t nodeCount) {
   return 1ULL << maxEdgesCount;
 }
 
-TEST(parseRender, generated3) {
-  DAG dag;
-  dag.nodes.push_back({{}, "0"});
-  dag.nodes.push_back({{}, "1"});
-  dag.nodes.push_back({{}, "2"});
-  size_t const nPermutations = numberOfEdgeConfigurations(dag.nodes.size());
-  for (size_t seed = 0; seed < nPermutations; ++seed) {
-    configureDAGFromSeed(dag, seed);
-    ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
-  }
-}
+class enumerateAllGraphs
+  : public testing::TestWithParam<std::tuple<std::array<std::string, 10> const*, size_t, size_t>> {
+};
 
-TEST(parseRender, generated4) {
-  DAG dag;
-  dag.nodes.push_back({{}, "0"});
-  dag.nodes.push_back({{}, "1"});
-  dag.nodes.push_back({{}, "2"});
-  dag.nodes.push_back({{}, "3"});
-  size_t const nPermutations = numberOfEdgeConfigurations(dag.nodes.size());
-  for (size_t seed = 0; seed < nPermutations; ++seed) {
-    configureDAGFromSeed(dag, seed);
-    ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
-  }
-}
+std::array<std::string, 10> const nodeLabelSingleDigit =
+  {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"};
 
-TEST(parseRender, generated5) {
-  DAG dag;
-  dag.nodes.push_back({{}, "0"});
-  dag.nodes.push_back({{}, "1"});
-  dag.nodes.push_back({{}, "2"});
-  dag.nodes.push_back({{}, "3"});
-  dag.nodes.push_back({{}, "4"});
-  size_t const nPermutations = numberOfEdgeConfigurations(dag.nodes.size());
-  for (size_t seed = 0; seed < nPermutations; ++seed) {
-    configureDAGFromSeed(dag, seed);
-    ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
-  }
-}
+std::array<std::string, 10> const nodeLabelUp =
+  {"0", "11", "222", "3333", "44444", "555555", "6666666", "77777777", "888888888", "9999999999"};
 
-//#define LONG_BRUTFORCE_TESTS
-#ifdef LONG_BRUTFORCE_TESTS
+std::array<std::string, 10> const nodeLabelDown =
+  {"00000000000", "111111111", "22222222", "3333333", "444444", "55555", "6666", "777", "88", "9"};
+
+std::array<std::string, 10> const nodeLabelUpDown =
+  {"0", "11", "222", "3333", "44444", "5555", "666", "77", "8", "9"};
+
+std::array<std::string, 10> const nodeLabelDownUp =
+  {"00000", "1111", "222", "33", "4", "5", "66", "777", "8888", "99999"};
+
+std::array<std::string, 10> const nodeLabelSaw =
+  {"00", "1", "222", "3", "444", "5", "66", "777", "8", "9999"};
 
 constexpr size_t batchSize = 10000;
 
-class enumerateAllGraphs : public testing::TestWithParam<std::tuple<size_t, size_t>> {
-};
-
 TEST_P(enumerateAllGraphs, parseOfRenderIsIdentity) {
   DAG dag;
-  auto const [nodeCount, from] = GetParam();
+  auto const [nodeLabel, nodeCount, from] = GetParam();
   auto param = GetParam();
   for (size_t nodeId = 0; nodeId < nodeCount; ++nodeId) {
-    dag.nodes.push_back({{}, std::to_string(nodeId)});
+    dag.nodes.push_back({{}, (*nodeLabel)[nodeId]});
   }
   size_t to = std::min(from + batchSize, numberOfEdgeConfigurations(nodeCount));
   for (size_t seed = from; seed < to; ++seed) {
     configureDAGFromSeed(dag, seed);
+    //std::cout <<seed <<":\n" <<toDOT(dag) <<"\n";
     ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
   }
 }
 
 INSTANTIATE_TEST_SUITE_P(
+  test3nodeGraphs,
+  enumerateAllGraphs,
+  testing::Combine(
+    testing::Values(
+      &nodeLabelSingleDigit,
+      &nodeLabelDown,
+      &nodeLabelUp,
+      &nodeLabelDownUp,
+      &nodeLabelUpDown,
+      &nodeLabelSaw
+    ),
+    testing::Values((size_t)3),
+    testing::Range((size_t)0, numberOfEdgeConfigurations(3), batchSize)
+  )
+);
+
+INSTANTIATE_TEST_SUITE_P(
+  test4nodeGraphs,
+  enumerateAllGraphs,
+  testing::Combine(
+    testing::Values(
+      &nodeLabelSingleDigit,
+      &nodeLabelDown,
+      &nodeLabelUp,
+      &nodeLabelDownUp,
+      &nodeLabelUpDown,
+      &nodeLabelSaw
+    ),
+    testing::Values((size_t)4),
+    testing::Range((size_t)0, numberOfEdgeConfigurations(4), batchSize)
+  )
+);
+
+INSTANTIATE_TEST_SUITE_P(
+  test5nodeGraphs,
+  enumerateAllGraphs,
+  testing::Combine(
+    testing::Values(
+      &nodeLabelSingleDigit,
+      &nodeLabelDown,
+      &nodeLabelUp,
+      &nodeLabelDownUp,
+      &nodeLabelUpDown,
+      &nodeLabelSaw
+    ),
+    testing::Values((size_t)5),
+    testing::Range((size_t)0, numberOfEdgeConfigurations(5), batchSize)
+  )
+);
+
+//#define LONG_BRUTFORCE_TESTS
+#ifdef LONG_BRUTFORCE_TESTS
+
+INSTANTIATE_TEST_SUITE_P(
   test6nodeGraphs,
   enumerateAllGraphs,
   testing::Combine(
+    testing::Values(
+      &nodeLabelSingleDigit,
+      &nodeLabelDown,
+      &nodeLabelUp,
+      &nodeLabelDownUp,
+      &nodeLabelUpDown,
+      &nodeLabelSaw
+    ),
     testing::Values((size_t)6),
     testing::Range((size_t)0, numberOfEdgeConfigurations(6), batchSize)
   )
@@ -218,6 +258,7 @@ INSTANTIATE_TEST_SUITE_P(
   test7nodeGraphs,
   enumerateAllGraphs,
   testing::Combine(
+    testing::Values(&nodeLabelSaw),
     testing::Values((size_t)7),
     testing::Range((size_t)0, numberOfEdgeConfigurations(7), batchSize)
   )
@@ -227,6 +268,7 @@ INSTANTIATE_TEST_SUITE_P(
   test8nodeGraphs,
   enumerateAllGraphs,
   testing::Combine(
+    testing::Values(&nodeLabelSaw),
     testing::Values((size_t)8),
     testing::Range((size_t)0, numberOfEdgeConfigurations(8), batchSize)
   )

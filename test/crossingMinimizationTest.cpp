@@ -304,9 +304,11 @@ TEST(crossingMinimizationTest, untangleEquipotentialStrayNodeUpperLayer) {
 5     6
 )"),
 R"(
-3 2   4
-| |\  |
-| / \ /
+3   2   4
+|  / \  |
+| /  /  /
+|/  /  /
+||  | /
 |/  |/
 5   6
 )");
@@ -325,9 +327,11 @@ TEST(crossingMinimizationTest, untangleEquipotentialStrayNodeLowerLayer) {
 R"(
 0   1
 |\  |\
-| \ / \
-| |/  |
-3 2   4
+| \ \ \
+|  \ \ \
+|  | |  \
+|  \ /  |
+3   2   4
 )");
 }
 
@@ -350,11 +354,15 @@ TEST(crossingMinimizationTest, untangleEquipotentialStrayNodeMiddleLayer) {
 R"(
 0   1
 |\  |\
-| \ / \
-| |/  |
-3 2   4
-| |\  |
-| / \ /
+| \ \ \
+|  \ \ \
+|  | |  \
+|  \ /  |
+3   2   4
+|  / \  |
+| /  /  /
+|/  /  /
+||  | /
 |/  |/
 5   6
 )");
@@ -374,23 +382,19 @@ TEST(crossingMinimizationTest, untangleCentripetalSymmetricalCrossingFail) {
  3   4   5
 )"),
 R"(
-0 1   2
-| |\  |
-| | \ \
-| |  \ \
-| \   \ \
-|  \   \ \
+0   1   2
+|  / \  |
+|  |  \ \
+|  |   \ \
 \  |   | |
  \ /   \ /
   X     X
  / \   / \
-/  /  /  /
-| /  /  /
-| | /  /
-| |/  /
-| ||  |
-| |/  |
-3 4   5
+/  |  /  /
+|  | /  /
+|  | |  |
+|  \ /  |
+3   4   5
 )");
 }
 
@@ -527,10 +531,14 @@ TEST(crossingMinimizationTest, danglingNodeDoesNotPreventSimpleSwap) {
   EXPECT_EQ(R"(
   0     1
  /|\   /|\
-/ | \ / | \
-| | |/  | |
-3 2 4   5 6
-| |     | |
+/ | \  |\ \
+| |  \ | \ \
+| |  | |  \ \
+| |  \ /  | |
+3 2   4   5 6
+| |       | |
+| |       / /
+| |      / /
 | |     / /
 | |    / /
 | |   / /

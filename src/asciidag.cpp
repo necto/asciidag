@@ -737,8 +737,10 @@ void NodeCollector::addNodeLine(size_t nodeAbove, EdgesInFlight& prevEdges, Posi
 struct Connectivity {
   struct Edge {
     size_t from;
-    Direction exitAngle;
+    size_t exitOffset;
     size_t to;
+    size_t entryOffset;
+    Direction exitAngle;
     Direction entryAngle;
   };
 
@@ -770,10 +772,19 @@ int directionShift(Direction dir) {
   return 0;
 }
 
+[[maybe_unused]]
+std::ostream&
+operator<<(std::ostream& os, Connectivity::Edge const& e) {
+  return os
+      << "(" << e.from << "[" << e.exitOffset << "]" << edgeChar(e.exitAngle)
+      << edgeChar(e.entryAngle) << e.to << "[" << e.entryOffset << "]"
+      << ")";
+}
+
 std::pair<std::optional<size_t>, size_t>
 minEdgeHeight(Connectivity::Edge const& edge, Vec<Position> const& positions) {
-  size_t from = positions[edge.from].col;
-  size_t to = positions[edge.to].col;
+  size_t from = positions[edge.from].col + edge.exitOffset;
+  size_t to = positions[edge.to].col + edge.entryOffset;
   switch (edge.exitAngle) {
     case Direction::Left:
       switch (edge.entryAngle) {
@@ -840,100 +851,168 @@ size_t minDistBetweenLayers(
   return singularMin ? *singularMin : minimum;
 }
 
-void setEntryAngles(Connectivity& conn, Vec2<size_t> predEdges, Vec<Position> const& coords, DAG const& dag) {
+void setEntryAngles(
+  Connectivity& conn,
+  Vec2<size_t> const& predEdges,
+  Vec<Position> const& coords,
+  DAG const& dag,
+  Vec<Position> const& dimensions
+) {
   for (size_t i = 0; i < predEdges.size(); ++i) {
-    auto const& edgeIds = predEdges[i];
-    switch (edgeIds.size()) {
-      case 0:
-        break;
-      case 1: {
-        conn.edges[edgeIds[0]].entryAngle = Direction::Straight;
-        break;
-      }
-      case 2: {
-        auto [left, right] = increasingOrder(
-          coords[conn.edges[edgeIds[0]].from].col,
-          coords[conn.edges[edgeIds[1]].from].col
-        );
-        conn.edges[edgeIds[right]].entryAngle = Direction::Left;
-        conn.nodeValencies[i].topRight = true;
-        if (dag.nodes[i].text == "X") {
-          conn.edges[edgeIds[left]].entryAngle = Direction::Right;
-          conn.nodeValencies[i].topLeft = true;
-        } else {
-          conn.edges[edgeIds[left]].entryAngle = Direction::Straight;
-        }
-        break;
-      }
-      case 3: {
-        auto [left, straight, right] = increasingOrder(
-          coords[conn.edges[edgeIds[0]].from].col,
-          coords[conn.edges[edgeIds[1]].from].col,
-          coords[conn.edges[edgeIds[2]].from].col
-        );
-        conn.edges[edgeIds[left]].entryAngle = Direction::Right;
-        conn.edges[edgeIds[straight]].entryAngle = Direction::Straight;
-        conn.edges[edgeIds[right]].entryAngle = Direction::Left;
-        conn.nodeValencies[i].topLeft = true;
-        conn.nodeValencies[i].topRight = true;
-        break;
-      }
-      default:
-        assert(false && "Overcrowded node");
-        break;
+    auto edgeIds = predEdges[i];
+    if (edgeIds.empty()) {
+      continue;
     }
+    if (edgeIds.size() == 1) {
+      // Important for the waypoint nodes '|'
+      // because they are not real nodes,
+      // and the generic algorithm below won't work on them -
+      // the left or right-directed edges will miss them
+      conn.edges[edgeIds[0]].entryAngle = Direction::Straight;
+      continue;
+    }
+    std::sort(edgeIds.begin(), edgeIds.end(), [&coords, &conn] (size_t id1, size_t id2) {
+      return coords[conn.edges[id1].from].col < coords[conn.edges[id2].from].col;
+    });
+    if (dag.nodes[i].text == "X") {
+      assert(edgeIds.size() == 2);
+      conn.edges[edgeIds[0]].entryAngle = Direction::Right;
+      conn.edges[edgeIds[0]].entryOffset = 0;
+      conn.edges[edgeIds[1]].entryAngle = Direction::Left;
+      conn.edges[edgeIds[1]].entryOffset = 0;
+      conn.nodeValencies[i].topRight = true;
+      conn.nodeValencies[i].topLeft = true;
+      continue;
+    }
+    size_t attachedEdges = 0;
+    size_t offset = 0;
+
+    assert(edgeIds.size() <= dimensions[i].col + 2);
+    if (dimensions[i].col + 2 == edgeIds.size()) {
+      // Too crowded, if no edge is inserted from the left,
+      // there will not be enough space for all edges.
+      conn.edges[edgeIds[attachedEdges]].entryAngle = Direction::Right;
+      conn.edges[edgeIds[attachedEdges]].entryOffset = 0;
+      conn.nodeValencies[i].topLeft = true;
+      ++offset;
+      ++attachedEdges;
+    }
+
+    // Coming from the nodes to the left of the current
+    while (
+      attachedEdges < edgeIds.size()
+      && coords[conn.edges[edgeIds[attachedEdges]].from].col < coords[i].col + offset
+      && offset < dimensions[i].col
+    ) {
+      conn.edges[edgeIds[attachedEdges]].entryAngle = Direction::Right;
+      conn.edges[edgeIds[attachedEdges]].entryOffset = offset;
+      conn.nodeValencies[i].topLeft = true;
+      ++offset;
+      ++attachedEdges;
+    }
+
+    if (offset <= 1 && dimensions[i].col + 1 == edgeIds.size() - attachedEdges) {
+      // Too crowded, if no edge is inserted as vertical
+      // there will not be enough space for all edges.
+      conn.edges[edgeIds[attachedEdges]].entryAngle = Direction::Straight;
+      conn.edges[edgeIds[attachedEdges]].entryOffset = 0;
+      ++attachedEdges;
+    }
+
+    // Coming from nodes to the right of the current
+    // Shift all these edges to the right side
+    offset = dimensions[i].col - edgeIds.size() + attachedEdges;
+    while (attachedEdges < edgeIds.size()) {
+      conn.edges[edgeIds[attachedEdges]].entryAngle = Direction::Left;
+      conn.edges[edgeIds[attachedEdges]].entryOffset = offset;
+      conn.nodeValencies[i].topRight = true;
+      ++offset;
+      ++attachedEdges;
+    }
+    // TODO: handle strictly-above nodes
   }
 }
 
-void setExitAngles(Connectivity& conn, Vec2<size_t> succEdges, Vec<Position> const& coords, DAG const& dag) {
+void setExitAngles(
+  Connectivity& conn,
+  Vec2<size_t> const& succEdges,
+  Vec<Position> const& coords,
+  DAG const& dag,
+  Vec<Position> const& dimensions
+) {
   for (size_t i = 0; i < succEdges.size(); ++i) {
-    auto const& edgeIds = succEdges[i];
-    switch (edgeIds.size()) {
-      case 0:
-        break;
-      case 1: {
-        conn.edges[edgeIds[0]].exitAngle = Direction::Straight;
-        break;
-      }
-      case 2: {
-        auto [left, right] = increasingOrder(
-          coords[conn.edges[edgeIds[0]].to].col,
-          coords[conn.edges[edgeIds[1]].to].col
-        );
-        conn.edges[edgeIds[right]].exitAngle = Direction::Right;
-        conn.nodeValencies[i].bottomRight = true;
-        if (dag.nodes[i].text == "X") {
-          conn.edges[edgeIds[left]].exitAngle = Direction::Left;
-          conn.nodeValencies[i].bottomLeft = true;
-        } else {
-          conn.edges[edgeIds[left]].exitAngle = Direction::Straight;
-        }
-        break;
-      }
-      case 3: {
-        auto [left, straight, right] = increasingOrder(
-          coords[conn.edges[edgeIds[0]].to].col,
-          coords[conn.edges[edgeIds[1]].to].col,
-          coords[conn.edges[edgeIds[2]].to].col
-        );
-        conn.edges[edgeIds[left]].exitAngle = Direction::Left;
-        conn.edges[edgeIds[straight]].exitAngle = Direction::Straight;
-        conn.edges[edgeIds[right]].exitAngle = Direction::Right;
-        conn.nodeValencies[i].bottomLeft = true;
-        conn.nodeValencies[i].bottomRight = true;
-        break;
-      }
-      default:
-        assert(false && "Overcrowded node");
-        break;
+    auto edgeIds = succEdges[i];
+    if (edgeIds.empty()) {
+      continue;
     }
-  }
-}
+    if (edgeIds.size() == 1) {
+      // Important for the waypoint nodes '|'
+      // because they are not real nodes,
+      // and the generic algorithm below won't work on them -
+      // the left or right-directed edges will miss them
+      conn.edges[edgeIds[0]].exitAngle = Direction::Straight;
+      continue;
+    }
+    std::sort(edgeIds.begin(), edgeIds.end(), [&coords, &conn] (size_t id1, size_t id2) {
+      return coords[conn.edges[id1].to].col < coords[conn.edges[id2].to].col;
+    });
+    if (dag.nodes[i].text == "X") {
+      assert(edgeIds.size() == 2);
+      conn.edges[edgeIds[0]].exitAngle = Direction::Left;
+      conn.edges[edgeIds[0]].exitOffset = 0;
+      conn.edges[edgeIds[1]].exitAngle = Direction::Right;
+      conn.edges[edgeIds[1]].exitOffset = 0;
+      conn.nodeValencies[i].topRight = true;
+      conn.nodeValencies[i].topLeft = true;
+      continue;
+    }
 
-[[maybe_unused]]
-std::ostream&
-operator<<(std::ostream& os, Connectivity::Edge const& e) {
-  return os << "(" << e.from << edgeChar(e.exitAngle) << edgeChar(e.entryAngle) << e.to << ")";
+    size_t attachedEdges = 0;
+    size_t offset = 0;
+    assert(edgeIds.size() <= dimensions[i].col + 2);
+    if (dimensions[i].col + 2 == edgeIds.size()) {
+      // Too crowded, if no edge is inserted to the left,
+      // there will not be enough space for all edges.
+      conn.edges[edgeIds[attachedEdges]].exitAngle = Direction::Left;
+      conn.edges[edgeIds[attachedEdges]].exitOffset = 0;
+      conn.nodeValencies[i].bottomLeft = true;
+      ++offset;
+      ++attachedEdges;
+    }
+
+    // Going to the nodes on the left of the current
+    while (
+      attachedEdges < edgeIds.size()
+      && coords[conn.edges[edgeIds[attachedEdges]].to].col < coords[i].col + offset
+      && offset < dimensions[i].col
+    ) {
+      conn.edges[edgeIds[attachedEdges]].exitAngle = Direction::Left;
+      conn.edges[edgeIds[attachedEdges]].exitOffset = offset;
+      conn.nodeValencies[i].topLeft = true;
+      ++offset;
+      ++attachedEdges;
+    }
+
+    if (offset <= 1 && dimensions[i].col + 1 == edgeIds.size() - attachedEdges) {
+      // Too crowded, if no edge is inserted as vertical
+      // there will not be enough space for all edges.
+      conn.edges[edgeIds[attachedEdges]].exitAngle = Direction::Straight;
+      conn.edges[edgeIds[attachedEdges]].exitOffset = 0;
+      ++attachedEdges;
+    }
+
+    // Coming from nodes to the right of the current
+    // Shift all these edges to the right side
+    offset = dimensions[i].col - edgeIds.size() + attachedEdges;
+    while (attachedEdges < edgeIds.size()) {
+      conn.edges[edgeIds[attachedEdges]].exitAngle = Direction::Right;
+      conn.edges[edgeIds[attachedEdges]].exitOffset = offset;
+      conn.nodeValencies[i].bottomRight = true;
+      ++offset;
+      ++attachedEdges;
+    }
+    // TODO: handle strictly-below nodes
+  }
 }
 
 bool compareEdges(
@@ -942,19 +1021,22 @@ bool compareEdges(
   Connectivity::Edge const& e2
 ) {
   auto fullTuple = [&coords](Connectivity::Edge const& e) {
-    return std::tie(
+    return std::make_tuple(
       coords[e.from].line,
       coords[e.from].col,
+      directionShift(e.exitAngle),
+      e.exitOffset,
       coords[e.to].line,
       coords[e.to].col,
-      e.exitAngle,
-      e.entryAngle
+      - directionShift(e.entryAngle),
+      e.entryOffset
     );
   };
   return fullTuple(e1) < fullTuple(e2);
 }
 
-Connectivity computeConnectivity(DAG const& dag, Vec<Position> const& coords) {
+Connectivity
+computeConnectivity(DAG const& dag, Vec<Position> const& coords, Vec<Position> const& dimensions) {
   size_t const N = dag.nodes.size();
   Vec2<size_t> preds(N);
   Vec2<size_t> predEdges(N);
@@ -968,17 +1050,17 @@ Connectivity computeConnectivity(DAG const& dag, Vec<Position> const& coords) {
       predEdges[e].push_back(edgeId);
       succEdges[i].push_back(edgeId);
       // The angles is not correct there yet
-      ret.edges.push_back({i, Direction::Straight, e, Direction::Straight});
+      ret.edges.push_back({i, 0, e, 0, Direction::Straight, Direction::Straight});
     }
   }
   for (auto& edge : ret.edges) {
-    assert(dag.nodes[edge.from].succs.size() <= 3 && "Overcrowded node");
-    assert(preds[edge.to].size() <= 3 && "Overcrowded node");
+    assert(dag.nodes[edge.from].succs.size() <= dimensions[edge.from].col + 2 && "Overcrowded node");
+    assert(preds[edge.to].size() <= dimensions[edge.to].col + 2 && "Overcrowded node");
     assert(1 <= dag.nodes[edge.from].succs.size() && "Fanthom edge");
     assert(1 <= preds[edge.to].size() && "Fanthom edge");
   }
-  setEntryAngles(ret, predEdges, coords, dag);
-  setExitAngles(ret, succEdges, coords, dag);
+  setEntryAngles(ret, predEdges, coords, dag, dimensions);
+  setExitAngles(ret, succEdges, coords, dag, dimensions);
   std::sort(ret.edges.begin(), ret.edges.end(), [&coords](auto const& a, auto const& b) {
     return compareEdges(coords, a, b);
   });
@@ -1088,8 +1170,12 @@ void placeEdges(
     return compareEdges(coordinates, e1, e2);
   }));
   for (auto const& e : edges) {
+    auto fromPos = coordinates[e.from];
+    fromPos.col += e.exitOffset;
+    auto toPos = coordinates[e.to];
+    toPos.col += e.entryOffset;
     // TODO: assert that it returns true = success
-    drawEdge(coordinates[e.from], e.exitAngle, coordinates[e.to], e.entryAngle, canvas);
+    drawEdge(fromPos, e.exitAngle, toPos, e.entryAngle, canvas);
   }
 }
 
@@ -1203,13 +1289,38 @@ std::optional<RenderError> checkDAGCompat(DAG const& dag) {
   return {};
 }
 
+Position singleNodeDimensions(DAG::Node const& n) {
+  assert(!n.text.empty());
+  Position ret{1, 0};
+  size_t lineLen = 0;
+  for (char c : n.text) {
+    if (c == '\n') {
+      ret.col = std::max(ret.col, lineLen);
+      ++ret.line;
+      lineLen = 0;
+      continue;
+    }
+    ++lineLen;
+  }
+  ret.col = std::max(ret.col, lineLen);
+  return ret;
+}
+
+Vec<Position> nodeDimensions(DAG const& dag) {
+  Vec<Position> ret;
+  ret.reserve(dag.nodes.size());
+  std::transform(dag.nodes.begin(), dag.nodes.end(), std::back_inserter(ret), singleNodeDimensions);
+  return ret;
+}
+
 std::optional<RenderError> checkIfEdgesFitOnNodes(DAG const& dag) {
   size_t const N = dag.nodes.size();
   Vec<size_t> incomingEdgesPerNode(N, 0);
+  auto const dimensions = nodeDimensions(dag);
 
   for (size_t i = 0; i < N; ++i) {
     auto const& n = dag.nodes[i];
-    if (3 < n.succs.size()) {
+    if (2 + dimensions[i].col < n.succs.size()) {
       return {
         {RenderError::Code::Overcrowded, "Too many outgoing edges from a node, they don't fit.", i}
       };
@@ -1219,7 +1330,7 @@ std::optional<RenderError> checkIfEdgesFitOnNodes(DAG const& dag) {
     }
   }
   for (size_t i = 0; i < N; ++i) {
-    if (3 < incomingEdgesPerNode[i]) {
+    if (2 + dimensions[i].col < incomingEdgesPerNode[i]) {
       return {
         {RenderError::Code::Overcrowded, "Too many incoming edges to a node, they don't fit.", i}
       };
@@ -1633,35 +1744,14 @@ bool drawEdge(
   return succeded;
 }
 
-Position singleNodeDimensions(DAG::Node const& n) {
-  assert(!n.text.empty());
-  Position ret{1, 0};
-  size_t lineLen = 0;
-  for (char c : n.text) {
-    if (c == '\n') {
-      ret.col = std::max(ret.col, lineLen);
-      ++ret.line;
-      lineLen = 0;
-      continue;
-    }
-    ++lineLen;
-  }
-  ret.col = std::max(ret.col, lineLen);
-  return ret;
-}
-
-Vec<Position> nodeDimensions(DAG const& dag) {
-  Vec<Position> ret;
-  ret.reserve(dag.nodes.size());
-  std::transform(dag.nodes.begin(), dag.nodes.end(), std::back_inserter(ret), singleNodeDimensions);
-  return ret;
-}
-
 std::string renderDAGWithLayers(DAG const& dag, std::vector<std::vector<size_t>> layers) {
   // TODO: find best horisontal position of nodes
   auto const dimensions = nodeDimensions(dag);
   auto coords = computeNodeCoordinates(dag, layers, dimensions);
-  auto const connectivity = computeConnectivity(dag, coords);
+  auto connectivity = computeConnectivity(dag, coords, dimensions);
+  adjustCoordsWithValencies(coords, connectivity, layers, dimensions);
+  // Reposition edges to account for the changes in positions
+  connectivity = computeConnectivity(dag, coords, dimensions);
   adjustCoordsWithValencies(coords, connectivity, layers, dimensions);
   auto canvas = Canvas::create(coords, dimensions);
   placeNodes(dag, coords, canvas);

@@ -313,11 +313,15 @@ TEST(render, twoMultiLayerEdges) {
  /|\
 / | \
 | |  \
-| |   \
-| |   |
-| 1   |
-| |\  |
-| / \ /
+| \   \
+|  \   \
+|   \   \
+|   |   |
+|   1   |
+|  / \  |
+| /  /  /
+|/  /  /
+||  | /
 |/  |/
 2   3
 )");
@@ -420,9 +424,11 @@ TEST(render, conflictingEdgesFromSamePredecessor) {
   test.nodes.push_back(DAG::Node{{}, "4"});
   test.nodes.push_back(DAG::Node{{}, "5"});
   EXPECT_EQ(renderSuccessfully(test), R"(
-0 1 2   3
-  | |\  |
-  / //  /
+0 1   2   3
+  |  / \  |
+  | /  /  /
+  |/  /  /
+  /| /  /
  / //  /
 / / | /
 |/  |/
@@ -463,9 +469,11 @@ TEST(render, dependenciesRightToLeft) {
   test.nodes.push_back(DAG::Node{{}, "3"});
   test.nodes.push_back(DAG::Node{{}, "4"});
   EXPECT_EQ(renderSuccessfully(test), R"(
-0 1 2
-  | |\
-  / //
+0 1   2
+  |  / \
+  | /  /
+  |/  /
+  /| /
  / //
 / / |
 |/  |
@@ -487,15 +495,23 @@ TEST(render, complex6nodes) {
   EXPECT_EQ(renderSuccessfully(test), R"(
   0     1
  /|\   /|\
-/ | \ / | \
-| | |/  |  \
-| | ||  |   \
-| | |/  |   |
-| | 4   2   |
-| |     |\  |
-| |     //  /
-| |    //  /
-| \   / | /
+/ | \  || \
+| |  \ ||  \
+| |  | |\   \
+| |  | | \   \
+| |  | |  \   \
+| |  | |   \   \
+| |  | |    \   \
+| |  \ /    |   |
+| |   4     2   |
+| |        / \  |
+| |       /  /  /
+| |      /  /  /
+| |     /  /  /
+| |    /  /  /
+| |   /  /  /
+| |  /  /  /
+| \  |  | /
 |  \ /  | |
 |   X   | |
 |  / \  | |
@@ -801,14 +817,14 @@ TEST(render, narrowGapForAnEdgeIngress) {
 | \ ||   |/ / /
 |  \|/   \|/  |
 |   3     4   |
-|   |\        |
-|   | \       /
-|   | |      /
-|   | |     /
-|   | |    /
-|   | |   /
-|   | |  /
-\   / | /
+|  / \        |
+|  |  \       /
+|  |  |      /
+|  |  |     /
+|  |  |    /
+|  |  |   /
+|  |  |  /
+\  |  | /
  \ /  | |
   X   | |
  / \  | |
@@ -1075,14 +1091,13 @@ TEST(render, crossingsSharingTheSameXnodeAbove) {
 | | | |  \ /  | |
 | | | |   X   | |
 | | | |  / \  | |
-| | | | /  /  / /
-| | | | | /  / /
-| | / | | | / /
-| |/  | | |/  |
-| 3   | | 5   |
-| |   | | |\  |
-| |   / | | \ |
-| |  /  / | | |
+| | / | /  |  / |
+| |/  | |  \ /  |
+| 3   | |   5   |
+| |   | |  / \  |
+| |   / | /  /  /
+| |  /  | | /  /
+| |  |  / | | /
 | |  \ /  | | |
 | |   X   | | |
 | |  / \  | | |
@@ -1134,10 +1149,10 @@ TEST(render, twoEdgesBetweenWideNodesDiverge) {
   EXPECT_EQ(renderSuccessfully(test),
             R"(
 000
-|\
-| \
-|  \
-|   \
+  \\
+  / \
+ /  |
+/   |
 |   |
 111 222
 )");
@@ -1152,11 +1167,69 @@ TEST(render, twoEdgesBetweenWideNodesConverge) {
             R"(
 000 111
 |   |
-|   /
-|  /
-| /
-|/
+\   |
+ \  |
+  \ /
+  //
 222
 )");
 }
 
+
+TEST(render, edgesHaveSpaceBecauseReadjustedAfterCoordsRecalculation) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{2, 3, 4}, "0"});
+  test.nodes.push_back(DAG::Node{{3, 4, 5}, "11"});
+  test.nodes.push_back(DAG::Node{{3, 5}, "222"});
+  test.nodes.push_back(DAG::Node{{4}, "3333"});
+  test.nodes.push_back(DAG::Node{{}, "44444"});
+  test.nodes.push_back(DAG::Node{{}, "555555"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+  0   11
+ /|\  |\\
+/ | \ | \\
+| | | \  \\
+| | |  \  \\
+| | |   \  \\
+| | |    \  \\
+| | |     \ | \
+| | |     | | |
+| | 222   | | |
+| |   \\  | | |
+| |   | \ | | \
+| \   |  \\ \  \
+|  \  |  | \ \  \
+\  |  |  | |  \  \
+ \ /  |  \ /   \ /
+  X   |   X     X
+ / \  |  / \   / \
+/  |  | /   \  \  \
+|  |  | |   |   \  \
+|  |  \ |   |    \  \
+|  |   \|   |     \  \
+|  |   ||   |      \  \
+|  \   //   \      /  |
+|   3333     555555   |
+|   |                 |
+|   |                 /
+|   |                /
+|   |               /
+|   |              /
+|   |             /
+|   |            /
+|   |           /
+|   |          /
+|   |         /
+|   |        /
+|   |       /
+|   |      /
+\   |     /
+ \  |    /
+  \ |   /
+   \|  /
+   || /
+   ///
+44444
+)");
+}
