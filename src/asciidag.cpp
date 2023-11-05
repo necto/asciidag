@@ -1964,7 +1964,7 @@ std::optional<string> renderDAG(DAG dag, RenderError& err) {
   minimizeCrossings(layers, dag);
   LOGDAGL(dag, layers, "after min crossings");
 
-  for (int i = 0; i < 9; ++i) {
+  for (int i = 0; i < 12; ++i) {
     if (countAllCrossings(layers, dag) == 0) {
       break;
     }
