@@ -27,6 +27,7 @@ public:
   static Canvas fromString(std::string const& str);
 
   void newMark(Position const& pos, char c);
+  void newMark(Position const& pos, std::string const& str);
   void clearPos(Position const& pos);
   char getChar(Position const& pos) const;
   bool isEmpty(Position const& pos) const { return getChar(pos) == ' '; }

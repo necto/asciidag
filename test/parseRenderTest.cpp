@@ -120,12 +120,17 @@ void configureDAGFromSeed(DAG &dag, size_t seed) {
   std::vector<size_t> nPreds(dag.nodes.size(), 0);
   size_t shift = 0;
   for (int node = 0; node < dag.nodes.size(); ++node) {
+    size_t nodeWidth =
+      std::find(dag.nodes[node].text.begin(), dag.nodes[node].text.end(), '\n')
+      - dag.nodes[node].text.begin();
     for (int succ = node + 1; succ < dag.nodes.size(); ++succ) {
-      assert(dag.nodes[node].text.find('\n') == std::string::npos);
-      if (2 + dag.nodes[node].text.size() <= dag.nodes[node].succs.size()) {
+      size_t succWidth =
+        std::find(dag.nodes[succ].text.begin(), dag.nodes[succ].text.end(), '\n')
+        - dag.nodes[succ].text.begin();
+      if (2 + nodeWidth <= dag.nodes[node].succs.size()) {
         break;
       }
-      if (2 + dag.nodes[succ].text.size() <= nPreds[succ]) {
+      if (2 + succWidth <= nPreds[succ]) {
         continue;
       }
       size_t mask = 1 << shift;
@@ -165,6 +170,45 @@ std::array<std::string, 10> const nodeLabelDownUp =
 std::array<std::string, 10> const nodeLabelSaw =
   {"00", "1", "222", "3", "444", "5", "66", "777", "8", "9999"};
 
+std::array<std::string, 10> const nodeLabelDeeper = {
+  "0",
+  "1\n1",
+  "2\n2\n2",
+  "3\n3\n3\n3",
+  "4\n4\n4\n4\n4",
+  "5\n5\n5\n5\n5\n5",
+  "6\n6\n6\n6\n6\n6\n6",
+  "7\n7\n7\n7\n7\n7\n7\n7",
+  "8\n8\n8\n8\n8\n8\n8\n8\n8",
+  "9\n9\n9\n9\n9\n9\n9\n9\n9\n9"
+};
+
+std::array<std::string, 10> const nodeLabelShallower = {
+  "0\n0\n0\n0\n0\n0\n0\n0\n0\n0",
+  "1\n1\n1\n1\n1\n1\n1\n1\n1",
+  "2\n2\n2\n2\n2\n2\n2\n2",
+  "3\n3\n3\n3\n3\n3\n3",
+  "4\n4\n4\n4\n4\n4",
+  "5\n5\n5\n5\n5",
+  "6\n6\n6\n6",
+  "7\n7\n7",
+  "8\n8",
+  "9"
+};
+
+std::array<std::string, 10> const nodeLabelDepthZigZag = {
+  "000\n000",
+  "11\n11\n11",
+  "2\n2",
+  "3\n3\n3\n3\n3",
+  "4\n4\n4",
+  "555",
+  "6\n6\n6\n6\n6\n6",
+  "77\n77\n77\n77",
+  "88\n88",
+  "9"
+};
+
 constexpr size_t batchSize = 10000;
 
 TEST_P(enumerateAllGraphs, parseOfRenderIsIdentity) {
@@ -192,7 +236,10 @@ INSTANTIATE_TEST_SUITE_P(
       &nodeLabelUp,
       &nodeLabelDownUp,
       &nodeLabelUpDown,
-      &nodeLabelSaw
+      &nodeLabelSaw,
+      &nodeLabelDeeper,
+      &nodeLabelShallower,
+      &nodeLabelDepthZigZag
     ),
     testing::Values((size_t)3),
     testing::Range((size_t)0, numberOfEdgeConfigurations(3), batchSize)
@@ -209,7 +256,10 @@ INSTANTIATE_TEST_SUITE_P(
       &nodeLabelUp,
       &nodeLabelDownUp,
       &nodeLabelUpDown,
-      &nodeLabelSaw
+      &nodeLabelSaw,
+      &nodeLabelDeeper,
+      &nodeLabelShallower,
+      &nodeLabelDepthZigZag
     ),
     testing::Values((size_t)4),
     testing::Range((size_t)0, numberOfEdgeConfigurations(4), batchSize)
@@ -226,15 +276,18 @@ INSTANTIATE_TEST_SUITE_P(
       &nodeLabelUp,
       &nodeLabelDownUp,
       &nodeLabelUpDown,
-      &nodeLabelSaw
+      &nodeLabelSaw,
+      &nodeLabelDeeper,
+      &nodeLabelShallower,
+      &nodeLabelDepthZigZag
     ),
     testing::Values((size_t)5),
     testing::Range((size_t)0, numberOfEdgeConfigurations(5), batchSize)
   )
 );
 
-//#define LONG_BRUTFORCE_TESTS
-#ifdef LONG_BRUTFORCE_TESTS
+//#define LONG_BRUTEFORCE_TESTS
+#ifdef LONG_BRUTEFORCE_TESTS
 
 INSTANTIATE_TEST_SUITE_P(
   test6nodeGraphs,
@@ -246,7 +299,10 @@ INSTANTIATE_TEST_SUITE_P(
       &nodeLabelUp,
       &nodeLabelDownUp,
       &nodeLabelUpDown,
-      &nodeLabelSaw
+      &nodeLabelSaw,
+      &nodeLabelDeeper,
+      &nodeLabelShallower,
+      &nodeLabelDepthZigZag
     ),
     testing::Values((size_t)6),
     testing::Range((size_t)0, numberOfEdgeConfigurations(6), batchSize)
@@ -257,20 +313,41 @@ INSTANTIATE_TEST_SUITE_P(
   test7nodeGraphs,
   enumerateAllGraphs,
   testing::Combine(
-    testing::Values(&nodeLabelSaw),
+    //testing::Values(&nodeLabelSaw),
+    testing::Values(
+      &nodeLabelSingleDigit,
+      &nodeLabelDown,
+      &nodeLabelUp,
+      &nodeLabelDownUp,
+      &nodeLabelUpDown,
+      &nodeLabelSaw,
+      &nodeLabelDeeper,
+      &nodeLabelShallower,
+      &nodeLabelDepthZigZag
+    ),
     testing::Values((size_t)7),
     testing::Range((size_t)0, numberOfEdgeConfigurations(7), batchSize)
   )
 );
 
-INSTANTIATE_TEST_SUITE_P(
-  test8nodeGraphs,
-  enumerateAllGraphs,
-  testing::Combine(
-    testing::Values(&nodeLabelSaw),
-    testing::Values((size_t)8),
-    testing::Range((size_t)0, numberOfEdgeConfigurations(8), batchSize)
-  )
-);
+// INSTANTIATE_TEST_SUITE_P(
+//   test8nodeGraphs,
+//   enumerateAllGraphs,
+//   testing::Combine(
+//     testing::Values(
+//       &nodeLabelSingleDigit,
+//       &nodeLabelDown,
+//       &nodeLabelUp,
+//       &nodeLabelDownUp,
+//       &nodeLabelUpDown,
+//       &nodeLabelSaw,
+//       &nodeLabelDeeper,
+//       &nodeLabelShallower,
+//       &nodeLabelDepthZigZag
+//     ),
+//     testing::Values((size_t)8),
+//     testing::Range((size_t)0, numberOfEdgeConfigurations(8), batchSize)
+//   )
+// );
 
-#endif // LONG_BRUTFORCE_TESTS
+#endif // LONG_BRUTEFORCE_TESTS

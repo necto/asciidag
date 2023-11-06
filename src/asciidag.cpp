@@ -18,7 +18,7 @@
 
 namespace asciidag {
 
-constexpr auto sketchMode = false;
+constexpr auto sketchMode = true;
 auto waypointText = "|";
 
 namespace {
@@ -781,8 +781,34 @@ operator<<(std::ostream& os, Connectivity::Edge const& e) {
       << ")";
 }
 
-std::pair<std::optional<size_t>, size_t>
-minEdgeHeight(Connectivity::Edge const& edge, Vec<Position> const& positions) {
+struct PointAndLowerBound {
+  std::optional<size_t> point;
+  size_t lowerBound;
+};
+
+PointAndLowerBound join(PointAndLowerBound a, PointAndLowerBound b) {
+  if (a.point) {
+    if (b.lowerBound <= *a.point) {
+      b.point = a.point;
+    }
+    if (b.point != a.point) {
+      b.point = std::nullopt;
+    }
+  } else {
+    if (b.point && *b.point < a.lowerBound) {
+      b.point = std::nullopt;
+    }
+  }
+  b.lowerBound = std::max(b.lowerBound, a.lowerBound);
+  assert(!b.point || *b.point < b.lowerBound);
+  return b;
+}
+
+size_t getLowestBound(PointAndLowerBound const& palb) {
+  return palb.point.value_or(palb.lowerBound);
+}
+
+PointAndLowerBound minEdgeHeight(Connectivity::Edge const& edge, Vec<Position> const& positions) {
   size_t from = positions[edge.from].col + edge.exitOffset;
   size_t to = positions[edge.to].col + edge.entryOffset;
   switch (edge.exitAngle) {
@@ -829,26 +855,14 @@ size_t minDistBetweenLayers(
   Vec<size_t> const& edges,
   Vec<Position> const& positions
 ) {
-  std::optional<size_t> singularMin = std::nullopt;
-  size_t minimum = 1; // At least 1 '|' must separate any two connected nodes
+  // At least 1 '|' must separate any two connected nodes
+  PointAndLowerBound ret = {std::nullopt, 1};
   for (auto eId : edges) {
-    auto [edgeMinPt, edgeMin] = minEdgeHeight(conn.edges[eId], positions);
-    if (edgeMinPt) {
-      if (minimum <= *edgeMinPt) {
-        singularMin = edgeMinPt;
-      }
-      if (singularMin != edgeMinPt) {
-        singularMin = std::nullopt;
-      }
-    } else {
-      if (singularMin && *singularMin < edgeMin) {
-        singularMin = std::nullopt;
-      }
-    }
-    minimum = std::max(minimum, edgeMin);
-    assert(!singularMin || *singularMin < minimum);
+    auto edgeBounds = minEdgeHeight(conn.edges[eId], positions);
+
+    ret = join(ret, edgeBounds);
   }
-  return singularMin ? *singularMin : minimum;
+  return getLowestBound(ret);
 }
 
 Vec<size_t> sortEdgeIdsPredsLeftToRight(
@@ -1252,13 +1266,15 @@ Vec<Position> computeNodeCoordinates(DAG const& dag, Vec2<size_t> const& layers,
   size_t line = 0;
   for (auto const& layer : layers) {
     size_t col = 0;
+    size_t maxLine = 0;
     for (size_t n : layer) {
       ret[n].col = col;
       ret[n].line = line;
       // 1 for space
       col += 1 + dimensions[n].col;
+      maxLine = std::max(maxLine, dimensions[n].line);
     }
-    ++line;
+    line += maxLine + 1;
   }
   return ret;
 }
@@ -1282,7 +1298,8 @@ void adjustCoordsWithValencies(
   Vec<Position>& coords,
   Connectivity const& conn,
   Vec2<size_t> const& layers,
-  Vec<Position> const& dimensions
+  Vec<Position> const& dimensions,
+  Vec<size_t> const& layerHeight
 ) {
   for (auto const& layer : layers) {
     size_t lastCol = 0;
@@ -1302,24 +1319,17 @@ void adjustCoordsWithValencies(
   assert(interLayerEdges.size() == layers.size());
   size_t line = 0;
   for (size_t i = 0; i < layers.size(); ++i) {
-    size_t maxHeight = 0;
     for (auto n : layers[i]) {
       coords[n].line = line;
-      maxHeight = std::max(maxHeight, dimensions[n].line);
     }
-    line += maxHeight + minDistBetweenLayers(conn, interLayerEdges[i], coords);
+    line += layerHeight[i] + minDistBetweenLayers(conn, interLayerEdges[i], coords);
   }
 }
 
 void placeNodes(DAG const& dag, Vec<Position> const& coordinates, Canvas& canvas) {
   for (size_t n = 0; n < dag.nodes.size(); ++n) {
     assert(!dag.nodes[n].text.empty());
-    assert(dag.nodes[n].text.find('\n') == std::string::npos);
-    Position pos = coordinates[n];
-    for (size_t i = 0; i < dag.nodes[n].text.size(); ++i) {
-      canvas.newMark(pos, dag.nodes[n].text[i]);
-      ++pos.col;
-    }
+    canvas.newMark(coordinates[n], dag.nodes[n].text);
   }
 }
 
@@ -1343,6 +1353,9 @@ template <typename T, typename C>
 
 void placeEdges(
   Vec<Position> const& coordinates,
+  Vec<Position> const& dimensions,
+  Vec<size_t> const& idToLayerMap,
+  Vec<size_t> const& layerHeights,
   Vec<Connectivity::Edge> const& edges,
   Canvas& canvas
 ) {
@@ -1352,10 +1365,22 @@ void placeEdges(
   for (auto const& e : edges) {
     auto fromPos = coordinates[e.from];
     fromPos.col += e.exitOffset;
+    fromPos.line += dimensions[e.from].line - 1;
     auto toPos = coordinates[e.to];
     toPos.col += e.entryOffset;
-    // TODO: assert that it returns true = success
-    drawEdge(fromPos, e.exitAngle, toPos, e.entryAngle, canvas);
+    auto layerHight = layerHeights[idToLayerMap[e.from]];
+    assert(dimensions[e.from].line + 1 != layerHight);
+    if (dimensions[e.from].line + 1 < layerHight) {
+      Position gatePos = fromPos;
+      gatePos.line = coordinates[e.from].line + layerHight;
+      gatePos.col += directionShift(e.exitAngle);
+      bool success = drawEdge(fromPos, e.exitAngle, gatePos, Direction::Straight, canvas);
+      assert(success);
+      fromPos.line = gatePos.line - 1;
+    }
+    bool success = drawEdge(fromPos, e.exitAngle, toPos, e.entryAngle, canvas);
+    (void) success;
+    // TODO assert(success);
   }
 }
 
@@ -1461,9 +1486,6 @@ std::optional<RenderError> checkDAGCompat(DAG const& dag) {
   for (size_t n = 0; n < dag.nodes.size(); ++n) {
     if (dag.nodes[n].text.empty()) {
       return {{RenderError::Code::Unsupported, "empty nodes are not supported.", n}};
-    }
-    if (dag.nodes[n].text.find('\n') != std::string::npos) {
-      return {{RenderError::Code::Unsupported, "multi-line nodes are not supported.", n}};
     }
   }
   return {};
@@ -1703,6 +1725,20 @@ string escapeForDOTlabel(string_view str) {
   return ret;
 }
 
+Vec<size_t> computeLayerHeights(Vec<Position> const& dimensions, Vec2<size_t> const& layers) {
+  Vec<size_t> ret;
+  ret.reserve(layers.size());
+  for (auto const& layer : layers) {
+    PointAndLowerBound commonBounds{std::nullopt, 1};
+    for (auto nId : layer) {
+      PointAndLowerBound layerBounds{dimensions[nId].line, dimensions[nId].line + 2};
+      commonBounds = join(commonBounds, layerBounds);
+    }
+    ret.push_back(getLowestBound(commonBounds));
+  }
+  return ret;
+}
+
 } // namespace
 
 namespace detail {
@@ -1924,18 +1960,32 @@ bool drawEdge(
   return succeded;
 }
 
+Vec<size_t> computeIdToLayerMap(Vec2<size_t> const& layers, size_t nNodes) {
+  Vec<size_t> ret;
+  ret.resize(nNodes);
+  for (size_t i = 0; i < layers.size(); ++i) {
+    for (auto nId : layers[i]) {
+      assert(nId < nNodes);
+      ret[nId] = i;
+    }
+  }
+  return ret;
+}
+
 std::string renderDAGWithLayers(DAG const& dag, std::vector<std::vector<size_t>> layers) {
   // TODO: find best horisontal position of nodes
   auto const dimensions = nodeDimensions(dag);
   auto coords = computeNodeCoordinates(dag, layers, dimensions);
   auto connectivity = computeConnectivity(dag, coords, dimensions);
-  adjustCoordsWithValencies(coords, connectivity, layers, dimensions);
+  auto layerHeights = computeLayerHeights(dimensions, layers);
+  auto idToLayerMap = computeIdToLayerMap(layers, dag.nodes.size());
+  adjustCoordsWithValencies(coords, connectivity, layers, dimensions, layerHeights);
   // Reposition edges to account for the changes in positions
   connectivity = computeConnectivity(dag, coords, dimensions);
-  adjustCoordsWithValencies(coords, connectivity, layers, dimensions);
+  adjustCoordsWithValencies(coords, connectivity, layers, dimensions, layerHeights);
   auto canvas = Canvas::create(coords, dimensions);
   placeNodes(dag, coords, canvas);
-  placeEdges(coords, connectivity.edges, canvas);
+  placeEdges(coords, dimensions, idToLayerMap, layerHeights, connectivity.edges, canvas);
   return canvas.render();
 }
 
@@ -2127,6 +2177,22 @@ void Canvas::newMark(Position const& pos, char c) {
   assert(sketchMode || lines[pos.line][pos.col] == ' ');
   assert(c != ' ');
   lines[pos.line][pos.col] = c;
+}
+
+void Canvas::newMark(Position const& pos, string const& str) {
+  Position offset{0, 0};
+  assert(inBounds(pos));
+  assert(!str.empty());
+  for (size_t i = 0; i < str.size(); ++i) {
+    if (str[i] == '\n') {
+      offset.col = 0;
+      ++offset.line;
+      continue;
+    }
+    assert(sketchMode || lines[pos.line + offset.line][pos.col + offset.col] == ' ');
+    lines[pos.line + offset.line][pos.col + offset.col] = str[i];
+    ++offset.col;
+  }
 }
 
 void Canvas::clearPos(Position const& pos) {

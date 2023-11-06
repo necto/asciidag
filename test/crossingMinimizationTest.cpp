@@ -472,10 +472,14 @@ TEST(crossingMinimizationTest, deconstructedRenderingNoMinimizationCrossing) {
 0     1
  \   /
  |  /
+ | /
+ | |
  \ /
   X
  / \
  |  \
+ |   \
+ |   |
  /   \
 2     3
 )";

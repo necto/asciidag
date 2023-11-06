@@ -588,7 +588,9 @@ TEST(render, wellConnected6nodes) {
  \ /  | |
   X   | |
  / \  | |
- |  \ | /
+ |  \ | |
+ |   \| |
+ |   || /
  /   \|/
 5     4
 )");
@@ -862,7 +864,9 @@ TEST(render, narrowGapForAnEdgeIngress) {
  \ /  | |
   X   | |
  / \  | |
- |  \ | /
+ |  \ | |
+ |   \| |
+ |   || /
  /   \|/
 6     5
 )");
@@ -1341,6 +1345,8 @@ TEST(render, exitConflictOfDirectEdgeWithLeftEdge) {
 / | \     //  /
 | |  \   //  /
 | |  |  / | /
+| |  | /  | |
+| |  | |  | |
 | |  \ /  | |
 | |   X   | |
 | |  / \  | |
@@ -1359,5 +1365,154 @@ TEST(render, exitConflictOfDirectEdgeWithLeftEdge) {
 | |  \  |    \\
 | |   \ |     \\
 3333   44444   555555
+)");
+}
+
+
+TEST(render, longNode) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{}, "A\nB\nC"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+A
+B
+C
+)");
+}
+
+TEST(render, twoLongNodesConnected) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{1}, "0\n0\n0"});
+  test.nodes.push_back(DAG::Node{{}, "1\n1\n1"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+0
+0
+0
+|
+1
+1
+1
+)");
+}
+
+TEST(render, twoPairsOfLongAndShortNodesConnected) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{1}, "0\n0\n0"});
+  test.nodes.push_back(DAG::Node{{}, "1"});
+  test.nodes.push_back(DAG::Node{{3}, "2"});
+  test.nodes.push_back(DAG::Node{{}, "3\n3\n3"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+0 2
+0 |
+0 |
+| |
+1 3
+  3
+  3
+)");
+}
+
+TEST(render, wellConnectedNodeHemedInByTwoLongNodes) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{3}, "0\n0\n0\n0\n0"});
+  test.nodes.push_back(DAG::Node{{3, 4, 5, 6, 7, 8}, "11111"});
+  test.nodes.push_back(DAG::Node{{8}, "2\n2\n2\n2\n2"});
+  test.nodes.push_back(DAG::Node{{}, "3\n3\n3\n3"});
+  test.nodes.push_back(DAG::Node{{}, "444\n444\n444\n444"});
+  test.nodes.push_back(DAG::Node{{}, "55\n55\n55\n55"});
+  test.nodes.push_back(DAG::Node{{}, "66\n66\n66\n66"});
+  test.nodes.push_back(DAG::Node{{}, "7\n7\n7\n7"});
+  test.nodes.push_back(DAG::Node{{}, "8\n8\n8\n8"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+0   11111   2
+0  / \\\\\  2
+0  | |||||  2
+0  | |||||  2
+0  | |||||  2
+|  / \\\\\   \
+| /   \\\\\   \
+|/    | \\\\   \
+||    | | \\\   \
+||    | |  \\\   \
+||    | |   \\\   \
+||    | |   | \\   \
+||    | |   |  \\   \
+||    | |   |   \\   \
+||    | |   |    \\   \
+||    | |   |    | \   \
+||    | |   |    |  \  |
+|/    | |   \    \   \ /
+3   444 55   66   7   8
+3   444 55   66   7   8
+3   444 55   66   7   8
+3   444 55   66   7   8
+)");
+}
+
+TEST(render, edgePassingByALongNode) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{1, 2}, "0"});
+  test.nodes.push_back(DAG::Node{{2}, "1\n1\n1\n1"});
+  test.nodes.push_back(DAG::Node{{}, "2"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+0
+|\
+| \
+| |
+1 |
+1 |
+1 |
+1 |
+| |
+| /
+|/
+2
+)");
+}
+
+TEST(render, node1ShorterThanLevel) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{}, "0\n0"});
+  test.nodes.push_back(DAG::Node{{2}, "1"});
+  test.nodes.push_back(DAG::Node{{}, "2"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+0   1
+0  /
+   |
+   |
+   /
+  /
+ /
+2
+)");
+}
+
+TEST(render, edgeFromShorterNodeNotHemmingOthers) {
+  DAG test;
+  test.nodes.push_back(DAG::Node{{1, 2}, "0\n0\n0"});
+  test.nodes.push_back(DAG::Node{{}, "1"});
+  test.nodes.push_back(DAG::Node{{}, "2"});
+  test.nodes.push_back(DAG::Node{{2, 4}, "3\n3"});
+  test.nodes.push_back(DAG::Node{{}, "4"});
+  test.nodes.push_back(DAG::Node{{6}, "5"});
+  test.nodes.push_back(DAG::Node{{}, "6"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+0   3   5
+0   3    \
+0   |\   |
+|\  ||   |
+||  ||   |
+|\  |\   \
+| \ \ \   \
+|  \ \ \   \
+|  | |  \   \
+|  \ /   \   \
+1   2     4   6
 )");
 }
