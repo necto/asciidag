@@ -5,6 +5,7 @@
 #include <gtest/gtest-param-test.h>
 #include <gtest/gtest.h>
 #include <iostream>
+#include <random>
 
 using namespace asciidag;
 
@@ -74,6 +75,7 @@ void assertRenderAndParseIdentity(DAG const& dag) {
   auto pic = renderDAG(dag, renderErr);
   EXPECT_EQ(renderErr.code, RenderError::Code::None);
   if (renderErr.code != RenderError::Code::None) {
+    std::cout <<toDOT(dag) <<"\n";
     // Print error message by violating an assertion
     EXPECT_EQ(renderErr.message, "");
     // Print error location by violating an assertion
@@ -85,6 +87,7 @@ void assertRenderAndParseIdentity(DAG const& dag) {
     auto dagClone = parseDAG(*pic, parseErr);
     EXPECT_EQ(parseErr.code, ParseError::Code::None);
     if (parseErr.code != ParseError::Code::None) {
+      std::cout <<*pic <<"\n";
       // Print error message by violating an assertion
       EXPECT_EQ(parseErr.message, "");
       // Print error location by violating an assertion
@@ -111,6 +114,33 @@ TEST(parseRender, oneEdge) {
   dag.nodes.push_back({{1}, "0"});
   dag.nodes.push_back({{}, "1"});
   ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
+}
+
+std::string squareLabel(char filler, size_t width, size_t height) {
+  std::string ret;
+  bool first = true;
+  for (size_t line = 0; line < height; ++line) {
+    if (!first) {
+      ret += '\n';
+    }
+    first = false;
+    for (size_t col = 0; col < width; ++col) {
+      ret += filler;
+    }
+  }
+  return ret;
+}
+
+DAG graphNodesFromSeed(size_t seed, size_t size) {
+  DAG ret;
+  for (size_t i = 0; i < size; ++i) {
+    size_t width = 1 + (seed & 0b111);
+    seed >>= 3;
+    size_t height = 1 + (seed & 0b111);
+    seed >>= 3;
+    ret.nodes.push_back({{}, squareLabel('0' + i, width, height)});
+  }
+  return ret;
 }
 
 void configureDAGFromSeed(DAG &dag, size_t seed) {
@@ -150,6 +180,10 @@ constexpr size_t numberOfEdgeConfigurations(size_t nodeCount) {
 
 class enumerateAllGraphs
   : public testing::TestWithParam<std::tuple<std::array<std::string, 10> const*, size_t, size_t>> {
+};
+
+class probeRandomGraphs
+  : public testing::TestWithParam<std::tuple<size_t, size_t>> {
 };
 
 std::array<std::string, 10> const nodeLabelSingleDigit =
@@ -214,17 +248,38 @@ constexpr size_t batchSize = 10000;
 TEST_P(enumerateAllGraphs, parseOfRenderIsIdentity) {
   DAG dag;
   auto const [nodeLabel, nodeCount, from] = GetParam();
-  auto param = GetParam();
   for (size_t nodeId = 0; nodeId < nodeCount; ++nodeId) {
     dag.nodes.push_back({{}, (*nodeLabel)[nodeId]});
   }
   size_t to = std::min(from + batchSize, numberOfEdgeConfigurations(nodeCount));
   for (size_t seed = from; seed < to; ++seed) {
     configureDAGFromSeed(dag, seed);
-    //std::cout <<seed <<":\n" <<toDOT(dag) <<"\n";
     ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
   }
 }
+
+TEST_P(probeRandomGraphs, parseOfRenderIsIdentity) {
+  auto const [nodeCount, seed] = GetParam();
+  std::mt19937_64 gen(seed);
+  gen.discard(1);
+  size_t nodesSeed = gen();
+  size_t edgesSeed = gen();
+  DAG dag = graphNodesFromSeed(nodesSeed, nodeCount);
+  for (size_t i = 0; i < std::min(batchSize, numberOfEdgeConfigurations(nodeCount)); ++i) {
+    edgesSeed = gen();
+    configureDAGFromSeed(dag, edgesSeed);
+    ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+  testSome345nodeGraphs,
+  probeRandomGraphs,
+  testing::Combine(
+    testing::Values((size_t)3, (size_t)4, (size_t)5),
+    testing::Range((size_t)0, 4*batchSize, batchSize)
+  )
+);
 
 INSTANTIATE_TEST_SUITE_P(
   test3nodeGraphs,
@@ -290,6 +345,15 @@ INSTANTIATE_TEST_SUITE_P(
 #ifdef LONG_BRUTEFORCE_TESTS
 
 INSTANTIATE_TEST_SUITE_P(
+  testSome6789nodeGraphs,
+  probeRandomGraphs,
+  testing::Combine(
+    testing::Values((size_t)6, (size_t)7, (size_t)8, (size_t)9),
+    testing::Range((size_t)0, 100*batchSize, batchSize)
+  )
+);
+
+INSTANTIATE_TEST_SUITE_P(
   test6nodeGraphs,
   enumerateAllGraphs,
   testing::Combine(
@@ -330,24 +394,24 @@ INSTANTIATE_TEST_SUITE_P(
   )
 );
 
-// INSTANTIATE_TEST_SUITE_P(
-//   test8nodeGraphs,
-//   enumerateAllGraphs,
-//   testing::Combine(
-//     testing::Values(
-//       &nodeLabelSingleDigit,
-//       &nodeLabelDown,
-//       &nodeLabelUp,
-//       &nodeLabelDownUp,
-//       &nodeLabelUpDown,
-//       &nodeLabelSaw,
-//       &nodeLabelDeeper,
-//       &nodeLabelShallower,
-//       &nodeLabelDepthZigZag
-//     ),
-//     testing::Values((size_t)8),
-//     testing::Range((size_t)0, numberOfEdgeConfigurations(8), batchSize)
-//   )
-// );
+INSTANTIATE_TEST_SUITE_P(
+  test8nodeGraphs,
+  enumerateAllGraphs,
+  testing::Combine(
+    testing::Values(
+      // &nodeLabelSingleDigit,
+      // &nodeLabelDown,
+      // &nodeLabelUp,
+      // &nodeLabelDownUp,
+      // &nodeLabelUpDown,
+      // &nodeLabelSaw,
+      // &nodeLabelDeeper,
+      // &nodeLabelShallower,
+      &nodeLabelDepthZigZag
+    ),
+    testing::Values((size_t)8),
+    testing::Range((size_t)0, numberOfEdgeConfigurations(8), batchSize)
+  )
+);
 
 #endif // LONG_BRUTEFORCE_TESTS
