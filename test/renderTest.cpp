@@ -704,11 +704,11 @@ TEST(render, wellConnected6nodes3) {
 | |  \ /  | | |
 | |   X   | | |
 | |  / \  | | |
-| | /  /  / / /
-| |/  /  / / /
-\ ||  |  |/ /
- \|/  |  \|/
-  3   4   5
+| | /  /  | | |
+| |/  /   | | |
+\ ||  |   \ | /
+ \|/  |    \|/
+  3   4     5
 )");
 }
 
@@ -1514,5 +1514,79 @@ TEST(render, edgeFromShorterNodeNotHemmingOthers) {
 |  | |  \   \
 |  \ /   \   \
 1   2     4   6
+)");
+}
+
+TEST(render, potentiallyUnstableNodePosition) {
+  // Here nodes 5 and 6 could shift left and right between different invocations
+  // of computeConnectivity which leads to suboptimal edge exit direction.
+  // because of that, the coordinates adjustment is now done only in the expansion direction
+  // and never shrinking (i.e., always to the right and not to the left).
+  DAG test;
+  test.nodes.push_back(DAG::Node{{1, 2, 3, 5, 6}, "000\n000"});
+  test.nodes.push_back(DAG::Node{{6}, "11\n11\n11"});
+  test.nodes.push_back(DAG::Node{{4, 7}, "2\n2"});
+  test.nodes.push_back(DAG::Node{{7}, "3\n3\n3\n3\n3"});
+  test.nodes.push_back(DAG::Node{{7}, "4\n4\n4"});
+  test.nodes.push_back(DAG::Node{{6, 7}, "555"});
+  test.nodes.push_back(DAG::Node{{}, "6\n6\n6\n6\n6\n6"});
+  test.nodes.push_back(DAG::Node{{}, "77\n77\n77\n77"});
+  EXPECT_EQ(renderSuccessfully(test),
+            R"(
+  000
+  000
+ /|\\\
+ || \\\
+ ||  \\\
+ ||   \\\
+ ||    \\\
+ ||     \\\
+ ||      \\\
+ ||      | \\
+ ||      |  \\
+ ||      |   \\
+ ||      |    \\
+ ||      |     \\
+ ||      |      \\
+ ||      |       \\
+ |\      |       | \
+ | \     |       |  \
+ |  \    |       |   \
+ /  |    \       \   |
+2   3     555     11 |
+2   3    //       11 |
+|\  3    ||       11 |
+||  3    ||      /   |
+||  3    ||      |   |
+||  |    ||      |   |
+||  |    ||      |   |
+|\  |    //      /   |
+| \ |   / \     /    /
+|  \\   |  \   /    /
+|   \\  |  |  /    /
+|   | \ |  | /    /
+|   | | |  |/    /
+|   | | |  ||   /
+|   | | |  ||  /
+|   | | |  || /
+|   | | |  \|/
+4   | | |   6
+4   | | |   6
+4   | | |   6
+ \  | | |   6
+ |  | | |   6
+ |  | | |   6
+ |  | | |
+ |  | | |
+ \  | | |
+ |  / | /
+ | /  //
+ |/  //
+ || //
+ \\//
+  77
+  77
+  77
+  77
 )");
 }

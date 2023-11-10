@@ -1308,7 +1308,12 @@ void adjustCoordsWithValencies(
       if (valencies.bottomLeft || valencies.topLeft) {
         lastCol += 2; // Accomodate left edge (incoming or outgoing)
       }
-      coords[node].col = lastCol;
+      if (lastCol < coords[node].col) {
+        // Avoid swinging back and forth
+        lastCol = coords[node].col;
+      } else {
+        coords[node].col = lastCol;
+      }
       lastCol += 1 + dimensions[node].col; // accomodate node width and mandatory space
       if (valencies.bottomRight || valencies.topRight) {
         lastCol += 2; // accomodate right edge (incoming or outgoing)
@@ -1378,9 +1383,8 @@ void placeEdges(
       assert(success);
       fromPos.line = gatePos.line - 1;
     }
-    bool success = drawEdge(fromPos, e.exitAngle, toPos, e.entryAngle, canvas);
-    (void) success;
-    // TODO assert(success);
+    [[maybe_unused]] bool success = drawEdge(fromPos, e.exitAngle, toPos, e.entryAngle, canvas);
+    assert(sketchMode || success);
   }
 }
 
