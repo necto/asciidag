@@ -132,6 +132,19 @@ TEST(parseRender, stableSuccs) {
   ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
 }
 
+TEST(parseRender, stablePreds) {
+  DAG dag;
+  dag.nodes.push_back(DAG::Node{{3, 4, 5}, "0"});
+  dag.nodes.push_back(DAG::Node{{3, 5}, "1"});
+  dag.nodes.push_back(DAG::Node{{3, 4, 5}, "2"});
+  dag.nodes.push_back(DAG::Node{{}, "3"});
+  dag.nodes.push_back(DAG::Node{{}, "4"});
+  dag.nodes.push_back(DAG::Node{{}, "5"});
+  RenderError err;
+  std::cout <<*renderDAG(dag, err) <<"\n";
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
+}
+
 std::string rectLabel(char filler, size_t width, size_t height) {
   std::string ret;
   bool first = true;

@@ -47,7 +47,7 @@ bool drawEdge(Position cur, Direction curDir, Position to, Direction finishDir, 
 
 string renderDAGWithLayers(DAG const& dag, Vec2<size_t> layers);
 
-void minimizeCrossings(Vec2<size_t>& layers, DAG const& dag);
+void minimizeCrossings(Vec2<size_t>& layers, DAG& dag);
 
 Vec2<size_t> insertCrossNodes(DAG& dag, Vec2<size_t> const& layers);
 

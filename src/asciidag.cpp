@@ -93,6 +93,42 @@ bool wellLayered(DAG const& dag, Vec2<size_t> const& layers) {
   return true;
 }
 
+void sortSuccsAsLayers(DAG& dag, Vec2<size_t> const& layers) {
+  size_t const N = dag.nodes.size();
+  Vec<size_t> pos(N, 0);
+  for (auto layer : layers) {
+    for (size_t nodeI = 0; nodeI < layer.size(); ++nodeI) {
+      pos[layer[nodeI]] = nodeI;
+    }
+  }
+  for (auto& node : dag.nodes) {
+    std::sort(node.succs.begin(), node.succs.end(), [&pos](size_t n1, size_t n2) {
+      return pos[n1] < pos[n2];
+    });
+  }
+}
+
+[[maybe_unused]]
+bool succsSameOrderAsLayers(DAG const& dag, Vec2<size_t> const& layers) {
+  for (size_t layerI = 1; layerI < layers.size(); ++layerI) {
+    auto const& prevLayer = layers[layerI - 1];
+    auto const& curLayer = layers[layerI];
+    for (size_t nodeId : prevLayer) {
+      auto const& succs = dag.nodes[nodeId].succs;
+      for (size_t succI = 1; succI < succs.size(); ++succI) {
+        if (findIndex(curLayer, succs[succI - 1]) > findIndex(curLayer, succs[succI])) {
+        std::cout
+          << "for node" << nodeId << " succ " << succs[succI - 1] << " is at "
+          << findIndex(curLayer, succs[succI - 1]) << " and succ " << succs[succI] << " is at "
+          << findIndex(curLayer, succs[succI]) << "\n";
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
 std::optional<RenderError> insertEdgeWaypoints(DAG& dag, Vec2<size_t>& layers) {
   size_t const preexistingCount = dag.nodes.size();
   Vec<size_t> rank(preexistingCount, 0);
@@ -130,7 +166,9 @@ std::optional<RenderError> insertEdgeWaypoints(DAG& dag, Vec2<size_t>& layers) {
       }
     }
   }
+  sortSuccsAsLayers(dag, layers);
   assert(wellLayered(dag, layers));
+  assert(succsSameOrderAsLayers(dag, layers));
   return {};
 }
 
@@ -1823,29 +1861,6 @@ Vec2<size_t> getAllSuccs(size_t node, DAG const& dag, Vec2<size_t> const& layers
   return ret;
 }
 
-[[maybe_unused]]
-bool crossSuccsSameOrderAsLayers(DAG const& dag, Vec2<size_t> const& layers) {
-  for (size_t layerI = 1; layerI < layers.size(); ++layerI) {
-    auto const& prevLayer = layers[layerI - 1];
-    auto const& curLayer = layers[layerI];
-    for (size_t nodeId : prevLayer) {
-      if (dag.nodes[nodeId].text != "X") {
-        continue;
-      }
-      auto const& succs = dag.nodes[nodeId].succs;
-      assert(succs.size() == 2);
-      if (findIndex(curLayer, succs[0]) > findIndex(curLayer, succs[1])) {
-        std::cout
-          << "for node" << nodeId << " succ " << succs[0] << " is at "
-          << findIndex(curLayer, succs[0]) << " and succ " << succs[1] << " is at "
-          << findIndex(curLayer, succs[1]) << "\n";
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
 } // namespace
 
 namespace detail {
@@ -1992,6 +2007,7 @@ Vec<size_t> insertCrossesAndWaypointsBetween(
 }
 
 Vec2<size_t> insertCrossNodes(DAG& dag, Vec2<size_t> const& layers) {
+  assert(succsSameOrderAsLayers(dag, layers));
   Vec2<size_t> newLayers;
   newLayers.push_back(layers[0]);
   for (size_t layerI = 1; layerI < layers.size(); ++layerI) {
@@ -2006,11 +2022,12 @@ Vec2<size_t> insertCrossNodes(DAG& dag, Vec2<size_t> const& layers) {
     newLayers.push_back(curLayer);
   }
   assert(wellLayered(dag, newLayers));
-  assert(crossSuccsSameOrderAsLayers(dag, newLayers));
+  assert(succsSameOrderAsLayers(dag, newLayers));
   return newLayers;
 }
 
-void minimizeCrossings(Vec2<size_t>& layers, DAG const& dag) {
+void minimizeCrossings(Vec2<size_t>& layers, DAG& dag) {
+  assert(succsSameOrderAsLayers(dag, layers));
   Vec2<size_t> preds(dag.nodes.size());
   // Enumerating nodes by layer to make sure preds[*] for each node have
   // the same order as the layer they are on
@@ -2029,6 +2046,8 @@ void minimizeCrossings(Vec2<size_t>& layers, DAG const& dag) {
   minimizeCrossingsBackward(layers, dag, preds, leftNodes);
   LOGDAGL(dag, layers, "after backward");
   minimizeCrossingsForward(layers, dag, preds, leftNodes);
+  sortSuccsAsLayers(dag, layers);
+  assert(succsSameOrderAsLayers(dag, layers));
 }
 
 bool drawEdge(
@@ -2079,7 +2098,6 @@ Vec<size_t> computeIdToLayerMap(Vec2<size_t> const& layers, size_t nNodes) {
 }
 
 std::string renderDAGWithLayers(DAG const& dag, std::vector<std::vector<size_t>> layers) {
-  assert(crossSuccsSameOrderAsLayers(dag, layers));
   // TODO: find best horisontal positions of nodes
   auto const dimensions = nodeDimensions(dag);
   auto coords = computeNodeCoordinates(dag, layers, dimensions);
@@ -2129,7 +2147,7 @@ std::optional<string> renderDAG(DAG dag, RenderError& err) {
     LOGDAGL(dag, layers, "after insert X");
     minimizeCrossings(layers, dag);
     LOGDAGL(dag, layers, "after min crossing in the loop");
-    assert(crossSuccsSameOrderAsLayers(dag, layers));
+    assert(succsSameOrderAsLayers(dag, layers));
   }
 
   return renderDAGWithLayers(dag, layers);
