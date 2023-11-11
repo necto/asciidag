@@ -65,8 +65,7 @@ void assertEqual(DAG const& a, DAG const& b) {
     std::string rendering = renderDAG(a, err).value_or("");
     GTEST_FAIL(
     ) << "Graph \n"
-      << toDOT(a) << "\n"
-      << rendering << " was transformed from " << a << " to " << b;
+      << rendering << " was transformed from " <<toDOT(canonA) << " to " << toDOT(canonB);
   }
 }
 
@@ -116,7 +115,24 @@ TEST(parseRender, oneEdge) {
   ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
 }
 
-std::string squareLabel(char filler, size_t width, size_t height) {
+TEST(parseRender, stableSuccs) {
+  // Here some former implementation used to mix up the node positions in
+  // a layer so that it no longer matched the positions in the "succs" vector.
+  DAG dag;
+  dag.nodes.push_back(DAG::Node{{3, 4, 5, 6}, "00000\n00000\n00000\n00000"});
+  dag.nodes.push_back(DAG::Node{{2, 4, 6, 9}, "1111\n1111\n1111\n1111"});
+  dag.nodes.push_back(DAG::Node{{4, 5, 6, 9}, "222\n222\n222\n222"});
+  dag.nodes.push_back(DAG::Node{{6, 7, 8, 9}, "33333\n33333\n33333\n33333\n33333\n33333\n33333\n33333"});
+  dag.nodes.push_back(DAG::Node{{5, 7}, "4\n4\n4\n4\n4"});
+  dag.nodes.push_back(DAG::Node{{6, 7, 8, 9}, "555555\n555555\n555555\n555555\n555555\n555555\n555555"});
+  dag.nodes.push_back(DAG::Node{{}, "666666\n666666\n666666\n666666\n666666\n666666"});
+  dag.nodes.push_back(DAG::Node{{}, "777\n777\n777\n777\n777\n777\n777"});
+  dag.nodes.push_back(DAG::Node{{}, "8888\n8888\n8888"});
+  dag.nodes.push_back(DAG::Node{{}, "99"});
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
+}
+
+std::string rectLabel(char filler, size_t width, size_t height) {
   std::string ret;
   bool first = true;
   for (size_t line = 0; line < height; ++line) {
@@ -138,7 +154,7 @@ DAG graphNodesFromSeed(size_t seed, size_t size) {
     seed >>= 3;
     size_t height = 1 + (seed & 0b111);
     seed >>= 3;
-    ret.nodes.push_back({{}, squareLabel('0' + i, width, height)});
+    ret.nodes.push_back({{}, rectLabel('0' + i, width, height)});
   }
   return ret;
 }

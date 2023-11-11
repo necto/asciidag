@@ -73,6 +73,26 @@ void replace(Vec<size_t>& values, size_t dated, size_t updated) {
   }
 }
 
+[[maybe_unused]]
+bool wellLayered(DAG const& dag, Vec2<size_t> const& layers) {
+  for (size_t layerI = 0; layerI < layers.size(); ++layerI) {
+    for (size_t n : layers[layerI]) {
+      if (!dag.nodes[n].succs.empty() && layerI + 1 == layers.size()) {
+        std::cout <<"node " <<n <<" has successors but is in the last layer\n";
+        return false;
+      }
+      for (size_t succ : dag.nodes[n].succs) {
+        if (std::find(layers[layerI + 1].begin(), layers[layerI + 1].end(), succ)
+            == layers[layerI + 1].end()) {
+          std::cout <<"node " <<n <<" has successor " <<succ <<" not in the next layer\n";
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
 std::optional<RenderError> insertEdgeWaypoints(DAG& dag, Vec2<size_t>& layers) {
   size_t const preexistingCount = dag.nodes.size();
   Vec<size_t> rank(preexistingCount, 0);
@@ -110,6 +130,7 @@ std::optional<RenderError> insertEdgeWaypoints(DAG& dag, Vec2<size_t>& layers) {
       }
     }
   }
+  assert(wellLayered(dag, layers));
   return {};
 }
 
@@ -1743,6 +1764,88 @@ Vec<size_t> computeLayerHeights(Vec<Position> const& dimensions, Vec2<size_t> co
   return ret;
 }
 
+[[maybe_unused]]
+Vec2<size_t> getAllSuccs(size_t node, DAG const& dag, Vec2<size_t> const& layers) {
+  size_t const N = dag.nodes.size();
+  Vec<size_t> pos(N, 0);
+  for (auto layer : layers) {
+    for (size_t nodeI = 0; nodeI < layer.size(); ++nodeI) {
+      pos[layer[nodeI]] = nodeI;
+    }
+  }
+  Vec2<size_t> preds(N);
+  // Enumerating nodes by layer to make sure preds[*] for each node have
+  // the same order as the layer they are on
+  for (size_t nodeI = 0; nodeI < N; ++nodeI) {
+    for (size_t succ : dag.nodes[nodeI].succs) {
+      preds[succ].push_back(nodeI);
+    }
+  }
+  for (auto const& layer : layers) {
+    for (auto nId : layer) {
+      for (auto succ : dag.nodes[nId].succs) {
+        preds[succ].push_back(nId);
+      }
+    }
+  }
+  Vec<std::tuple<Vec<size_t>, size_t, size_t>> unresolvedEdges;
+  for (size_t succ : dag.nodes[node].succs) {
+    unresolvedEdges.emplace_back(Vec<size_t>{}, node, succ);
+  }
+
+  Vec2<size_t> ret;
+  while (!unresolvedEdges.empty()) {
+    auto [prefix, from, to] = unresolvedEdges.back();
+    prefix.push_back(from);
+    unresolvedEdges.pop_back();
+    if (dag.nodes[to].text == waypointText) {
+      unresolvedEdges.emplace_back(prefix, to, dag.nodes[to].succs[0]);
+      continue;
+    }
+    if (dag.nodes[to].text == "X") {
+      size_t otherPred = preds[to][0] == from ? preds[to][1] : preds[to][0];
+      size_t succLeft = dag.nodes[to].succs[0];
+      size_t succRight = dag.nodes[to].succs[1];
+      if (pos[succRight] < pos[succLeft]) {
+        std::swap(succLeft, succRight);
+      }
+      if (pos[otherPred] < pos[from]) {
+        unresolvedEdges.emplace_back(prefix, to, succLeft);
+      } else {
+        unresolvedEdges.emplace_back(prefix, to, succRight);
+      }
+      continue;
+    }
+    prefix.push_back(to);
+    ret.push_back({to});
+  }
+
+  return ret;
+}
+
+[[maybe_unused]]
+bool crossSuccsSameOrderAsLayers(DAG const& dag, Vec2<size_t> const& layers) {
+  for (size_t layerI = 1; layerI < layers.size(); ++layerI) {
+    auto const& prevLayer = layers[layerI - 1];
+    auto const& curLayer = layers[layerI];
+    for (size_t nodeId : prevLayer) {
+      if (dag.nodes[nodeId].text != "X") {
+        continue;
+      }
+      auto const& succs = dag.nodes[nodeId].succs;
+      assert(succs.size() == 2);
+      if (findIndex(curLayer, succs[0]) > findIndex(curLayer, succs[1])) {
+        std::cout
+          << "for node" << nodeId << " succ " << succs[0] << " is at "
+          << findIndex(curLayer, succs[0]) << " and succ " << succs[1] << " is at "
+          << findIndex(curLayer, succs[1]) << "\n";
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 } // namespace
 
 namespace detail {
@@ -1816,28 +1919,6 @@ size_t insertEdgeWaypoint(DAG& dag, size_t from, size_t to) {
   return nodeId;
 }
 
-void padWithWaypointToPreserveCrossPredOrder(
-  DAG& dag,
-  Vec<size_t>& layer,
-  Vec<size_t> const& predLayer,
-  size_t from,
-  size_t to
-) {
-  assert(contains(dag.nodes[from].succs, to));
-  if (dag.nodes[to].text == "X") {
-    auto leftNodeI = std::find_if(predLayer.begin(), predLayer.end(), [&](size_t id) {
-      auto const& succs = dag.nodes[id].succs;
-      return std::find(succs.begin(), succs.end(), to) != succs.end();
-    });
-    assert(leftNodeI != predLayer.end());
-    auto rightNodeI = std::find(predLayer.begin(), predLayer.end(), from);
-    assert(rightNodeI != predLayer.end());
-    if (leftNodeI < rightNodeI) {
-      layer.push_back(insertEdgeWaypoint(dag, *leftNodeI, to));
-    }
-  }
-}
-
 // Inserting two crossings that involve the same "X" node on the upper or lower layer
 // might result in inadvertently mixing the predecessors or successors of that "X" node.
 // It is possible to do that safely and carefully if they share only one "X" node,
@@ -1872,39 +1953,60 @@ Vec<CrossingPair> keepOneCrossingPerXNode(Vec<CrossingPair> &&crossings, DAG con
   return ret;
 }
 
+Vec<size_t> insertCrossesAndWaypointsBetween(
+  DAG& dag,
+  Vec<CrossingPair>&& crossings,
+  Vec<size_t> layerAbove,
+  Vec<size_t> curLayer
+) {
+  Vec<size_t> insertedNodes;
+  std::sort(crossings.begin(), crossings.end(), [&](auto const& x1, auto const& x2) {
+    return std::make_pair(findIndex(layerAbove, x1.fromLeft), findIndex(curLayer, x1.toRight))
+         < std::make_pair(findIndex(layerAbove, x2.fromLeft), findIndex(curLayer, x2.toRight));
+  });
+  std::unordered_map<size_t, Vec<size_t>> rightLeftEdges;
+  auto nextCrossing = crossings.begin();
+  for (size_t n : layerAbove) {
+    // Range-for here would be illdefined because the succs range is modified in the body.
+    for (size_t succI = 0; succI < dag.nodes[n].succs.size(); ++succI) {
+      size_t succ = dag.nodes[n].succs[succI];
+      if (nextCrossing != crossings.end() && n == nextCrossing->fromLeft && succ == nextCrossing->toRight) {
+        size_t insertedXNode = insertCrossNode(dag, *nextCrossing);
+        assert(dag.nodes[n].succs[succI] == insertedXNode);
+        insertedNodes.push_back(insertedXNode);
+        rightLeftEdges[nextCrossing->fromRight].push_back(insertedXNode);
+        ++nextCrossing;
+        continue;
+      }
+      if (auto bucket = rightLeftEdges.find(n);
+          bucket != rightLeftEdges.end() && contains(bucket->second, succ)) {
+        continue;
+      }
+      size_t insertedWaypoint = insertEdgeWaypoint(dag, n, succ);
+      insertedNodes.push_back(insertedWaypoint);
+      assert(dag.nodes[n].succs[succI] == insertedWaypoint);
+    }
+  }
+  assert(nextCrossing == crossings.end());
+  return insertedNodes;
+}
+
 Vec2<size_t> insertCrossNodes(DAG& dag, Vec2<size_t> const& layers) {
   Vec2<size_t> newLayers;
   newLayers.push_back(layers[0]);
   for (size_t layerI = 1; layerI < layers.size(); ++layerI) {
     auto const& curLayer = layers[layerI];
     auto const& layerAbove = layers[layerI - 1];
-    Vec<size_t> insertedNodes;
     auto crossings = keepOneCrossingPerXNode(findNonConflictingCrossings(dag, layerAbove, curLayer), dag);
-    for (auto const& crossing : crossings) {
-      // Order (right->left then left->right) avoids introducing unnecessary crossing
-      padWithWaypointToPreserveCrossPredOrder(
-        dag,
-        insertedNodes,
-        layerAbove,
-        crossing.fromRight,
-        crossing.toLeft
+    if (!crossings.empty()) {
+      newLayers.emplace_back(
+        insertCrossesAndWaypointsBetween(dag, std::move(crossings), layerAbove, curLayer)
       );
-      padWithWaypointToPreserveCrossPredOrder(
-        dag,
-        insertedNodes,
-        layerAbove,
-        crossing.fromLeft,
-        crossing.toRight
-      );
-      insertedNodes.push_back(insertCrossNode(dag, crossing));
     }
-    if (!insertedNodes.empty()) {
-      newLayers.emplace_back(std::move(insertedNodes));
-    }
-    newLayers.push_back(layers[layerI]);
+    newLayers.push_back(curLayer);
   }
-  auto waypointErr = insertEdgeWaypoints(dag, newLayers);
-  assert(!waypointErr.has_value() && "It's safe, I promise");
+  assert(wellLayered(dag, newLayers));
+  assert(crossSuccsSameOrderAsLayers(dag, newLayers));
   return newLayers;
 }
 
@@ -1977,7 +2079,8 @@ Vec<size_t> computeIdToLayerMap(Vec2<size_t> const& layers, size_t nNodes) {
 }
 
 std::string renderDAGWithLayers(DAG const& dag, std::vector<std::vector<size_t>> layers) {
-  // TODO: find best horisontal position of nodes
+  assert(crossSuccsSameOrderAsLayers(dag, layers));
+  // TODO: find best horisontal positions of nodes
   auto const dimensions = nodeDimensions(dag);
   auto coords = computeNodeCoordinates(dag, layers, dimensions);
   auto connectivity = computeConnectivity(dag, coords, dimensions);
@@ -2026,6 +2129,7 @@ std::optional<string> renderDAG(DAG dag, RenderError& err) {
     LOGDAGL(dag, layers, "after insert X");
     minimizeCrossings(layers, dag);
     LOGDAGL(dag, layers, "after min crossing in the loop");
+    assert(crossSuccsSameOrderAsLayers(dag, layers));
   }
 
   return renderDAGWithLayers(dag, layers);
