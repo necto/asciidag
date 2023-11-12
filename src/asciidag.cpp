@@ -1302,7 +1302,7 @@ computeConnectivity(DAG const& dag, Vec<Position> const& coords, Vec<Position> c
       size_t edgeId = ret.edges.size();
       predEdges[e].push_back(edgeId);
       succEdges[i].push_back(edgeId);
-      // The angles is not correct there yet
+      // The angles are not correct there yet
       ret.edges.push_back({i, 0, e, 0, Direction::Straight, Direction::Straight});
     }
   }
@@ -1353,13 +1353,14 @@ Vec2<size_t> groupEdgesByLayer(Connectivity const& conn, Vec2<size_t> const& lay
   return ret;
 }
 
-void adjustCoordsWithValencies(
+bool adjustCoordsWithValencies(
   Vec<Position>& coords,
   Connectivity const& conn,
   Vec2<size_t> const& layers,
   Vec<Position> const& dimensions,
   Vec<size_t> const& layerHeight
 ) {
+  bool moved = false;
   for (auto const& layer : layers) {
     size_t lastCol = 0;
     for (auto node : layer) {
@@ -1370,8 +1371,9 @@ void adjustCoordsWithValencies(
       if (lastCol < coords[node].col) {
         // Avoid swinging back and forth
         lastCol = coords[node].col;
-      } else {
+      } else if (coords[node].col < lastCol) {
         coords[node].col = lastCol;
+        moved = true;
       }
       lastCol += 1 + dimensions[node].col; // accomodate node width and mandatory space
       if (valencies.bottomRight || valencies.topRight) {
@@ -1384,10 +1386,14 @@ void adjustCoordsWithValencies(
   size_t line = 0;
   for (size_t i = 0; i < layers.size(); ++i) {
     for (auto n : layers[i]) {
+      if (coords[n].line != line) {
+        moved = true;
+      }
       coords[n].line = line;
     }
     line += layerHeight[i] + minDistBetweenLayers(conn, interLayerEdges[i], coords);
   }
+  return moved;
 }
 
 void placeNodes(DAG const& dag, Vec<Position> const& coordinates, Canvas& canvas) {
@@ -2083,10 +2089,14 @@ std::string renderDAGWithLayers(DAG const& dag, std::vector<std::vector<size_t>>
   auto connectivity = computeConnectivity(dag, coords, dimensions);
   auto layerHeights = computeLayerHeights(dimensions, layers);
   auto idToLayerMap = computeIdToLayerMap(layers, dag.nodes.size());
-  adjustCoordsWithValencies(coords, connectivity, layers, dimensions, layerHeights);
-  // Reposition edges to account for the changes in positions
-  connectivity = computeConnectivity(dag, coords, dimensions);
-  adjustCoordsWithValencies(coords, connectivity, layers, dimensions, layerHeights);
+  for (int i = 0; i < 5; ++i) {
+    bool moved = adjustCoordsWithValencies(coords, connectivity, layers, dimensions, layerHeights);
+    if (!moved) {
+      break;
+    }
+    // Reposition edges to account for the changes in positions
+    connectivity = computeConnectivity(dag, coords, dimensions);
+  }
   auto canvas = Canvas::create(coords, dimensions);
   placeNodes(dag, coords, canvas);
   placeEdges(coords, dimensions, idToLayerMap, layerHeights, connectivity.edges, canvas);

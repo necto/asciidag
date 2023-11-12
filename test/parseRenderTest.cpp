@@ -185,6 +185,18 @@ TEST(parseRender, insertingAlwaysLeftMostCrossingFirst2) {
   dag.nodes.push_back(DAG::Node{{}, "888\n888\n888\n888\n888\n888\n888\n888"});
   ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
 }
+
+TEST(parseRender, threeIterationsToReadjustEdges) {
+  DAG dag;
+  dag.nodes.push_back(DAG::Node{{2, 3, 6, 7},"00000000\n00000000\n00000000\n00000000" });
+  dag.nodes.push_back(DAG::Node{{4, 5, 6, 8},"1111111\n1111111\n1111111\n1111111\n1111111\n1111111\n1111111" });
+  dag.nodes.push_back(DAG::Node{{4, 5, 7},"2222\n2222\n2222\n2222\n2222" });
+  dag.nodes.push_back(DAG::Node{{6, 7},"333333\n333333\n333333\n333333\n333333" });
+  dag.nodes.push_back(DAG::Node{{8},"444\n444\n444\n444\n444" });
+  dag.nodes.push_back(DAG::Node{{},"55\n55\n55\n55\n55\n55\n55" });
+  dag.nodes.push_back(DAG::Node{{7},"6\n6\n6\n6\n6\n6\n6\n6" });
+  dag.nodes.push_back(DAG::Node{{8},"777777\n777777\n777777\n777777\n777777\n777777" });
+  dag.nodes.push_back(DAG::Node{{},"88888\n88888\n88888\n88888\n88888" });
   ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
 }
 

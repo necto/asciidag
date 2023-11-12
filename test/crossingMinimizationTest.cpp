@@ -544,20 +544,20 @@ TEST(crossingMinimizationTest, danglingNodeDoesNotPreventSimpleSwap) {
  |  \    | |   |  \
  /   \   \ /   \   \
 3     2   4     5   6
-|     |        /   /
-|     |       /   /
-|     |      /   /
-|     |     /   /
-|     |    /   /
-|     |   /   /
-|     |  /   /
-|     | /   /
-|     |/   /
-|     /|  /
-|    / / /
-|   / / /
-|  / / /
-|  |/ /
+|    /         /   /
+|   /         /   /
+|  /         /   /
+|  |        /   /
+|  |       /   /
+|  |      /   /
+|  |     /   /
+|  |    /   /
+|  |   /   /
+|  |  /   /
+|  | /   /
+|  |/   /
+|  ||  /
+|  || /
 |  \|/
 7   8
 )", '\n' + renderDAGWithLayers(dag, layers));
