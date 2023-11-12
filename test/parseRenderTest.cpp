@@ -86,6 +86,7 @@ void assertRenderAndParseIdentity(DAG const& dag) {
     auto dagClone = parseDAG(*pic, parseErr);
     EXPECT_EQ(parseErr.code, ParseError::Code::None);
     if (parseErr.code != ParseError::Code::None) {
+      std::cout <<toDOT(dag) <<"\n";
       std::cout <<*pic <<"\n";
       // Print error message by violating an assertion
       EXPECT_EQ(parseErr.message, "");
@@ -140,8 +141,50 @@ TEST(parseRender, stablePreds) {
   dag.nodes.push_back(DAG::Node{{}, "3"});
   dag.nodes.push_back(DAG::Node{{}, "4"});
   dag.nodes.push_back(DAG::Node{{}, "5"});
-  RenderError err;
-  std::cout <<*renderDAG(dag, err) <<"\n";
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
+}
+
+TEST(parseRender, nineNodesStableCrossings) {
+  DAG dag;
+  dag.nodes.push_back(DAG::Node{{3, 8}, "00\n00\n00\n00\n00\n00\n00"});
+  dag.nodes.push_back(DAG::Node{{2, 5, 7, 8}, "1111\n1111"});
+  dag.nodes.push_back(DAG::Node{{3, 4, 5, 6, 7, 8}, "2222\n2222\n2222\n2222\n2222\n2222\n2222\n2222"});
+  dag.nodes.push_back(DAG::Node{{4, 7, 8}, "3333333"});
+  dag.nodes.push_back(DAG::Node{{5, 6, 7, 8}, "4444444\n4444444\n4444444\n4444444\n4444444\n4444444\n4444444\n4444444"});
+  dag.nodes.push_back(DAG::Node{{}, "55555"});
+  dag.nodes.push_back(DAG::Node{{}, "6\n6\n6\n6\n6\n6\n6"});
+  dag.nodes.push_back(DAG::Node{{}, "77\n77\n77\n77\n77\n77\n77\n77"});
+  dag.nodes.push_back(DAG::Node{{}, "888\n888\n888\n888\n888\n888\n888\n888"});
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
+}
+
+TEST(parseRender, insertingAlwaysLeftMostCrossingFirst) {
+  DAG dag;
+  dag.nodes.push_back(DAG::Node{{1, 3, 4, 6, 7, 8}, "000000"});
+  dag.nodes.push_back(DAG::Node{{2, 4, 5, 8}, "11\n11"});
+  dag.nodes.push_back(DAG::Node{{3, 4, 5}, "222\n222\n222\n222\n222\n222\n222\n222"});
+  dag.nodes.push_back(DAG::Node{{4, 5, 7, 8}, "333333\n333333"});
+  dag.nodes.push_back(DAG::Node{{5, 7, 8}, "44\n44\n44\n44\n44"});
+  dag.nodes.push_back(DAG::Node{{6, 7, 8}, "5555\n5555\n5555"});
+  dag.nodes.push_back(DAG::Node{{}, "66666666"});
+  dag.nodes.push_back(DAG::Node{{}, "777777"});
+  dag.nodes.push_back(DAG::Node{{}, "888"});
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
+}
+
+TEST(parseRender, insertingAlwaysLeftMostCrossingFirst2) {
+  DAG dag;
+  dag.nodes.push_back(DAG::Node{{1, 5}, "00000\n00000\n00000"});
+  dag.nodes.push_back(DAG::Node{{3, 4, 5, 6, 7, 8}, "1111\n1111\n1111\n1111"});
+  dag.nodes.push_back(DAG::Node{{4, 5, 6, 7, 8}, "2222"});
+  dag.nodes.push_back(DAG::Node{{4, 5, 6}, "3333333\n3333333\n3333333\n3333333\n3333333"});
+  dag.nodes.push_back(DAG::Node{{7, 8}, "44444\n44444\n44444\n44444"});
+  dag.nodes.push_back(DAG::Node{{6, 7, 8}, "555555\n555555\n555555\n555555\n555555\n555555\n555555\n555555"});
+  dag.nodes.push_back(DAG::Node{{}, "666\n666\n666\n666\n666\n666\n666\n666"});
+  dag.nodes.push_back(DAG::Node{{}, "77\n77"});
+  dag.nodes.push_back(DAG::Node{{}, "888\n888\n888\n888\n888\n888\n888\n888"});
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
+}
   ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(dag));
 }
 

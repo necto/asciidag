@@ -1861,6 +1861,12 @@ Vec2<size_t> getAllSuccs(size_t node, DAG const& dag, Vec2<size_t> const& layers
   return ret;
 }
 
+template<class Iter, class Elem>
+void bringForward(Iter from, Iter to, Elem el) {
+  Iter pos = std::find(from, to, el);
+  std::rotate(from, pos, pos + 1);
+}
+
 } // namespace
 
 namespace detail {
@@ -1870,26 +1876,26 @@ findNonConflictingCrossings(DAG const& dag, Vec<size_t> const& lAbove, Vec<size_
   Vec<CrossingPair> ret;
   std::unordered_set<SimpleEdge, SimpleEdgeHash> takenEdges;
   // TODO: These 5 nested loops can definitely be optmized
-  // TODO: reverse this top-level loop: it should scan right-to-left to find the highest crossing first
+  // Moving from left to right to find the left-most crossing points
+  // for any node involved. This helps keeping the order of predecessors and successors
+  // for nodes when inserting the X nodes from left to right
   for (size_t leftTopPos = 0; leftTopPos < lAbove.size(); ++leftTopPos) {
     auto leftTop = lAbove[leftTopPos];
-    // Starting at the other end to find the highest crossing first
-    for (size_t rightBottomPos = lBelow.size() - 1; rightBottomPos != 0; --rightBottomPos) {
+    for (size_t rightBottomPos = 1; rightBottomPos < lBelow.size(); ++rightBottomPos) {
       auto rightBottom = lBelow[rightBottomPos];
       SimpleEdge leftRightEdge{leftTop, rightBottom};
-      if (!contains(dag.nodes[leftTop].succs, rightBottom) ||
-          takenEdges.count(leftRightEdge) != 0) {
+      if (!contains(dag.nodes[leftTop].succs, rightBottom) || takenEdges.count(leftRightEdge)) {
         continue;
       }
+      bool found = false;
       for (size_t rightTopPos = leftTopPos + 1; rightTopPos < lAbove.size(); ++rightTopPos) {
         auto rightTop = lAbove[rightTopPos];
-        bool found = false;
         for (size_t leftBottomPos = 0; leftBottomPos < rightBottomPos; ++leftBottomPos) {
           auto leftBottom = lBelow[leftBottomPos];
+          SimpleEdge rightLeftEdge{rightTop, leftBottom};
           if (!contains(dag.nodes[rightTop].succs, leftBottom)) {
             continue;
           }
-          SimpleEdge rightLeftEdge{rightTop, leftBottom};
           if (takenEdges.count(rightLeftEdge) == 0) {
             takenEdges.insert(rightLeftEdge);
             takenEdges.insert(leftRightEdge);
@@ -1975,28 +1981,34 @@ Vec<size_t> insertCrossesAndWaypointsBetween(
   Vec<size_t> curLayer
 ) {
   Vec<size_t> insertedNodes;
-  std::sort(crossings.begin(), crossings.end(), [&](auto const& x1, auto const& x2) {
+  assert(std::is_sorted(crossings.begin(), crossings.end(), [&](auto const& x1, auto const& x2) {
     return std::make_pair(findIndex(layerAbove, x1.fromLeft), findIndex(curLayer, x1.toRight))
          < std::make_pair(findIndex(layerAbove, x2.fromLeft), findIndex(curLayer, x2.toRight));
-  });
+  }));
   std::unordered_map<size_t, Vec<size_t>> rightLeftEdges;
   auto nextCrossing = crossings.begin();
   for (size_t n : layerAbove) {
-    // Range-for here would be illdefined because the succs range is modified in the body.
-    for (size_t succI = 0; succI < dag.nodes[n].succs.size(); ++succI) {
+    size_t handledSuccCount = rightLeftEdges[n].size();
+    for (size_t succI = handledSuccCount; succI < dag.nodes[n].succs.size(); ++succI) {
       size_t succ = dag.nodes[n].succs[succI];
       if (nextCrossing != crossings.end() && n == nextCrossing->fromLeft && succ == nextCrossing->toRight) {
         size_t insertedXNode = insertCrossNode(dag, *nextCrossing);
         assert(dag.nodes[n].succs[succI] == insertedXNode);
         insertedNodes.push_back(insertedXNode);
-        rightLeftEdges[nextCrossing->fromRight].push_back(insertedXNode);
+        auto & insertedEdgesOfRightNode = rightLeftEdges[nextCrossing->fromRight];
+        auto alreadyInsertedSuccs = insertedEdgesOfRightNode.size();
+        assert(
+          dag.nodes[nextCrossing->fromRight].text != "X"
+          || insertedXNode == dag.nodes[nextCrossing->fromRight].succs[0]
+          || alreadyInsertedSuccs == 1
+        );
+        auto & rightSuccs = dag.nodes[nextCrossing->fromRight].succs;
+        bringForward(rightSuccs.begin() + alreadyInsertedSuccs, rightSuccs.end(), insertedXNode);
+        insertedEdgesOfRightNode.push_back(insertedXNode);
         ++nextCrossing;
         continue;
       }
-      if (auto bucket = rightLeftEdges.find(n);
-          bucket != rightLeftEdges.end() && contains(bucket->second, succ)) {
-        continue;
-      }
+      assert(!contains(rightLeftEdges[n], succ));
       size_t insertedWaypoint = insertEdgeWaypoint(dag, n, succ);
       insertedNodes.push_back(insertedWaypoint);
       assert(dag.nodes[n].succs[succI] == insertedWaypoint);
@@ -2007,6 +2019,7 @@ Vec<size_t> insertCrossesAndWaypointsBetween(
 }
 
 Vec2<size_t> insertCrossNodes(DAG& dag, Vec2<size_t> const& layers) {
+  assert(wellLayered(dag, layers));
   assert(succsSameOrderAsLayers(dag, layers));
   Vec2<size_t> newLayers;
   newLayers.push_back(layers[0]);
@@ -2139,7 +2152,7 @@ std::optional<string> renderDAG(DAG dag, RenderError& err) {
   minimizeCrossings(layers, dag);
   LOGDAGL(dag, layers, "after min crossings");
 
-  for (int i = 0; i < 12; ++i) {
+  for (int i = 0; i < 16; ++i) {
     if (countAllCrossings(layers, dag) == 0) {
       break;
     }
