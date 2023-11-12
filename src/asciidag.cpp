@@ -1940,40 +1940,6 @@ size_t insertEdgeWaypoint(DAG& dag, size_t from, size_t to) {
   return nodeId;
 }
 
-// Inserting two crossings that involve the same "X" node on the upper or lower layer
-// might result in inadvertently mixing the predecessors or successors of that "X" node.
-// It is possible to do that safely and carefully if they share only one "X" node,
-// but might be impossible if they share two "X" nodes.
-// However, it is always tricky, so easier to insert some of these crossings at a later iteration.
-Vec<CrossingPair> keepOneCrossingPerXNode(Vec<CrossingPair> &&crossings, DAG const& dag) {
-  Vec<CrossingPair> ret;
-  ret.reserve(crossings.size());
-  std::unordered_set<size_t> takenXnodes;
-  auto checkNInsert = [&takenXnodes, &dag](size_t nId) {
-    if (dag.nodes[nId].text == "X") {
-      auto [_, inserted] = takenXnodes.insert(nId);
-      return !inserted;
-    }
-    return false;
-  };
-  for (auto && crossing : std::move(crossings)) {
-    if (checkNInsert(crossing.fromLeft)) {
-      continue;
-    }
-    if (checkNInsert(crossing.fromRight)) {
-      continue;
-    }
-    if (checkNInsert(crossing.toLeft)) {
-      continue;
-    }
-    if (checkNInsert(crossing.toRight)) {
-      continue;
-    }
-    ret.emplace_back(std::move(crossing));
-  }
-  return ret;
-}
-
 Vec<size_t> insertCrossesAndWaypointsBetween(
   DAG& dag,
   Vec<CrossingPair>&& crossings,
@@ -2026,7 +1992,7 @@ Vec2<size_t> insertCrossNodes(DAG& dag, Vec2<size_t> const& layers) {
   for (size_t layerI = 1; layerI < layers.size(); ++layerI) {
     auto const& curLayer = layers[layerI];
     auto const& layerAbove = layers[layerI - 1];
-    auto crossings = keepOneCrossingPerXNode(findNonConflictingCrossings(dag, layerAbove, curLayer), dag);
+    auto crossings = findNonConflictingCrossings(dag, layerAbove, curLayer);
     if (!crossings.empty()) {
       newLayers.emplace_back(
         insertCrossesAndWaypointsBetween(dag, std::move(crossings), layerAbove, curLayer)
