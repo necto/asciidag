@@ -1825,13 +1825,6 @@ Vec2<size_t> getAllSuccs(size_t node, DAG const& dag, Vec2<size_t> const& layers
       preds[succ].push_back(nodeI);
     }
   }
-  for (auto const& layer : layers) {
-    for (auto nId : layer) {
-      for (auto succ : dag.nodes[nId].succs) {
-        preds[succ].push_back(nId);
-      }
-    }
-  }
   Vec<std::tuple<Vec<size_t>, size_t, size_t>> unresolvedEdges;
   for (size_t succ : dag.nodes[node].succs) {
     unresolvedEdges.emplace_back(Vec<size_t>{}, node, succ);
@@ -1865,12 +1858,6 @@ Vec2<size_t> getAllSuccs(size_t node, DAG const& dag, Vec2<size_t> const& layers
   }
 
   return ret;
-}
-
-template<class Iter, class Elem>
-void bringForward(Iter from, Iter to, Elem el) {
-  Iter pos = std::find(from, to, el);
-  std::rotate(from, pos, pos + 1);
 }
 
 } // namespace
@@ -1967,15 +1954,12 @@ Vec<size_t> insertCrossesAndWaypointsBetween(
         size_t insertedXNode = insertCrossNode(dag, *nextCrossing);
         assert(dag.nodes[n].succs[succI] == insertedXNode);
         insertedNodes.push_back(insertedXNode);
-        auto & insertedEdgesOfRightNode = rightLeftEdges[nextCrossing->fromRight];
-        auto alreadyInsertedSuccs = insertedEdgesOfRightNode.size();
+        auto& insertedEdgesOfRightNode = rightLeftEdges[nextCrossing->fromRight];
         assert(
           dag.nodes[nextCrossing->fromRight].text != "X"
           || insertedXNode == dag.nodes[nextCrossing->fromRight].succs[0]
-          || alreadyInsertedSuccs == 1
+          || insertedEdgesOfRightNode.size() == 1
         );
-        auto & rightSuccs = dag.nodes[nextCrossing->fromRight].succs;
-        bringForward(rightSuccs.begin() + alreadyInsertedSuccs, rightSuccs.end(), insertedXNode);
         insertedEdgesOfRightNode.push_back(insertedXNode);
         ++nextCrossing;
         continue;
