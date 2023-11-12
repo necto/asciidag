@@ -11,4 +11,6 @@ string parseAndRender(string_view str);
 
 std::pair<DAG, Vec2<size_t>> parseWithLayers(string_view str);
 
+void assertRenderAndParseIdentity(DAG const& dag);
+
 } // namespace asciidag::tests

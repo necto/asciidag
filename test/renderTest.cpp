@@ -1,8 +1,10 @@
 #include "asciidag.h"
+#include "testUtils.h"
 
 #include <gtest/gtest.h>
 
 using namespace asciidag;
+using namespace asciidag::tests;
 
 std::string renderSuccessfully(DAG const& dag) {
   RenderError err;
@@ -22,6 +24,7 @@ TEST(render, singleNode) {
             R"(
 #
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, singleEdge) {
@@ -34,6 +37,7 @@ TEST(render, singleEdge) {
 |
 1
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, twoSimpleEdgesDiverge) {
@@ -49,6 +53,7 @@ TEST(render, twoSimpleEdgesDiverge) {
 |  \
 1   2
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, twoSimpleEdgesDivergeDiffOrder) {
@@ -64,6 +69,7 @@ TEST(render, twoSimpleEdgesDivergeDiffOrder) {
 |  \
 1   2
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, twoSimpleEdgesConverge) {
@@ -79,6 +85,7 @@ TEST(render, twoSimpleEdgesConverge) {
 |/
 2
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, threeSimpleEdgesDiverge) {
@@ -99,6 +106,7 @@ TEST(render, threeSimpleEdgesDiverge) {
  /   \   \
 1     2   3
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, threeSimpleEdgesDivergeOrder321) {
@@ -119,6 +127,7 @@ TEST(render, threeSimpleEdgesDivergeOrder321) {
  /   \   \
 1     2   3
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, threeSimpleEdgesDivergeOrder312) {
@@ -139,6 +148,7 @@ TEST(render, threeSimpleEdgesDivergeOrder312) {
  /   \   \
 1     2   3
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, threeSimpleEdgesConverge) {
@@ -159,6 +169,7 @@ TEST(render, threeSimpleEdgesConverge) {
  \|/
   3
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, twoParallelSimpleEdges) {
@@ -173,6 +184,7 @@ TEST(render, twoParallelSimpleEdges) {
 | |
 1 3
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, nonStraightRightEdge) {
@@ -197,6 +209,7 @@ TEST(render, nonStraightRightEdge) {
 |  \   \   \
 1   2   4   5
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, tripleEdgePair) {
@@ -210,6 +223,7 @@ TEST(render, tripleEdgePair) {
  \|/
   1
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, twoTripleEdgePairs) {
@@ -225,6 +239,7 @@ TEST(render, twoTripleEdgePairs) {
  \|/   \|/
   1     3
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, nonStraightLeftEdge) {
@@ -247,6 +262,7 @@ TEST(render, nonStraightLeftEdge) {
 |/  |/
 2   5
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 
@@ -265,6 +281,7 @@ TEST(render, twoParallelRightEdges) {
 |  \   \
 1   2   4
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, twoParallelLeftEdges) {
@@ -282,6 +299,7 @@ TEST(render, twoParallelLeftEdges) {
  /   /
 2   4
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, hammock) {
@@ -302,6 +320,7 @@ TEST(render, hammock) {
 |/
 3
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, multiLayerEdge) {
@@ -321,6 +340,7 @@ TEST(render, multiLayerEdge) {
 |/
 2
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, twoMultiLayerEdges) {
@@ -347,6 +367,7 @@ TEST(render, twoMultiLayerEdges) {
 |/  |/
 2   3
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, twoLayerEdge) {
@@ -369,6 +390,7 @@ TEST(render, twoLayerEdge) {
 |/
 3
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, fourLayers) {
@@ -405,6 +427,7 @@ TEST(render, fourLayers) {
 |/
 B
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(renderError, emptyStringNodeUnsupported) {
@@ -466,6 +489,7 @@ TEST(render, conflictingEdgesFromSamePredecessor) {
 |/  |/
 4   5
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, twoEdgeCrossingsFromSamePredecessor) {
@@ -490,6 +514,7 @@ TEST(render, twoEdgeCrossingsFromSamePredecessor) {
 | |/  |/
 4 2   3
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, dependenciesRightToLeft) {
@@ -511,6 +536,7 @@ TEST(render, dependenciesRightToLeft) {
 |/   /
 4   3
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, complex6nodes) {
@@ -553,6 +579,7 @@ TEST(render, complex6nodes) {
 |/   \|/
 5     3
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, wellConnected6nodes) {
@@ -594,6 +621,7 @@ TEST(render, wellConnected6nodes) {
  /   \|/
 5     4
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, wellConnected6nodes2) {
@@ -635,6 +663,7 @@ TEST(render, wellConnected6nodes2) {
 |/   \|/   \|/
 5     3     4
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, crossedPlusUncrossedGraphs) {
@@ -668,6 +697,7 @@ TEST(render, crossedPlusUncrossedGraphs) {
 |/  | |/
 3   4 5
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, wellConnected6nodes3) {
@@ -707,6 +737,7 @@ TEST(render, wellConnected6nodes3) {
  \|/   /   \|/
   3   4     5
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, fullyConnected3x3) {
@@ -761,6 +792,7 @@ TEST(render, fullyConnected3x3) {
  \|/   \|/   \|/
   3     4     5
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, narrowGapForAnEdgeEgress) {
@@ -795,6 +827,7 @@ TEST(render, narrowGapForAnEdgeEgress) {
 |/  |/   \|/   /
 4   5     3   6
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, narrowGapForAnEdgeIngress) {
@@ -856,6 +889,7 @@ TEST(render, narrowGapForAnEdgeIngress) {
  /   \|/
 6     5
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, notHemmingInAnyEdge) {
@@ -904,6 +938,7 @@ TEST(render, notHemmingInAnyEdge) {
  \|/
   5
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, full3x3PlusTwoDisconnectedNodes) {
@@ -959,6 +994,7 @@ TEST(render, full3x3PlusTwoDisconnectedNodes) {
  \|/   \|/   \|/
   3     4     5
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, case8nodes1) {
@@ -1036,6 +1072,7 @@ TEST(render, case8nodes1) {
  \|/   \|/   \|/
   6     4     7
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, crossingsSharingTheSameXnodeAbove) {
@@ -1101,6 +1138,7 @@ TEST(render, crossingsSharingTheSameXnodeAbove) {
  \|/  |/  |/
   4   6   7
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, wideNode) {
@@ -1110,6 +1148,7 @@ TEST(render, wideNode) {
             R"(
 ABC
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, threeDisconnectedWideNodes) {
@@ -1121,6 +1160,7 @@ TEST(render, threeDisconnectedWideNodes) {
             R"(
 ABC DE FGHIJ
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, edgeBetweenWideNodes) {
@@ -1133,6 +1173,7 @@ TEST(render, edgeBetweenWideNodes) {
   |
 111
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, twoEdgesBetweenWideNodesDiverge) {
@@ -1150,6 +1191,7 @@ TEST(render, twoEdgesBetweenWideNodesDiverge) {
   |  \
 111   222
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, fourLegsTable) {
@@ -1165,6 +1207,7 @@ TEST(render, fourLegsTable) {
 | | | |
 1 2 3 4
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, fourAntennasTv) {
@@ -1180,6 +1223,7 @@ TEST(render, fourAntennasTv) {
 | | | |
 4444444
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, partialCoverBottomLeft) {
@@ -1193,6 +1237,7 @@ TEST(render, partialCoverBottomLeft) {
   | |
 22222
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, partialCoverBottomRight) {
@@ -1207,6 +1252,7 @@ TEST(render, partialCoverBottomRight) {
   |    |
 22222 3333
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, twoEdgesBetweenWideNodesConverge) {
@@ -1224,6 +1270,7 @@ TEST(render, twoEdgesBetweenWideNodesConverge) {
  | /
 222
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 
@@ -1279,6 +1326,7 @@ TEST(render, edgesHaveSpaceBecauseReadjustedAfterCoordsRecalculation) {
 |   //
 44444
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, exitConflictOfDirectEdgeWithLeftEdge) {
@@ -1316,6 +1364,7 @@ TEST(render, exitConflictOfDirectEdgeWithLeftEdge) {
 |   /   \ |     \\
 3333     44444   555555
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 
@@ -1328,6 +1377,7 @@ A
 B
 C
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, twoLongNodesConnected) {
@@ -1344,6 +1394,7 @@ TEST(render, twoLongNodesConnected) {
 1
 1
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, twoPairsOfLongAndShortNodesConnected) {
@@ -1362,6 +1413,7 @@ TEST(render, twoPairsOfLongAndShortNodesConnected) {
   3
   3
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, wellConnectedNodeHemedInByTwoLongNodes) {
@@ -1400,6 +1452,7 @@ TEST(render, wellConnectedNodeHemedInByTwoLongNodes) {
 3   444 55   66   7   8
 3   444 55   66   7   8
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, edgePassingByALongNode) {
@@ -1422,6 +1475,7 @@ TEST(render, edgePassingByALongNode) {
 |/
 2
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, node1ShorterThanLevel) {
@@ -1440,6 +1494,7 @@ TEST(render, node1ShorterThanLevel) {
  /
 2
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, edgeFromShorterNodeNotHemmingOthers) {
@@ -1465,6 +1520,7 @@ TEST(render, edgeFromShorterNodeNotHemmingOthers) {
 |  \ /   \   \
 1   2     4   6
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }
 
 TEST(render, potentiallyUnstableNodePosition) {
@@ -1539,4 +1595,5 @@ TEST(render, potentiallyUnstableNodePosition) {
   77
   77
 )");
+  ASSERT_NO_FATAL_FAILURE(assertRenderAndParseIdentity(test));
 }

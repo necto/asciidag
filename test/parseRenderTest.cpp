@@ -4,99 +4,10 @@
 #include <cstddef>
 #include <gtest/gtest-param-test.h>
 #include <gtest/gtest.h>
-#include <iostream>
 #include <random>
 
 using namespace asciidag;
-
-DAG canonicalDAG(DAG const& orig) {
-  DAG ret = orig;
-  std::sort(ret.nodes.begin(), ret.nodes.end(), [](auto const& a, auto const& b) {
-    return a.text < b.text;
-  });
-  auto equal = std::adjacent_find(ret.nodes.begin(), ret.nodes.end(), [](auto const& a, auto const& b) {
-    return a.text == b.text;
-  });
-  assert(equal == ret.nodes.end() && "Cannot compare graphs with similar nodes.");
-  std::vector<size_t> idMap(orig.nodes.size());
-  for (size_t origId = 0; origId < orig.nodes.size(); ++origId) {
-    size_t newId = std::
-      distance(ret.nodes.begin(), std::find_if(ret.nodes.begin(), ret.nodes.end(), [&](auto const& n) {
-                 return n.text == orig.nodes[origId].text;
-               }));
-    idMap[origId] = newId;
-  }
-  for (auto &node : ret.nodes) {
-    for (size_t &succ : node.succs) {
-      succ = idMap[succ];
-    }
-    std::sort(node.succs.begin(), node.succs.end());
-  }
-  return ret;
-}
-
-bool compareDAGs(DAG const& a, DAG const& b) {
-  if (a.nodes.size() != b.nodes.size()) {
-    return false;
-  }
-  for (size_t i = 0; i < a.nodes.size(); ++i) {
-    auto const& nodeA = a.nodes[i];
-    auto const& nodeB = b.nodes[i];
-    if (nodeA.succs.size() != nodeB.succs.size()) {
-      return false;
-    }
-    if (nodeA.text != nodeB.text) {
-      return false;
-    }
-    for (size_t j = 0; j < nodeA.succs.size(); ++j) {
-      if (nodeA.succs[j] != nodeB.succs[j]) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
-void assertEqual(DAG const& a, DAG const& b) {
-  DAG canonA = canonicalDAG(a);
-  DAG canonB = canonicalDAG(b);
-  if (!compareDAGs(canonA, canonB)) {
-    RenderError err;
-    std::string rendering = renderDAG(a, err).value_or("");
-    GTEST_FAIL(
-    ) << "Graph \n"
-      << rendering << " was transformed from " <<toDOT(canonA) << " to " << toDOT(canonB);
-  }
-}
-
-void assertRenderAndParseIdentity(DAG const& dag) {
-  RenderError renderErr;
-  auto pic = renderDAG(dag, renderErr);
-  EXPECT_EQ(renderErr.code, RenderError::Code::None);
-  if (renderErr.code != RenderError::Code::None) {
-    std::cout <<toDOT(dag) <<"\n";
-    // Print error message by violating an assertion
-    EXPECT_EQ(renderErr.message, "");
-    // Print error location by violating an assertion
-    EXPECT_EQ(renderErr.nodeId, 0U);
-  }
-  ASSERT_TRUE(pic.has_value());
-  if (pic) {
-    ParseError parseErr;
-    auto dagClone = parseDAG(*pic, parseErr);
-    EXPECT_EQ(parseErr.code, ParseError::Code::None);
-    if (parseErr.code != ParseError::Code::None) {
-      std::cout <<toDOT(dag) <<"\n";
-      std::cout <<*pic <<"\n";
-      // Print error message by violating an assertion
-      EXPECT_EQ(parseErr.message, "");
-      // Print error location by violating an assertion
-      EXPECT_EQ(parseErr.pos, (Position{0, 0}));
-    }
-    ASSERT_TRUE(dagClone.has_value());
-    ASSERT_NO_FATAL_FAILURE(assertEqual(dag, *dagClone));
-  }
-}
+using namespace asciidag::tests;
 
 TEST(parseRender, empty) {
   DAG dag;
