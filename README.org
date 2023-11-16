@@ -1,0 +1,238 @@
+* ASCIIDAG - Convert between ASCII-art and DAG (directed acyclic graph).
+
+This is a hobby project defined mostly by the attactiveness of its intellectual challenge
+rather than practical applicability.
+
+#+begin_src
+D
+ \
+  ASCII
+   \
+    G
+#+end_src
+
+** Function
+
+This C++ library lets you parse and render directed acyclic graph
+(or any graph if you squint) as an ASCII diagram.
+
+*** Syntax
+
+All ASCII characters belong to three categories, mostly context-independent:
+
+- whitespace characters: space and new-line
+- potentially edge characters: '\', '|', '/', and 'X' (horisontal edges are not supported)
+- node characters - all other characters, and 'X' if surrounded by other node characters
+
+**** Edges
+
+Edges consist of one or more edge character that visually follow each other.
+All edges go from top to bottom, and can shift left or right.
+Here are some examples of recognized edges (of length 4):
+
+#+begin_src
+\    |    /   \   |     \   \    /
+ \   |   /    |   /     /    \   |
+  \  |  /     /   \     \    /   |
+   \ | /     /     \    /   /    \
+#+end_src
+
+It is important that the next edge character continues on the column that follows the direction of the previous one.
+
+Here some examples of non-recognized edges:
+
+#+begin_src
+ \   /    \    |    |
+ \  |      \   |     \
+ |  |      /  |       |
+ |  |    /    |       |
+#+end_src
+
+In all the cases above the next character is shifted inappropriately with respect to the previous one
+and the edge looses continuity.
+
+Arguably, when it comes to the transition from a vertical '|' to and oblique '/' character,
+both relative columns look suboptimal.
+This library chooses to work with the cases where such transitions happen on the same column:
+
+#+begin_src
+      \         \
+good: |    bad:  |
+      /         /
+#+end_src
+
+Edges can come close to each other and still be recognized as long as they follow the same rules.
+So in the example below, A is connected do C, B to D, 1 to 3, 2 to 4, X to N, Y to P, Z to T:
+
+#+begin_src
+A  B     1   2     X Y Z    I  J   6  7
+ \ |      \ /       \|/      \/     \ |
+  \\       \\       |||      /\      \|
+   \\      | \      /|\     /  \     |\
+   ||      3  4    N P T   L    M    | \
+   /\                                8  9
+  C  D
+#+end_src
+
+Note that in some cases the rules of edge continuity might still yield surprising interpretation.
+So in the above example, I is connected to L, J to M, 6 to 8, and 7 to 9 -- the edges do not cross.
+
+Because of such surprises, it is better to avoid drawing edges close to each other,
+however, ASCIIDAG parser has no issue with it.
+
+***** Crossing
+
+Edges can cross using an explicit crossing point marked with 'X'.
+'X' can designate the crossing of two or three edges:
+
+#+begin_src
+A   B    C D E
+ \ /      \|/
+  X        X
+ / \      /|\
+F   G    H W Y
+#+end_src
+
+The crossed edges continue on the opposit side of the 'X'.
+In this example, A is considered connected to G, B to F; C to Y, D to W, and E to H.
+
+Two-edge crossings can also involve vertical edges
+but they might be surprising and hence are discouraged:
+
+#+begin_src
+  A B    C E    K N
+  |/      \|     \|
+  X        X      X
+ /|       / \    /|
+F G      H   Y  M L
+#+end_src
+
+Here A is connected to G, B to F, C to Y, E to H, K to L, and N to M.
+
+**** Nodes
+
+Nodes must be rectangular aggregations of characters.
+To be recognizable as nodes,
+the characters on the "border" of the rectangle must be mostly non-edge characters.
+You can use whitespace and edge characters within the rectangle.
+
+Here are the proper nodes:
+
+#+begin_src
+      one-word   multi   ########################
+                 line.   # with white space     #
+  A                      # and / | \ edge chars #
+                         ########################
+#+end_src
+
+And here are broken nodes that will not parse well:
+
+#+begin_src
+ \|   /##################\  uneven
+      |edge chars outside|  lines        "space in the top-line"
+      \##################/
+#+end_src
+
+**** Edge Connection
+
+All edges are directed from the node that has a character above the edge highest character
+to the node that has a character below the edge lowest character.
+
+Edges can start from the bottom line of a node or from its side,
+and finish at a top line of a node or on a side of a node.
+
+The node connected to the edge must have a character in the direction of the edge.
+
+Proper connections:
+
+#+begin_src
+ A  A    *** ***    $$$
+ |   \   *A*\*B*   /$$$
+ B    B  *** ***   \$$$
+                    $$$
+#+end_src
+
+In the three graphs above, A is connected to B, and the "$$" node is connected to itself (loop edge).
+
+Improper connections:
+
+#+begin_src
+  A  A    ***\***
+ |    \   *A* *B*
+ B    B   *** ***
+#+end_src
+
+In the examples above, the edge "misses" the A in the first graph, B in the second,
+and the 3x3 A node in the last graph.
+
+See unit tests in test/ for more examples of valid and invalid diagrams.
+
+*** Parsing
+
+Use `asciidag::parseDAG(std::string_view str, ParseError& err)` to parse your diagram.
+
+The function expects an ASCII string with one or more diagrams of DAGs following the rules above.
+
+The result is `class DAG` that stores the vector of nodes each containing the rectangular text and
+the vector of successor nodes.
+
+You can use `toDOT` to convert the dag into the [[https://graphviz.org/doc/info/lang.html][DOT language]] and render a non-ASCII version of it.
+
+*** Rendering
+
+Use `asciidag::renderDAG(DAG dag, RenderError& err)` to generate an `std::string` with ASCII diagram
+representing the provided DAG.
+
+** Applications
+
+The primary application is likely testing scaffolding that would enable you to specify
+inputs and/or outputs of your algorithms that work on graphs.
+
+For example:
+
+- you could specify the output AST of your parser
+- connectivity of your docker-compose deployment
+- connectivity of a simulated computer network
+- intermediate and final states of a Dijkstra graph search
+- file-system structure
+- expected dependency graph of a package
+
+** Testing
+
+In addition to unit tests,
+I use exhaustive and randomized testing for the parser and the render algorithms.
+See test/parseRenderTest.cpp
+
+Taking advantage of the fact that the library implements both,
+I can generate feasibly generate all graph configurations for graphs up to 7 nodes,
+and make sure that
+
+#+begin_src
+parse(render(graph)) -> graph
+#+end_src
+
+However, it is only feasible for a limited of node dimensions.
+
+For larger grahs and graphs with variable node dimensions,
+I use randomized selection.
+I've tested a few milions of graphs of up to 12 nodes and node width and length being between 1 and 10 characters.
+These tests take a long time so are only run ocasionally.
+
+** Contribution
+
+I do not expecte contributions to the project at this point.
+
+However if you are interested in improving or building upon this work,
+I am open to a chat.
+
+** Limitations
+
+At the moment this is rather proof of concept.
+
+- Performance of the render algorithm can likely be improved manyfold.
+- It lacks examples of applications.
+- The rendering does not look beautiful and can easily produce hard-to-read diagrams
+  for DAGs with many intersections.
+  Its heuristics also fail to avoid some obviously avoidable intersections.
+- There is no packaging story. Only the source code of the library is available without
+  any convenient package or build-configuration wrapped around it.
